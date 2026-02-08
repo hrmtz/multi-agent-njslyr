@@ -401,6 +401,7 @@ load_adapter_with() {
 # =============================================================================
 
 @test "validate_cli_availability: claude → 0 (インストール済み)" {
+    command -v claude >/dev/null 2>&1 || skip "claude not installed (CI environment)"
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
     run validate_cli_availability "claude"
     [ "$status" -eq 0 ]
