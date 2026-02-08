@@ -276,10 +276,10 @@ load_adapter_with() {
     [ "$result" = "claude --model opus --dangerously-skip-permissions" ]
 }
 
-@test "build_cli_command: codex → codex" {
+@test "build_cli_command: codex → codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
     result=$(build_cli_command "ashigaru5")
-    [ "$result" = "codex" ]
+    [ "$result" = "codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen" ]
 }
 
 @test "build_cli_command: copilot → copilot --yolo" {
@@ -288,16 +288,16 @@ load_adapter_with() {
     [ "$result" = "copilot --yolo" ]
 }
 
-@test "build_cli_command: kimi + model → kimi-cli --model k2.5" {
+@test "build_cli_command: kimi + model → kimi --yolo --model k2.5" {
     load_adapter_with "${TEST_TMP}/settings_kimi.yaml"
     result=$(build_cli_command "ashigaru3")
-    [ "$result" = "kimi-cli --model k2.5" ]
+    [ "$result" = "kimi --yolo --model k2.5" ]
 }
 
-@test "build_cli_command: kimi (モデル指定なし) → kimi-cli --model k2.5" {
+@test "build_cli_command: kimi (モデル指定なし) → kimi --yolo --model k2.5" {
     load_adapter_with "${TEST_TMP}/settings_kimi.yaml"
     result=$(build_cli_command "ashigaru4")
-    [ "$result" = "kimi-cli --model k2.5" ]
+    [ "$result" = "kimi --yolo --model k2.5" ]
 }
 
 @test "build_cli_command: cliセクションなし → claude フォールバック" {
