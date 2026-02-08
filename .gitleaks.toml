@@ -123,4 +123,5 @@ description = "ntfy topic name (acts as password)"
 regex = '''ntfy_topic:\s*["']?[a-zA-Z0-9_\-]{5,}["']?'''
 tags = ["ntfy", "secret"]
 [rules.allowlist]
-regexes = ['''ntfy_topic:\s*["']?shogun-yourname["']?''', '''ntfy_topic:\s*["']?your-topic["']?''']
+regexes = ['''ntfy_topic:\s*["']?shogun-yourname["']?''', '''ntfy_topic:\s*["']?your-topic["']?''', '''ntfy_topic:\s*["']?your-random-topic-name-here["']?''']
+paths = ['''SECURITY\.md''', '''config/ntfy_auth\.env\.sample''']

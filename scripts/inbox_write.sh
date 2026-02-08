@@ -72,9 +72,16 @@ try:
         # Keep all unread + newest 30 read messages
         data['messages'] = unread + read[-30:]
 
-    # Write back with consistent formatting (2-space indent)
-    with open('$INBOX', 'w') as f:
-        yaml.dump(data, f, default_flow_style=False, allow_unicode=True, indent=2)
+    # Atomic write: tmp file + rename (prevents partial reads)
+    import tempfile, os
+    tmp_fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname('$INBOX'), suffix='.tmp')
+    try:
+        with os.fdopen(tmp_fd, 'w') as f:
+            yaml.dump(data, f, default_flow_style=False, allow_unicode=True, indent=2)
+        os.replace(tmp_path, '$INBOX')
+    except:
+        os.unlink(tmp_path)
+        raise
 
 except Exception as e:
     print(f'ERROR: {e}', file=sys.stderr)

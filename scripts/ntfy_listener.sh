@@ -3,6 +3,7 @@
 # ntfy Input Listener
 # Streams messages from ntfy topic, writes to inbox YAML, wakes shogun.
 # NOT polling — uses ntfy's streaming endpoint (long-lived HTTP connection).
+# FR-066: ntfy認証対応 (Bearer token / Basic auth)
 # ═══════════════════════════════════════════════════════════════
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -10,15 +11,28 @@ SETTINGS="$SCRIPT_DIR/config/settings.yaml"
 TOPIC=$(grep 'ntfy_topic:' "$SETTINGS" | awk '{print $2}' | tr -d '"')
 INBOX="$SCRIPT_DIR/queue/ntfy_inbox.yaml"
 
+# ntfy_auth.sh読み込み
+# shellcheck source=../lib/ntfy_auth.sh
+source "$SCRIPT_DIR/lib/ntfy_auth.sh"
+
 if [ -z "$TOPIC" ]; then
     echo "[ntfy_listener] ntfy_topic not configured in settings.yaml" >&2
     exit 1
 fi
 
+# トピック名セキュリティ検証
+ntfy_validate_topic "$TOPIC" || true
+
 # Initialize inbox if not exists
 if [ ! -f "$INBOX" ]; then
     echo "inbox:" > "$INBOX"
 fi
+
+# 認証引数を取得（設定がなければ空 = 後方互換）
+AUTH_ARGS=()
+while IFS= read -r line; do
+    [ -n "$line" ] && AUTH_ARGS+=("$line")
+done < <(ntfy_get_auth_args "$SCRIPT_DIR/config/ntfy_auth.env")
 
 # JSON field extractor (python3 — jq not available)
 parse_json() {
@@ -29,11 +43,11 @@ parse_tags() {
     python3 -c "import sys,json; print(','.join(json.load(sys.stdin).get('tags',[])))" 2>/dev/null
 }
 
-echo "[$(date)] ntfy listener started — topic: $TOPIC" >&2
+echo "[$(date)] ntfy listener started — topic: $TOPIC (auth: ${NTFY_TOKEN:+token}${NTFY_USER:+basic}${NTFY_TOKEN:-${NTFY_USER:-none}})" >&2
 
 while true; do
     # Stream new messages (long-lived connection, blocks until message arrives)
-    curl -s --no-buffer "https://ntfy.sh/$TOPIC/json" 2>/dev/null | while IFS= read -r line; do
+    curl -s --no-buffer "${AUTH_ARGS[@]}" "https://ntfy.sh/$TOPIC/json" 2>/dev/null | while IFS= read -r line; do
         # Skip keepalive pings and non-message events
         EVENT=$(echo "$line" | parse_json event)
         [ "$EVENT" != "message" ] && continue
