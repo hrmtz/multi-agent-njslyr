@@ -1083,6 +1083,29 @@ ntfy_topic: "shogun-yourname"
 
 スマホの [ntfyアプリ](https://ntfy.sh) で同じトピックをサブスクライブしてください。リスナーは `shutsujin_departure.sh` で自動起動します。
 
+#### ntfy認証（セルフホストサーバ向け）
+
+公開の ntfy.sh インスタンスは**認証不要**です。上記の設定だけで動作します。
+
+セルフホストのntfyサーバでアクセス制御を有効にしている場合、認証を設定します：
+
+```bash
+# 1. サンプル設定をコピー
+cp config/ntfy_auth.env.sample config/ntfy_auth.env
+
+# 2. 認証情報を記入（いずれかの方式を選択）
+```
+
+| 方式 | 設定 | 用途 |
+|------|------|------|
+| **Bearerトークン**（推奨） | `NTFY_TOKEN=tk_your_token_here` | トークン認証のセルフホストntfy（`ntfy token add <user>` で生成） |
+| **Basic認証** | `NTFY_USER=ユーザー名` + `NTFY_PASS=パスワード` | ユーザー/パスワード認証のセルフホストntfy |
+| **認証なし**（デフォルト） | ファイルを空のままにするか作成しない | 公開の ntfy.sh — 認証不要 |
+
+優先順位: トークン > Basic認証 > なし。どちらも設定されていなければ、認証ヘッダは送信されません（後方互換）。
+
+`config/ntfy_auth.env` はgit追跡対象外です。詳細は `config/ntfy_auth.env.sample` を参照。
+
 ---
 
 ## 🛠️ 上級者向け
@@ -1233,6 +1256,10 @@ multi-agent-shogun/
 │       ├── claude_tools.md   # Claude Code ツール・機能
 │       └── copilot_tools.md  # GitHub Copilot CLI ツール・機能
 │
+├── lib/
+│   ├── cli_adapter.sh        # Multi-CLIアダプタ（Claude/Codex/Copilot/Kimi）
+│   └── ntfy_auth.sh          # ntfy認証ヘルパー
+│
 ├── scripts/                  # ユーティリティスクリプト
 │   ├── inbox_write.sh        # エージェントinboxへのメッセージ書き込み
 │   ├── inbox_watcher.sh      # inotifywaitでinbox変更を監視
@@ -1241,6 +1268,7 @@ multi-agent-shogun/
 │
 ├── config/
 │   ├── settings.yaml         # 言語、ntfy、その他の設定
+│   ├── ntfy_auth.env.sample  # ntfy認証テンプレート（セルフホスト用）
 │   └── projects.yaml         # プロジェクト一覧
 │
 ├── projects/                 # プロジェクト詳細（git対象外、機密情報含む）

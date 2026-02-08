@@ -1107,6 +1107,29 @@ ntfy_topic: "shogun-yourname"
 
 Subscribe to the same topic in the [ntfy app](https://ntfy.sh) on your phone. The listener starts automatically with `shutsujin_departure.sh`.
 
+#### ntfy Authentication (Self-Hosted Servers)
+
+The public ntfy.sh instance requires **no authentication** — the setup above is all you need.
+
+If you run a self-hosted ntfy server with access control enabled, configure authentication:
+
+```bash
+# 1. Copy the sample config
+cp config/ntfy_auth.env.sample config/ntfy_auth.env
+
+# 2. Edit with your credentials (choose one method)
+```
+
+| Method | Config | When to use |
+|--------|--------|-------------|
+| **Bearer Token** (recommended) | `NTFY_TOKEN=tk_your_token_here` | Self-hosted ntfy with token auth (`ntfy token add <user>`) |
+| **Basic Auth** | `NTFY_USER=username` + `NTFY_PASS=password` | Self-hosted ntfy with user/password |
+| **None** (default) | Leave file empty or don't create it | Public ntfy.sh — no auth needed |
+
+Priority: Token > Basic > None. If neither is set, no auth headers are sent (backward compatible).
+
+`config/ntfy_auth.env` is excluded from git. See `config/ntfy_auth.env.sample` for details.
+
 ---
 
 ## Advanced
@@ -1257,6 +1280,10 @@ multi-agent-shogun/
 │       ├── claude_tools.md   # Claude Code tools & features
 │       └── copilot_tools.md  # GitHub Copilot CLI tools & features
 │
+├── lib/
+│   ├── cli_adapter.sh        # Multi-CLI adapter (Claude/Codex/Copilot/Kimi)
+│   └── ntfy_auth.sh          # ntfy authentication helper
+│
 ├── scripts/                  # Utility scripts
 │   ├── inbox_write.sh        # Write messages to agent inbox
 │   ├── inbox_watcher.sh      # Watch inbox changes via inotifywait
@@ -1265,6 +1292,7 @@ multi-agent-shogun/
 │
 ├── config/
 │   ├── settings.yaml         # Language, ntfy, and other settings
+│   ├── ntfy_auth.env.sample  # ntfy authentication template (self-hosted)
 │   └── projects.yaml         # Project registry
 │
 ├── projects/                 # Project details (excluded from git, contains confidential info)
