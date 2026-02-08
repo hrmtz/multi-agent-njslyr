@@ -501,26 +501,47 @@ Session 2: AI loads memory on startup
             → Stops suggesting complex solutions
 ```
 
-### 📡 4. Event-Driven (Zero Polling)
+### 📡 4. Event-Driven Communication (Zero Polling)
 
-Agents communicate through file-based mailbox (inbox_write.sh + inbox_watcher.sh). **No polling loops wasting API calls.**
+Agents talk to each other by writing YAML files — like passing notes. **No polling loops, no wasted API calls.**
 
-**Three-Layer Architecture (Layered Hybrid v3.1):**
+```
+Karo wants to wake Ashigaru 3:
 
-- **Layer 1: File Persistence**
-  - `inbox_write.sh` writes messages to `queue/inbox/{agent}.yaml` with flock (exclusive lock)
-  - Full message content stored in YAML — guaranteed persistence
-  - Multiple agents can write simultaneously (flock serializes writes)
+Step 1: Write the message          Step 2: Wake the agent up
+┌──────────────────────┐           ┌──────────────────────────┐
+│ inbox_write.sh       │           │ inbox_watcher.sh         │
+│                      │           │                          │
+│ Writes full message  │  file     │ Detects file change      │
+│ to ashigaru3.yaml    │──change──▶│ (inotifywait, not poll)  │
+│ with flock (no race) │           │                          │
+└──────────────────────┘           │ Wakes agent via:         │
+                                   │  1. Self-watch (skip)    │
+                                   │  2. paste-buffer (safe)  │
+                                   │  3. Enter key only       │
+                                   └──────────────────────────┘
 
-- **Layer 2: Wake-Up Delivery** (3-tier fallback)
-  - `inbox_watcher.sh` detects file changes via `inotifywait` (kernel event, not polling)
-  - **Tier 1 — Self-Watch**: If the agent runs its own `inotifywait` on its inbox file, no nudge is needed (agent wakes itself)
-  - **Tier 2 — Paste-Buffer**: `tmux set-buffer` + `tmux paste-buffer` writes a short nudge directly to the agent's terminal input (no key-binding interference)
-  - **Tier 3 — send-keys**: Only used for `Enter` key after paste-buffer, and for CLI commands (`/clear`, `/model`)
-  - Agent reads its own inbox file and processes unread messages
+Step 3: Agent reads its own inbox
+┌──────────────────────────────────┐
+│ Ashigaru 3 reads ashigaru3.yaml  │
+│ → Finds unread messages          │
+│ → Processes them                 │
+│ → Marks as read                  │
+└──────────────────────────────────┘
+```
 
-- **Zero CPU**: Watcher blocks on `inotifywait` until file modification event (CPU 0% while idle)
-- **Zero send-keys for content**: Message content never travels through send-keys — eliminates character corruption and transmission hangs
+**How the wake-up works (3-tier fallback):**
+
+| Priority | Method | What happens | When used |
+|----------|--------|-------------|-----------|
+| 1st | **Self-Watch** | Agent watches its own inbox file — wakes itself, no nudge needed | Agent has its own `inotifywait` running |
+| 2nd | **Paste-Buffer** | Writes a short nudge directly into the agent's terminal input | Default fallback — reliable, no key conflicts |
+| 3rd | **Enter key** | Sends Enter to confirm the pasted nudge | Always follows paste-buffer |
+
+**Key design choices:**
+- **Message content is never sent through tmux** — only a short "you have mail" nudge. The agent reads its own file. This eliminates character corruption and transmission hangs.
+- **Zero CPU while idle** — `inotifywait` blocks on a kernel event (not a poll loop). CPU usage is 0% between messages.
+- **Guaranteed delivery** — If the file write succeeded, the message is there. No lost messages, no retries needed.
 
 ### 📸 5. Screenshot Integration
 
@@ -940,13 +961,16 @@ These principles are documented in detail: **[docs/philosophy.md](docs/philosoph
 
 ### Why Mailbox System?
 
-1. **State persistence**: YAML files provide structured communication that survives agent restarts
-2. **No polling needed**: `inotifywait` is event-driven (kernel-level), reducing API costs to zero during idle
-3. **No interruptions**: Prevents agents from interrupting each other or your input
-4. **Easy debugging**: Humans can read inbox YAML files directly to understand message flow
-5. **No conflicts**: `flock` (exclusive lock) prevents concurrent writes — multiple agents can send simultaneously without race conditions
-6. **Guaranteed delivery**: File write succeeded = message will be delivered. No delivery verification needed, no false negatives
-7. **Layered Hybrid delivery (v3.1)**: Three-tier wake-up: (1) agent self-watch via `inotifywait` (zero nudge needed), (2) `paste-buffer` fallback (writes directly to terminal input), (3) `send-keys` only for Enter key. Message content never travels through send-keys — eliminates character corruption and transmission hangs that plagued earlier approaches.
+Why use files instead of direct messaging between agents?
+
+| Problem with direct messaging | How mailbox solves it |
+|-------------------------------|----------------------|
+| Agent crashes → message lost | YAML files survive restarts |
+| Polling wastes API calls | `inotifywait` is event-driven (zero CPU while idle) |
+| Agents interrupt each other | Each agent has its own inbox file — no cross-talk |
+| Hard to debug | Open any `.yaml` file to see exact message history |
+| Concurrent writes corrupt data | `flock` (exclusive lock) serializes writes automatically |
+| Delivery failures (character corruption, hangs) | Message content stays in files — only a short "you have mail" nudge is sent through tmux |
 
 ### Agent Identification (@agent_id)
 
