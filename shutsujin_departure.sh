@@ -775,11 +775,7 @@ NINJA_EOF
     pkill -f "inotifywait.*queue/inbox" 2>/dev/null || true
     sleep 1
 
-    # 将軍のwatcher（CLI種別を第3引数で渡す）
-    _shogun_watcher_cli=$(tmux show-options -p -t "shogun:main" -v @agent_cli 2>/dev/null || echo "claude")
-    nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" shogun "shogun:main" "$_shogun_watcher_cli" \
-        &>> "$SCRIPT_DIR/logs/inbox_watcher_shogun.log" &
-    disown
+    # 将軍のwatcherは不要（殿が直接操作するペインのため、nudgeが邪魔になる）
 
     # 家老のwatcher
     _karo_watcher_cli=$(tmux show-options -p -t "multiagent:agents.${PANE_BASE}" -v @agent_cli 2>/dev/null || echo "claude")
@@ -796,7 +792,7 @@ NINJA_EOF
         disown
     done
 
-    log_success "  └─ 10エージェント分のinbox_watcher起動完了"
+    log_success "  └─ 9エージェント分のinbox_watcher起動完了（将軍は除外）"
 
     # STEP 6.7 は廃止 — CLAUDE.md Session Start (step 1: tmux agent_id) で各自が自律的に
     # 自分のinstructions/*.mdを読み込む。検証済み (2026-02-08)。
