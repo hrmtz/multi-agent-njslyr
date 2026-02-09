@@ -30,13 +30,25 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-yaml
 
-      - name: Run root-level tests (inbox_write.sh etc.)
+      - name: Run root-level tests (except agent_selfwatch)
         run: |
-          if ls tests/*.bats 1>/dev/null 2>&1; then
-            bats tests/*.bats --timing
+          ROOT_TESTS=$(ls tests/*.bats 2>/dev/null | grep -v 'tests/agent_selfwatch.bats' || true)
+          if [ -n "$ROOT_TESTS" ]; then
+            bats $ROOT_TESTS --timing
           else
-            echo "::warning::No root-level test files found"
+            echo "::warning::No root-level bats files found (excluding agent_selfwatch)"
           fi
+
+      - name: Run agent self-watch unit tests
+        run: |
+          if [ ! -f tests/agent_selfwatch.bats ]; then
+            echo "::error::tests/agent_selfwatch.bats not found"
+            exit 1
+          fi
+          bats tests/agent_selfwatch.bats --timing || {
+            echo "::error::Agent self-watch tests failed"
+            exit 1
+          }
 
       - name: Run unit tests
         run: |

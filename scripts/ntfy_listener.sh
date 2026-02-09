@@ -10,6 +10,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SETTINGS="$SCRIPT_DIR/config/settings.yaml"
 TOPIC=$(grep 'ntfy_topic:' "$SETTINGS" | awk '{print $2}' | tr -d '"')
 INBOX="$SCRIPT_DIR/queue/ntfy_inbox.yaml"
+LOCKFILE="${INBOX}.lock"
+CORRUPT_DIR="$SCRIPT_DIR/logs/ntfy_inbox_corrupt"
 
 # ntfy_auth.sh読み込み
 # shellcheck source=../lib/ntfy_auth.sh
@@ -43,6 +45,92 @@ parse_tags() {
     python3 -c "import sys,json; print(','.join(json.load(sys.stdin).get('tags',[])))" 2>/dev/null
 }
 
+append_ntfy_inbox() {
+    local msg_id="$1"
+    local ts="$2"
+    local msg="$3"
+
+    (
+        flock -w 5 200 || exit 1
+        NTFY_INBOX_PATH="$INBOX" \
+        NTFY_CORRUPT_DIR="$CORRUPT_DIR" \
+        MSG_ID="$msg_id" \
+        MSG_TS="$ts" \
+        MSG_TEXT="$msg" \
+        python3 - << 'PY'
+import datetime
+import os
+import shutil
+import sys
+import tempfile
+import yaml
+
+path = os.environ["NTFY_INBOX_PATH"]
+corrupt_dir = os.environ.get("NTFY_CORRUPT_DIR", "")
+entry = {
+    "id": os.environ.get("MSG_ID", ""),
+    "timestamp": os.environ.get("MSG_TS", ""),
+    "message": os.environ.get("MSG_TEXT", ""),
+    "status": "pending",
+}
+
+data = {}
+parse_error = False
+
+if os.path.exists(path):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            loaded = yaml.safe_load(f)
+        if isinstance(loaded, dict):
+            data = loaded
+        elif loaded is None:
+            data = {}
+        else:
+            parse_error = True
+    except Exception:
+        parse_error = True
+
+if parse_error and os.path.exists(path):
+    try:
+        if corrupt_dir:
+            os.makedirs(corrupt_dir, exist_ok=True)
+            backup = os.path.join(
+                corrupt_dir,
+                f"ntfy_inbox_corrupt_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.yaml",
+            )
+            shutil.copy2(path, backup)
+    except Exception:
+        pass
+    data = {}
+
+items = data.get("inbox")
+if not isinstance(items, list):
+    items = []
+items.append(entry)
+data["inbox"] = items
+
+tmp_fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
+try:
+    with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+        yaml.safe_dump(
+            data,
+            f,
+            default_flow_style=False,
+            allow_unicode=True,
+            sort_keys=False,
+        )
+    os.replace(tmp_path, path)
+except Exception as e:
+    try:
+        os.unlink(tmp_path)
+    except Exception:
+        pass
+    print(f"[ntfy_listener] failed to write inbox: {e}", file=sys.stderr)
+    sys.exit(1)
+PY
+    ) 200>"$LOCKFILE"
+}
+
 echo "[$(date)] ntfy listener started — topic: $TOPIC (auth: ${NTFY_TOKEN:+token}${NTFY_USER:+basic}${NTFY_TOKEN:-${NTFY_USER:-none}})" >&2
 
 while true; do
@@ -65,13 +153,11 @@ while true; do
 
         echo "[$(date)] Received: $MSG" >&2
 
-        # Append to inbox YAML
-        cat >> "$INBOX" << ENTRY
-  - id: "$MSG_ID"
-    timestamp: "$TIMESTAMP"
-    message: "$MSG"
-    status: pending
-ENTRY
+        # Append to inbox YAML (flock + atomic write; multiline-safe)
+        if ! append_ntfy_inbox "$MSG_ID" "$TIMESTAMP" "$MSG"; then
+            echo "[$(date)] [ntfy_listener] WARNING: failed to append ntfy_inbox entry" >&2
+            continue
+        fi
 
         # Wake shogun via inbox
         bash "$SCRIPT_DIR/scripts/inbox_write.sh" shogun \

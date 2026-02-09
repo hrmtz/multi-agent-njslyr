@@ -30,6 +30,10 @@
 #   T-CODEX-004: C-u NOT sent when agent is busy
 #   T-CODEX-005: send_cli_command — claude /clear passes through as-is
 #   T-CODEX-006: inbox_watcher.sh has agent_is_busy and Codex/Copilot handlers
+#   T-CODEX-007: pane @agent_cli=codex overrides stale CLI_TYPE (Phase2 C-c抑止)
+#   T-CODEX-008: pane @agent_cli=codex overrides stale CLI_TYPE (/clear→/new)
+#   T-CODEX-009: normalize_special_command rejects invalid model_switch payload
+#   T-CODEX-010: unresolved CLI type falls back to codex-safe path
 #   T-COPILOT-001: send_cli_command — copilot /clear → Ctrl-C + restart
 #   T-COPILOT-002: send_cli_command — copilot /model → skip
 
@@ -64,6 +68,7 @@ MOCK
     # Default mock control variables
     export MOCK_CAPTURE_PANE=""
     export MOCK_SENDKEYS_RC=0
+    export MOCK_PANE_CLI=""
 
     # Test harness: sets up mocks, then sources the REAL inbox_watcher.sh
     # __INBOX_WATCHER_TESTING__=1 skips arg parsing, inotifywait check, and main loop.
@@ -88,6 +93,10 @@ tmux() {
     fi
     if echo "\$*" | grep -q "send-keys"; then
         return \${MOCK_SENDKEYS_RC:-0}
+    fi
+    if echo "\$*" | grep -q "show-options"; then
+        echo "\${MOCK_PANE_CLI:-}"
+        return 0
     fi
     if echo "\$*" | grep -q "display-message"; then
         echo "mock_pane"
@@ -516,6 +525,65 @@ MOCK
     # Copilot handler exists
     grep -q 'copilot --yolo' "$WATCHER_SCRIPT"
     grep -q 'not supported on copilot' "$WATCHER_SCRIPT"
+}
+
+# --- T-CODEX-007: pane cli overrides stale CLI_TYPE in Phase2 ---
+
+@test "T-CODEX-007: pane @agent_cli=codex overrides stale CLI_TYPE for Phase2 (no C-c)" {
+    run bash -c '
+        MOCK_PANE_CLI="codex"
+        source "'"$TEST_HARNESS"'"
+        CLI_TYPE="claude"
+        send_wakeup_with_escape 2
+    '
+    [ "$status" -eq 0 ]
+
+    grep -q "send-keys.*Escape" "$MOCK_LOG"
+    grep -q "send-keys.*inbox2" "$MOCK_LOG"
+    ! grep -q "send-keys.*C-c" "$MOCK_LOG"
+}
+
+# --- T-CODEX-008: pane cli overrides stale CLI_TYPE in /clear path ---
+
+@test "T-CODEX-008: pane @agent_cli=codex overrides stale CLI_TYPE for /clear (uses /new)" {
+    run bash -c '
+        MOCK_PANE_CLI="codex"
+        source "'"$TEST_HARNESS"'"
+        CLI_TYPE="claude"
+        send_cli_command "/clear"
+    '
+    [ "$status" -eq 0 ]
+
+    grep -q "send-keys.*/new" "$MOCK_LOG"
+    ! grep -q "send-keys.*/clear" "$MOCK_LOG"
+    ! grep -q "send-keys.*C-c" "$MOCK_LOG"
+}
+
+# --- T-CODEX-009: invalid model_switch payload is rejected ---
+
+@test "T-CODEX-009: normalize_special_command rejects invalid model_switch payload" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        cmd=$(normalize_special_command "model_switch" "please change model" 2>/dev/null)
+        [ -z "$cmd" ]
+    '
+    [ "$status" -eq 0 ]
+}
+
+# --- T-CODEX-010: unresolved cli falls back to codex-safe ---
+
+@test "T-CODEX-010: unresolved CLI type falls back to codex-safe (/clear->/new, no C-c)" {
+    run bash -c '
+        MOCK_PANE_CLI=""
+        source "'"$TEST_HARNESS"'"
+        CLI_TYPE="unknown_cli"
+        send_cli_command "/clear"
+    '
+    [ "$status" -eq 0 ]
+
+    grep -q "send-keys.*/new" "$MOCK_LOG"
+    ! grep -q "send-keys.*/clear" "$MOCK_LOG"
+    ! grep -q "send-keys.*C-c" "$MOCK_LOG"
 }
 
 # --- T-COPILOT-001: copilot /clear → Ctrl-C + restart ---

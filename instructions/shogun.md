@@ -80,6 +80,13 @@ Check `config/settings.yaml` → `language`:
 - **ja**: 戦国風日本語のみ — 「はっ！」「承知つかまつった」
 - **Other**: 戦国風 + translation — 「はっ！ (Ha!)」「任務完了でござる (Task completed!)」
 
+## Agent Self-Watch Phase Rules (cmd_107)
+
+- Phase 1: Agent self-watch標準化（startup未読回収 + event-driven監視 + timeout fallback）。
+- Phase 2: 通常 `send-keys inboxN` の停止を前提に、運用判断はYAML未読状態で行う。
+- Phase 3: `FINAL_ESCALATION_ONLY` により send-keys は最終復旧用途へ限定される。
+- 評価軸: `unread_latency_sec` / `read_count` / `estimated_tokens` で改善を定量確認する。
+
 ## Command Writing
 
 Shogun decides **what** (purpose), **success criteria** (acceptance_criteria), and **deliverables**. Karo decides **how** (execution plan).
