@@ -19,6 +19,14 @@
 #   T-ESC-003: escalation — unread 2-4min → Escape+nudge
 #   T-ESC-004: escalation — unread > 4min → /clear sent
 #   T-ESC-005: escalation — /clear cooldown → falls back to Escape+nudge
+#   T-BUSY-001: agent_is_busy — detects "Working" in pane
+#   T-BUSY-002: agent_is_busy — idle pane returns 1
+#   T-BUSY-003: send_wakeup — skips when agent is busy
+#   T-BUSY-004: send_wakeup_with_escape — skips when agent is busy
+#   T-CODEX-001: send_cli_command — codex /clear → /new conversion
+#   T-CODEX-002: send_cli_command — codex /model → skip
+#   T-CODEX-003: C-u sent when unread=0 and agent is idle
+#   T-CODEX-004: C-u NOT sent when agent is busy
 
 # --- セットアップ ---
 
@@ -102,6 +110,21 @@ agent_has_self_watch() {
     pgrep -f "inotifywait.*inbox/\${AGENT_ID}.yaml" >/dev/null 2>&1
 }
 
+# agent_is_busy — check if CLI is processing (Working/Thinking)
+# Uses MOCK_CAPTURE_PANE env var to control test output
+agent_is_busy() {
+    local pane_content
+    if [ -n "\${MOCK_CAPTURE_PANE:-}" ]; then
+        pane_content="\$MOCK_CAPTURE_PANE"
+    else
+        pane_content=\$(timeout 2 tmux capture-pane -t "\$PANE_TARGET" -p 2>/dev/null | tail -15)
+    fi
+    if echo "\$pane_content" | grep -qiE '(Working|Thinking|Planning|Sending|esc to interrupt)'; then
+        return 0
+    fi
+    return 1
+}
+
 # send_wakeup — tmux send-keys (短いnudge + Enter, timeout 5s)
 send_wakeup() {
     local unread_count="\$1"
@@ -109,6 +132,11 @@ send_wakeup() {
 
     if agent_has_self_watch; then
         echo "[SKIP] Agent \$AGENT_ID has active self-watch" >&2
+        return 0
+    fi
+
+    if agent_is_busy; then
+        echo "[SKIP] Agent \$AGENT_ID is busy (Working), deferring nudge" >&2
         return 0
     fi
 
@@ -123,10 +151,26 @@ send_wakeup() {
     return 1
 }
 
-# send_cli_command — tmux send-keys with C-c prefix
+# send_cli_command — CLI_TYPE別分岐あり
 send_cli_command() {
     local cmd="\$1"
     local actual_cmd="\$cmd"
+
+    case "\$CLI_TYPE" in
+        codex)
+            if [[ "\$cmd" == "/clear" ]]; then
+                echo "SENDKEYS_CLI:/new" >> "$PTY_LOG"
+                echo "[SEND-KEYS] Codex /clear→/new" >&2
+                timeout 5 tmux send-keys -t "\$PANE_TARGET" "/new" Enter 2>/dev/null
+                return 0
+            fi
+            if [[ "\$cmd" == /model* ]]; then
+                echo "SKIP_MODEL:\$cmd" >> "$PTY_LOG"
+                echo "[SKIP] \$cmd not supported on codex" >&2
+                return 0
+            fi
+            ;;
+    esac
 
     echo "[SEND-KEYS] Sending CLI command: \$actual_cmd" >&2
     timeout 5 tmux send-keys -t "\$PANE_TARGET" C-c 2>/dev/null
@@ -148,6 +192,11 @@ send_wakeup_with_escape() {
     local nudge="inbox\${unread_count}"
 
     if agent_has_self_watch; then
+        return 0
+    fi
+
+    if agent_is_busy; then
+        echo "[SKIP] Agent \$AGENT_ID is busy (Working), deferring Phase 2 nudge" >&2
         return 0
     fi
 
@@ -411,4 +460,171 @@ MOCK
     echo "$output" | grep -q "COOLDOWN_FALLBACK"
     grep -q "SENDKEYS_ESC_NUDGE:inbox4" "$PTY_LOG"
     ! grep -q "SENDKEYS_CLI" "$PTY_LOG"
+}
+
+# --- T-BUSY-001: agent_is_busy detects "Working" ---
+
+@test "T-BUSY-001: agent_is_busy returns 0 when pane shows Working" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        MOCK_CAPTURE_PANE="◦ Working on task (12s • esc to interrupt)"
+        agent_is_busy
+    '
+    [ "$status" -eq 0 ]
+}
+
+# --- T-BUSY-002: agent_is_busy returns 1 when idle ---
+
+@test "T-BUSY-002: agent_is_busy returns 1 when pane is idle" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        MOCK_CAPTURE_PANE="› Summarize recent commits
+  ? for shortcuts                100% context left"
+        agent_is_busy
+    '
+    [ "$status" -eq 1 ]
+}
+
+# --- T-BUSY-003: send_wakeup skips when agent is busy ---
+
+@test "T-BUSY-003: send_wakeup skips nudge when agent is busy" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        MOCK_CAPTURE_PANE="◦ Thinking about approach (5s • esc to interrupt)"
+        send_wakeup 3
+    '
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "SKIP.*busy"
+
+    # No nudge should have been sent
+    [ ! -s "$PTY_LOG" ]
+}
+
+# --- T-BUSY-004: send_wakeup_with_escape skips when agent is busy ---
+
+@test "T-BUSY-004: send_wakeup_with_escape skips when agent is busy" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        MOCK_CAPTURE_PANE="◦ Sending request (2s • esc to interrupt)"
+        send_wakeup_with_escape 2
+    '
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "SKIP.*busy"
+
+    # No nudge should have been sent
+    [ ! -s "$PTY_LOG" ]
+}
+
+# --- T-CODEX-001: codex /clear → /new conversion ---
+
+@test "T-CODEX-001: send_cli_command converts /clear to /new for codex" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        CLI_TYPE="codex"
+        send_cli_command "/clear"
+    '
+    [ "$status" -eq 0 ]
+
+    # Should send /new, NOT /clear
+    grep -q "SENDKEYS_CLI:/new" "$PTY_LOG"
+    ! grep -q "SENDKEYS_CLI:/clear" "$PTY_LOG"
+
+    # Verify /new was in tmux send-keys call
+    grep -q "send-keys.*/new" "$MOCK_LOG"
+}
+
+# --- T-CODEX-002: codex /model → skip ---
+
+@test "T-CODEX-002: send_cli_command skips /model for codex" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        CLI_TYPE="codex"
+        send_cli_command "/model opus"
+    '
+    [ "$status" -eq 0 ]
+
+    # Should log skip, NOT send /model
+    grep -q "SKIP_MODEL:/model opus" "$PTY_LOG"
+    ! grep -q "SENDKEYS_CLI:/model" "$PTY_LOG"
+}
+
+# --- T-CODEX-003: C-u sent when unread=0 and agent is idle ---
+
+@test "T-CODEX-003: C-u cleanup sent when no unread and agent is idle" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        MOCK_CAPTURE_PANE="› Summarize recent commits
+  ? for shortcuts                100% context left"
+        # Simulate no unread
+        FIRST_UNREAD_SEEN=12345
+        normal_count=0
+        if [ "$normal_count" -gt 0 ] 2>/dev/null; then
+            echo "SHOULD_NOT_REACH"
+        else
+            FIRST_UNREAD_SEEN=0
+            if ! agent_is_busy; then
+                timeout 2 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
+                echo "C_U_SENT"
+            fi
+        fi
+    '
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "C_U_SENT"
+    grep -q "send-keys.*C-u" "$MOCK_LOG"
+}
+
+# --- T-CODEX-004: C-u NOT sent when agent is busy ---
+
+@test "T-CODEX-004: C-u cleanup NOT sent when agent is busy" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        MOCK_CAPTURE_PANE="◦ Working on request (10s • esc to interrupt)"
+        FIRST_UNREAD_SEEN=12345
+        normal_count=0
+        if [ "$normal_count" -gt 0 ] 2>/dev/null; then
+            echo "SHOULD_NOT_REACH"
+        else
+            FIRST_UNREAD_SEEN=0
+            if ! agent_is_busy; then
+                timeout 2 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
+                echo "C_U_SENT"
+            else
+                echo "C_U_SKIPPED"
+            fi
+        fi
+    '
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "C_U_SKIPPED"
+    ! grep -q "C-u" "$MOCK_LOG"
+}
+
+# --- T-CODEX-005: claude /clear passes through as-is ---
+
+@test "T-CODEX-005: send_cli_command sends /clear as-is for claude" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        CLI_TYPE="claude"
+        send_cli_command "/clear"
+    '
+    [ "$status" -eq 0 ]
+
+    # Should send /clear directly (not /new)
+    grep -q "SENDKEYS_CLI:/clear" "$PTY_LOG"
+    ! grep -q "/new" "$PTY_LOG"
+}
+
+# --- T-CODEX-006: inbox_watcher.sh has agent_is_busy function ---
+
+@test "T-CODEX-006: inbox_watcher.sh contains agent_is_busy and Codex handlers" {
+    grep -q "agent_is_busy()" "$WATCHER_SCRIPT"
+    grep -q 'Working|Thinking|Planning|Sending' "$WATCHER_SCRIPT"
+
+    # Codex /clear → /new conversion exists
+    grep -q '/new' "$WATCHER_SCRIPT"
+
+    # Codex /model skip exists
+    grep -q 'not supported on codex' "$WATCHER_SCRIPT"
+
+    # C-u cleanup exists
+    grep -q 'C-u' "$WATCHER_SCRIPT"
 }
