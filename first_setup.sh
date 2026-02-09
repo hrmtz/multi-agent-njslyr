@@ -247,6 +247,83 @@ else
 fi
 
 # ============================================================
+# STEP 4.5: Python3 / PyYAML / inotify-tools チェック
+# ============================================================
+log_step "STEP 4.5: Python3 / PyYAML / inotify-tools チェック"
+
+# --- python3 ---
+if command -v python3 &> /dev/null; then
+    PY3_VERSION=$(python3 --version 2>&1)
+    log_success "python3 がインストール済みです ($PY3_VERSION)"
+    RESULTS+=("python3: OK ($PY3_VERSION)")
+else
+    log_warn "python3 がインストールされていません"
+    if command -v apt-get &> /dev/null; then
+        log_info "python3 をインストール中..."
+        sudo apt-get update -qq 2>/dev/null
+        if sudo apt-get install -y python3 2>/dev/null; then
+            PY3_VERSION=$(python3 --version 2>&1)
+            log_success "python3 インストール完了 ($PY3_VERSION)"
+            RESULTS+=("python3: インストール完了 ($PY3_VERSION)")
+        else
+            log_error "python3 のインストールに失敗しました"
+            RESULTS+=("python3: インストール失敗")
+            HAS_ERROR=true
+        fi
+    else
+        log_error "apt-get が見つかりません。手動で python3 をインストールしてください"
+        RESULTS+=("python3: 未インストール (手動インストール必要)")
+        HAS_ERROR=true
+    fi
+fi
+
+# --- PyYAML (python3-yaml) ---
+if python3 -c "import yaml" 2>/dev/null; then
+    log_success "PyYAML がインストール済みです"
+    RESULTS+=("PyYAML: OK")
+else
+    log_warn "PyYAML がインストールされていません"
+    if command -v apt-get &> /dev/null; then
+        log_info "python3-yaml をインストール中..."
+        if sudo apt-get install -y python3-yaml 2>/dev/null; then
+            log_success "python3-yaml インストール完了"
+            RESULTS+=("PyYAML: インストール完了")
+        else
+            log_error "python3-yaml のインストールに失敗しました"
+            RESULTS+=("PyYAML: インストール失敗")
+            HAS_ERROR=true
+        fi
+    else
+        log_error "apt-get が見つかりません。手動で python3-yaml をインストールしてください"
+        RESULTS+=("PyYAML: 未インストール (手動インストール必要)")
+        HAS_ERROR=true
+    fi
+fi
+
+# --- inotify-tools (inotifywait) ---
+if command -v inotifywait &> /dev/null; then
+    log_success "inotify-tools がインストール済みです"
+    RESULTS+=("inotify-tools: OK")
+else
+    log_warn "inotify-tools がインストールされていません"
+    if command -v apt-get &> /dev/null; then
+        log_info "inotify-tools をインストール中..."
+        if sudo apt-get install -y inotify-tools 2>/dev/null; then
+            log_success "inotify-tools インストール完了"
+            RESULTS+=("inotify-tools: インストール完了")
+        else
+            log_error "inotify-tools のインストールに失敗しました"
+            RESULTS+=("inotify-tools: インストール失敗")
+            HAS_ERROR=true
+        fi
+    else
+        log_error "apt-get が見つかりません。手動で inotify-tools をインストールしてください"
+        RESULTS+=("inotify-tools: 未インストール (手動インストール必要)")
+        HAS_ERROR=true
+    fi
+fi
+
+# ============================================================
 # STEP 5: Claude Code CLI チェック（ネイティブ版）
 # ※ npm版は公式非推奨（deprecated）。ネイティブ版を使用する。
 #    Node.jsはMCPサーバー（npx経由）で引き続き必要。
