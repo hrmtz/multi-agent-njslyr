@@ -6,7 +6,7 @@
 #
 # 設計思想:
 #   メッセージ本体はファイル（inbox YAML）に書く = 確実
-#   起動シグナルは pty直接書き込み = tmux完全バイパス、send-keys不使用
+#   起動シグナルは tmux send-keys（テキストとEnterを分離送信）
 #   エージェントが自分でinboxをReadして処理する
 #   冪等: 2回届いてもunreadがなければ何もしない
 #
@@ -15,7 +15,7 @@
 # Fallback 2: rc=1処理（Claude Code atomic write = tmp+rename でinode変更時）
 #
 # エスカレーション（未読メッセージが放置されている場合）:
-#   0〜2分: 通常nudge（pty direct write）
+#   0〜2分: 通常nudge（send-keys）。ただしWorking中はスキップ
 #   2〜4分: Escape×2 + nudge（カーソル位置バグ対策）
 #   4分〜 : /clear送信（5分に1回まで。強制リセット+YAML再読）
 # ═══════════════════════════════════════════════════════════════
@@ -103,7 +103,20 @@ send_cli_command() {
     local actual_cmd="$cmd"
     case "$CLI_TYPE" in
         codex)
-            # Codex: /clear対応（TUIモード）, /model非対応→スキップ
+            # Codex: /clearはセッション終了→再起動が必要, /model非対応→スキップ
+            if [[ "$cmd" == "/clear" ]]; then
+                echo "[$(date)] [SEND-KEYS] Codex /clear: sending /clear + restart for $AGENT_ID" >&2
+                timeout 5 tmux send-keys -t "$PANE_TARGET" "/clear" 2>/dev/null
+                sleep 0.3
+                timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+                sleep 3
+                # Codex exits to bash after /clear — restart it
+                timeout 5 tmux send-keys -t "$PANE_TARGET" "codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen" 2>/dev/null
+                sleep 0.3
+                timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+                sleep 5
+                return 0
+            fi
             if [[ "$cmd" == /model* ]]; then
                 echo "[$(date)] Skipping $cmd (not supported on codex)" >&2
                 return 0
@@ -152,10 +165,26 @@ agent_has_self_watch() {
     pgrep -f "inotifywait.*inbox/${AGENT_ID}.yaml" >/dev/null 2>&1
 }
 
+# ─── Agent busy detection ───
+# Check if the agent's CLI is currently processing (Working/thinking/etc).
+# Sending nudge during Working causes text to queue but Enter to be lost.
+# Returns 0 (true) if agent is busy, 1 if idle.
+agent_is_busy() {
+    local pane_content
+    pane_content=$(timeout 2 tmux capture-pane -t "$PANE_TARGET" -p 2>/dev/null | tail -15)
+    # Codex CLI: "Working", "Thinking", "Planning", "Sending"
+    # Claude CLI: thinking spinner, tool execution
+    if echo "$pane_content" | grep -qiE '(Working|Thinking|Planning|Sending|esc to interrupt)'; then
+        return 0  # busy
+    fi
+    return 1  # idle
+}
+
 # ─── Send wake-up nudge ───
 # Layered approach:
 #   1. If agent has active inotifywait self-watch → skip (agent wakes itself)
-#   2. tmux send-keys (短いnudgeのみ、timeout 5s)
+#   2. If agent is busy (Working) → skip (nudge during Working loses Enter)
+#   3. tmux send-keys (短いnudgeのみ、timeout 5s)
 send_wakeup() {
     local unread_count="$1"
     local nudge="inbox${unread_count}"
@@ -166,7 +195,13 @@ send_wakeup() {
         return 0
     fi
 
-    # 優先度2: tmux send-keys（テキストとEnterを分離 — Codex TUI対策）
+    # 優先度2: Agent busy — nudge送信するとEnterが消失するためスキップ
+    if agent_is_busy; then
+        echo "[$(date)] [SKIP] Agent $AGENT_ID is busy (Working), deferring nudge" >&2
+        return 0
+    fi
+
+    # 優先度3: tmux send-keys（テキストとEnterを分離 — Codex TUI対策）
     echo "[$(date)] [SEND-KEYS] Sending nudge to $PANE_TARGET for $AGENT_ID" >&2
     if timeout 5 tmux send-keys -t "$PANE_TARGET" "$nudge" 2>/dev/null; then
         sleep 0.3
@@ -187,6 +222,12 @@ send_wakeup_with_escape() {
     local nudge="inbox${unread_count}"
 
     if agent_has_self_watch; then
+        return 0
+    fi
+
+    # Phase 2 still skips if agent is busy — Escape during Working would interrupt
+    if agent_is_busy; then
+        echo "[$(date)] [SKIP] Agent $AGENT_ID is busy (Working), deferring Phase 2 nudge" >&2
         return 0
     fi
 
@@ -273,6 +314,11 @@ for s in data.get('specials', []):
             echo "[$(date)] All messages read for $AGENT_ID — escalation reset" >&2
         fi
         FIRST_UNREAD_SEEN=0
+        # Clear stale nudge text from input field (Codex CLI prefills last input on idle).
+        # Only send C-u when agent is idle — during Working it would be disruptive.
+        if ! agent_is_busy; then
+            timeout 2 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
+        fi
     fi
 }
 
