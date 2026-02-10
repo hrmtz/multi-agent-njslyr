@@ -387,10 +387,11 @@ agent_has_self_watch() {
 # Returns 0 (true) if agent is busy, 1 if idle.
 agent_is_busy() {
     local pane_content
-    pane_content=$(timeout 2 tmux capture-pane -t "$PANE_TARGET" -p 2>/dev/null | tail -15)
+    # NOTE: Capture more lines to reduce false-idle detection (status line can scroll).
+    pane_content=$(timeout 2 tmux capture-pane -t "$PANE_TARGET" -p 2>/dev/null | tail -60)
     # Codex CLI: "Working", "Thinking", "Planning", "Sending"
     # Claude CLI: thinking spinner, tool execution
-    if echo "$pane_content" | grep -qiE '(Working|Thinking|Planning|Sending|esc to interrupt)'; then
+    if echo "$pane_content" | grep -qiE '(Working|Thinking|Planning|Sending|task is in progress|esc to interrupt|Compacting conversation|思考中|考え中|計画中|送信中|処理中|実行中)'; then
         return 0  # busy
     fi
     return 1  # idle
@@ -555,6 +556,15 @@ for s in data.get('specials', []):
     if [ "$normal_count" -gt 0 ] 2>/dev/null; then
         local now
         now=$(date +%s)
+
+        # When the agent is busy/thinking, do NOT escalate. Interrupting with Escape or /clear
+        # can terminate the current thought. Also pause the escalation timer while busy so we
+        # don't immediately jump to Phase 2/3 once it becomes idle.
+        if agent_is_busy; then
+            FIRST_UNREAD_SEEN=$now
+            echo "[$(date)] $normal_count unread for $AGENT_ID but agent is busy — pausing escalation timer" >&2
+            return 0
+        fi
 
         # Track when we first saw unread messages
         if [ "$FIRST_UNREAD_SEEN" -eq 0 ]; then
