@@ -17,9 +17,14 @@ Run 10 AI coding agents in parallel — **Claude Code, OpenAI Codex, GitHub Copi
 
 </div>
 
-<!-- <p align="center">
-  <img src="assets/screenshots/tmux_multiagent_9panes.png" alt="multi-agent-shogun: 9 panes running in parallel" width="800">
-</p> -->
+<p align="center">
+  <img src="images/screenshots/hero/latest-translucent-20260210-190453.png" alt="Latest translucent command session in the Shogun pane" width="940">
+</p>
+
+<p align="center">
+  <img src="images/screenshots/hero/latest-translucent-20260208-084602.png" alt="Quick natural-language command in the Shogun pane" width="420">
+  <img src="images/company-creed-all-panes.png" alt="Karo and Ashigaru panes reacting in parallel" width="520">
+</p>
 
 <p align="center"><i>One Karo (manager) coordinating 8 Ashigaru (workers) — real session, no mock data.</i></p>
 
@@ -455,9 +460,9 @@ The Karo breaks the task into subtasks:
 
 All 5 Ashigaru research simultaneously. You can watch them work in real time:
 
-<!-- <p align="center">
-  <img src="assets/screenshots/tmux_multiagent_working.png" alt="Ashigaru agents working in parallel" width="700">
-</p> -->
+<p align="center">
+  <img src="images/company-creed-all-panes.png" alt="Ashigaru agents working in parallel across tmux panes" width="900">
+</p>
 
 Results appear in `dashboard.md` as they complete.
 
@@ -714,16 +719,16 @@ The listener automatically reconnects if the connection drops. `shutsujin_depart
 **Real-world notification screenshots:**
 
 <p align="center">
-  <img src="images/screenshots/ntfy_saytask_rename.jpg" alt="Bidirectional phone communication" width="300">
+  <img src="images/screenshots/masked/ntfy_saytask_rename.jpg" alt="Bidirectional phone communication" width="300">
   &nbsp;&nbsp;
-  <img src="images/screenshots/ntfy_cmd043_progress.jpg" alt="Progress notification" width="300">
+  <img src="images/screenshots/masked/ntfy_cmd043_progress.jpg" alt="Progress notification" width="300">
 </p>
 <p align="center"><i>Left: Bidirectional phone ↔ Shogun communication · Right: Real-time progress report from Ashigaru</i></p>
 
 <p align="center">
-  <img src="images/screenshots/ntfy_bloom_oc_test.jpg" alt="Command completion notification" width="300">
+  <img src="images/screenshots/masked/ntfy_bloom_oc_test.jpg" alt="Command completion notification" width="300">
   &nbsp;&nbsp;
-  <img src="images/screenshots/ntfy_persona_eval_complete.jpg" alt="8-agent parallel completion" width="300">
+  <img src="images/screenshots/masked/ntfy_persona_eval_complete.jpg" alt="8-agent parallel completion" width="300">
 </p>
 <p align="center"><i>Left: Command completion notification · Right: All 8 Ashigaru completing in parallel</i></p>
 
@@ -836,7 +841,7 @@ Silent mode sets `DISPLAY_MODE=silent` as a tmux environment variable. The Karo 
 
 | Before (v1) | After (v2) |
 |:-----------:|:----------:|
-| ![Task list v1](images/screenshots/ntfy_tasklist_v1_before.jpg) | ![Task list v2](images/screenshots/ntfy_tasklist_v2_aligned.jpg) |
+| ![Task list v1](images/screenshots/masked/ntfy_tasklist_v1_before.jpg) | ![Task list v2](images/screenshots/masked/ntfy_tasklist_v2_aligned.jpg) |
 | Raw task dump | Clean, organized daily summary |
 
 > *Note: Topic names shown in screenshots are examples. Use your own unique topic name.*

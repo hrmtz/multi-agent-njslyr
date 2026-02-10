@@ -17,9 +17,14 @@
 
 </div>
 
-<!-- <p align="center">
-  <img src="assets/screenshots/tmux_multiagent_9panes.png" alt="multi-agent-shogun: 9ペインが並列稼働" width="800">
-</p> -->
+<p align="center">
+  <img src="images/screenshots/hero/latest-translucent-20260210-190453.png" alt="将軍ペインでの最新半透過セッションキャプチャ" width="940">
+</p>
+
+<p align="center">
+  <img src="images/screenshots/hero/latest-translucent-20260208-084602.png" alt="将軍ペインでの自然言語コマンド入力" width="420">
+  <img src="images/company-creed-all-panes.png" alt="家老と足軽が全ペインで並列反応する様子" width="520">
+</p>
 
 <p align="center"><i>家老1体が足軽8体を統率 — 実際の稼働画面、モックデータなし</i></p>
 
@@ -455,6 +460,10 @@ JavaScriptフレームワーク上位5つを調査して比較表を作成せよ
 
 5体の足軽が同時に調査開始。リアルタイムで作業を見ることができます。
 
+<p align="center">
+  <img src="images/company-creed-all-panes.png" alt="足軽がtmux全ペインで並列実行する様子" width="900">
+</p>
+
 結果は完了次第 `dashboard.md` に表示されます。
 
 ---
@@ -813,7 +822,7 @@ task:
 
 | 変更前（v1） | 変更後（v2） |
 |:-----------:|:----------:|
-| ![タスク一覧 v1](images/screenshots/ntfy_tasklist_v1_before.jpg) | ![タスク一覧 v2](images/screenshots/ntfy_tasklist_v2_aligned.jpg) |
+| ![タスク一覧 v1](images/screenshots/masked/ntfy_tasklist_v1_before.jpg) | ![タスク一覧 v2](images/screenshots/masked/ntfy_tasklist_v2_aligned.jpg) |
 | 生のタスクダンプ | きれいに整理された日次サマリ |
 
 > *注: スクリーンショットに表示されているトピック名は例です。自分専用のトピック名を使用してください。*
