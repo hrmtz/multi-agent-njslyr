@@ -112,6 +112,7 @@ generate_agents_md() {
         return 1
     fi
 
+    # Normalize line endings to LF to keep tracked auto-load files stable across platforms.
     sed \
         -e 's|CLAUDE\.md|AGENTS.md|g' \
         -e 's|CLAUDE\.local\.md|AGENTS.override.md|g' \
@@ -122,7 +123,7 @@ generate_agents_md() {
         -e 's|\.claude\.json|.codex/config.toml|g' \
         -e 's|\.mcp\.json|config.toml (mcp_servers section)|g' \
         -e 's|Claude Code|Codex CLI|g' \
-        "$claude_md" > "$output_path"
+        "$claude_md" | tr -d '\r' > "$output_path"
 
     echo "  ✅ Created: AGENTS.md"
 }
@@ -146,6 +147,7 @@ generate_copilot_instructions() {
 
     mkdir -p "$github_dir"
 
+    # Normalize line endings to LF to keep tracked auto-load files stable across platforms.
     sed \
         -e 's|CLAUDE\.md|copilot-instructions.md|g' \
         -e 's|CLAUDE\.local\.md|copilot-instructions.local.md|g' \
@@ -156,7 +158,7 @@ generate_copilot_instructions() {
         -e 's|\.claude\.json|.copilot/config.json|g' \
         -e 's|\.mcp\.json|.copilot/mcp-config.json|g' \
         -e 's|Claude Code|GitHub Copilot CLI|g' \
-        "$claude_md" > "$output_path"
+        "$claude_md" | tr -d '\r' > "$output_path"
 
     echo "  ✅ Created: .github/copilot-instructions.md"
 }
@@ -182,6 +184,7 @@ generate_kimi_instructions() {
     mkdir -p "$agents_dir"
 
     # Generate system.md (CLAUDE.md → Kimi版)
+    # Normalize line endings to LF to keep tracked auto-load files stable across platforms.
     sed \
         -e 's|CLAUDE\.md|agents/default/system.md|g' \
         -e 's|CLAUDE\.local\.md|agents/default/system.local.md|g' \
@@ -192,7 +195,7 @@ generate_kimi_instructions() {
         -e 's|\.claude\.json|.kimi/config.json|g' \
         -e 's|\.mcp\.json|.kimi/mcp.json|g' \
         -e 's|Claude Code|Kimi K2 CLI|g' \
-        "$claude_md" > "$system_md_path"
+        "$claude_md" | tr -d '\r' > "$system_md_path"
 
     echo "  ✅ Created: agents/default/system.md"
 
