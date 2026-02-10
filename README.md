@@ -517,8 +517,8 @@ Step 1: Write the message          Step 2: Wake the agent up
 │ with flock (no race) │           │                          │
 └──────────────────────┘           │ Wakes agent via:         │
                                    │  1. Self-watch (skip)    │
-                                   │  2. pty direct write     │
-                                   │     (tmux bypass)        │
+                                   │  2. tmux send-keys       │
+                                   │     (short nudge only)   │
                                    └──────────────────────────┘
 
 Step 3: Agent reads its own inbox
@@ -535,7 +535,15 @@ Step 3: Agent reads its own inbox
 | Priority | Method | What happens | When used |
 |----------|--------|-------------|-----------|
 | 1st | **Self-Watch** | Agent watches its own inbox file — wakes itself, no nudge needed | Agent has its own `inotifywait` running |
-| 2nd | **pty direct write** | Writes nudge directly to the agent's pty device (`/dev/pts/N`) — completely bypasses tmux | Default — no cursor bugs, no key conflicts, CLI-agnostic |
+| 2nd | **tmux send-keys** | Sends short nudge via `tmux send-keys` (text and Enter sent separately for Codex CLI compatibility) | Default fallback if self-watch misses |
+
+**3-Phase Escalation (v3.2)** — If agent doesn't respond to nudge:
+
+| Phase | Timing | Action |
+|-------|--------|--------|
+| Phase 1 | 0-2 min | Standard nudge (`inbox3` text + Enter) |
+| Phase 2 | 2-4 min | Escape×2 + C-c to reset cursor, then nudge |
+| Phase 3 | 4+ min | Send `/clear` to force session reset (max once per 5 min) |
 
 **Key design choices:**
 - **Message content is never sent through tmux** — only a short "you have mail" nudge. The agent reads its own file. This eliminates character corruption and transmission hangs.
@@ -1511,7 +1519,7 @@ Even if you're not comfortable with keyboard shortcuts, you can switch, scroll, 
 - **SayTask notifications** — Streak tracking, Eat the Frog, behavioral psychology-driven motivation
 - **Pane border task display** — See each agent's current task at a glance on the tmux pane border
 - **Shout mode** (default) — Ashigaru shout personalized battle cries after completing tasks. Disable with `--silent`
-- **pty direct write mailbox (v3.1)** — Agents communicate via file-based inbox; wake-up nudge writes directly to pty device (`/dev/pts/N`), completely bypassing tmux. send-keys eliminated from nudge delivery, solving cursor bugs and transmission failures
+- **Agent self-watch + escalation (v3.2)** — Each agent monitors its own inbox file with `inotifywait` (zero-polling, instant wake-up). Fallback: `tmux send-keys` short nudge (text/Enter sent separately for Codex CLI). 3-phase escalation: standard nudge (0-2min) → Escape×2+nudge (2-4min) → `/clear` force reset (4min+). Linux FS symlink resolves WSL2 9P inotify issues.
 - **Agent self-identification** (`@agent_id`) — Stable identity via tmux user options, immune to pane reordering
 - **Battle mode** (`-k` flag) — All-Opus formation for maximum capability
 - **Task dependency system** (`blockedBy`) — Automatic unblocking of dependent tasks
