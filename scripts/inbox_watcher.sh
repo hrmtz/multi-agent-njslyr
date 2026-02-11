@@ -428,15 +428,19 @@ agent_has_self_watch() {
 # Returns 0 (true) if agent is busy, 1 if idle.
 agent_is_busy() {
     local pane_content
-    # NOTE: Capture enough scrollback to avoid false-idle.
-    # Codex/Claude can show "esc to interrupt" or progress lines slightly above the visible tail.
-    pane_content=$(timeout 2 tmux capture-pane -t "$PANE_TARGET" -p -S -200 2>/dev/null | tail -200)
-    # Codex CLI: "Working", "Thinking", "Planning", "Sending"
-    # Claude CLI: thinking spinner, tool execution
-    # NOTE: Codex/Claude の「思考中」表示は時期やテーマで文言が変わることがある。
-    # 例: "thought for 5s", "↓ 1.1k tokens", "70% context left", "esc to interrupt".
-    # 誤判定（busyでないのにbusy扱い）を避けるため、"tokens" 単体のような広すぎる語は使わない。
-    if echo "$pane_content" | grep -qiE '(Working|Thinking|Planning|Sending|task is in progress|esc to interrupt|Compacting conversation|thought for|↓[[:space:]]*[0-9.]+[kK]?[[:space:]]+tokens|[0-9.]+[kK][[:space:]]+tokens|思考中|考え中|計画中|送信中|処理中|実行中)'; then
+    # NOTE:
+    # - Codex は「思考中に入力が入ると即拾う」ため、busy判定はシンプルに寄せる。
+    # - Claude も含め、スピナー（見た目カスタムされがち）には依存しない。
+    # - 取得行数を増やし過ぎると誤判定が増えるので、基本は直近の行だけを見る。
+    pane_content=$(timeout 2 tmux capture-pane -t "$PANE_TARGET" -p -S -60 2>/dev/null | tail -60)
+
+    # Most reliable marker across TUIs while the model is actively streaming.
+    if echo "$pane_content" | grep -qiF 'esc to interrupt'; then
+        return 0  # busy
+    fi
+
+    # Minimal fallbacks (no spinner dependency).
+    if echo "$pane_content" | grep -qiE '(Working|Thinking|Planning|Sending|task is in progress|Compacting conversation|thought for|思考中|考え中|計画中|送信中|処理中|実行中)'; then
         return 0  # busy
     fi
     return 1  # idle

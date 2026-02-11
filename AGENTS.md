@@ -36,6 +36,10 @@ task_status_transitions:
   - "RULE: Ashigaru updates OWN yaml only. Never touch other ashigaru's yaml."
   - "RULE: blocked状態タスクを足軽へ事前割当しない。前提完了までpending_tasksで保留。"
 
+# Status definitions are authoritative in:
+# - instructions/common/task_flow.md (Status Reference)
+# Do NOT invent new status values without updating that document.
+
 mcp_tools: [Notion, Playwright, GitHub, Sequential Thinking, Memory]
 mcp_usage: "Lazy-loaded. Always ToolSearch before first use."
 

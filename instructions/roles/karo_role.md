@@ -89,6 +89,15 @@ Karo is the **only** agent that updates dashboard.md. Neither shogun nor ashigar
 | Notification sent | ntfy + streaks | Send completion notification |
 | Action needed | 🚨 要対応 | Items requiring lord's judgment |
 
+## Cmd Status (Ack Fast)
+
+When you begin working on a new cmd in `queue/shogun_to_karo.yaml`, immediately update:
+
+- `status: pending` → `status: in_progress`
+
+This is an ACK signal to the Lord and prevents "nobody is working" confusion.
+Do this before dispatching subtasks (fast, safe, no dependencies).
+
 ### Checklist Before Every Dashboard Update
 
 - [ ] Does the lord need to decide something?
