@@ -68,6 +68,8 @@ ESCALATE_COOLDOWN=${ESCALATE_COOLDOWN:-300}
 LAST_NUDGE_TS=${LAST_NUDGE_TS:-0}
 LAST_NUDGE_COUNT=${LAST_NUDGE_COUNT:-""}
 NUDGE_COOLDOWN_SEC=${NUDGE_COOLDOWN_SEC:-60}
+# Codex は「思考中に入力が入ると即拾う」挙動があり、思考がループすることがあるため長めにする。
+NUDGE_COOLDOWN_SEC_CODEX=${NUDGE_COOLDOWN_SEC_CODEX:-300}
 
 # ─── Phase feature flags (cmd_107 Phase 1/2/3) ───
 # ASW_PHASE:
@@ -126,10 +128,18 @@ should_throttle_nudge() {
     local now
     now=$(date +%s)
 
+    local effective_cli
+    effective_cli=$(get_effective_cli_type)
+
+    local cooldown_sec="${NUDGE_COOLDOWN_SEC:-60}"
+    if [[ "$effective_cli" == "codex" ]]; then
+        cooldown_sec="${NUDGE_COOLDOWN_SEC_CODEX:-300}"
+    fi
+
     if [ "${LAST_NUDGE_COUNT:-}" = "$unread_count" ] && [ "${LAST_NUDGE_TS:-0}" -gt 0 ]; then
         local age=$((now - LAST_NUDGE_TS))
-        if [ "$age" -lt "${NUDGE_COOLDOWN_SEC:-60}" ]; then
-            echo "[$(date)] [SKIP] Throttling nudge for $AGENT_ID: inbox${unread_count} (${age}s < ${NUDGE_COOLDOWN_SEC}s)" >&2
+        if [ "$age" -lt "${cooldown_sec}" ]; then
+            echo "[$(date)] [SKIP] Throttling nudge for $AGENT_ID: inbox${unread_count} (${age}s < ${cooldown_sec}s, cli=$effective_cli)" >&2
             return 0
         fi
     fi
@@ -418,8 +428,9 @@ agent_has_self_watch() {
 # Returns 0 (true) if agent is busy, 1 if idle.
 agent_is_busy() {
     local pane_content
-    # NOTE: Capture more lines to reduce false-idle detection (status line can scroll).
-    pane_content=$(timeout 2 tmux capture-pane -t "$PANE_TARGET" -p 2>/dev/null | tail -60)
+    # NOTE: Capture enough scrollback to avoid false-idle.
+    # Codex/Claude can show "esc to interrupt" or progress lines slightly above the visible tail.
+    pane_content=$(timeout 2 tmux capture-pane -t "$PANE_TARGET" -p -S -200 2>/dev/null | tail -200)
     # Codex CLI: "Working", "Thinking", "Planning", "Sending"
     # Claude CLI: thinking spinner, tool execution
     # NOTE: Codex/Claude の「思考中」表示は時期やテーマで文言が変わることがある。
