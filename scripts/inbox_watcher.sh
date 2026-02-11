@@ -422,7 +422,9 @@ agent_is_busy() {
     pane_content=$(timeout 2 tmux capture-pane -t "$PANE_TARGET" -p 2>/dev/null | tail -60)
     # Codex CLI: "Working", "Thinking", "Planning", "Sending"
     # Claude CLI: thinking spinner, tool execution
-    if echo "$pane_content" | grep -qiE '(Working|Thinking|Planning|Sending|task is in progress|esc to interrupt|Compacting conversation|思考中|考え中|計画中|送信中|処理中|実行中)'; then
+    # NOTE: Codex/Claude の「思考中」表示は時期やテーマで文言が変わることがある。
+    # 例えば: "thought for 5s", "↓ 1.1k tokens" のようなステータス行。
+    if echo "$pane_content" | grep -qiE '(Working|Thinking|Planning|Sending|task is in progress|esc to interrupt|Compacting conversation|thought for|tokens|思考中|考え中|計画中|送信中|処理中|実行中)'; then
         return 0  # busy
     fi
     return 1  # idle
