@@ -63,7 +63,10 @@ Meanings and allowed/forbidden actions (short):
   - Allowed: report must include reason + unblock suggestion
   - Forbidden: silent failure
 
-Note: "idle" is a UI state (no active task), not a YAML status value.
+Note:
+- Normally, "idle" is a UI state (no active task), not a YAML status value.
+- Exception (placeholder only): `status: idle` is allowed **only** when `task_id: null` (clean start template written by `shutsujin_departure.sh --clean`).
+  - In that state, the file is a placeholder and should be treated as "no task assigned yet".
 
 ### Pending Tasks (Karo-managed): `queue/tasks/pending.yaml`
 
