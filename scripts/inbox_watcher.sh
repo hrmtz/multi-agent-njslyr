@@ -427,13 +427,26 @@ agent_has_self_watch() {
 # Sending nudge during Working causes text to queue but Enter to be lost.
 # Returns 0 (true) if agent is busy, 1 if idle.
 agent_is_busy() {
-    local pane_content
+    local pane_content pane_tail
     # NOTE:
     # - Codex は「思考中に入力が入ると即拾う」ため、busy判定はシンプルに寄せる。
     # - Claude も含め、スピナー（見た目カスタムされがち）には依存しない。
     # - 取得行数を増やし過ぎると誤判定が増えるので、基本は直近の行だけを見る。
     pane_content=$(timeout 2 tmux capture-pane -t "$PANE_TARGET" -p -S -60 2>/dev/null | tail -60)
+    pane_tail=$(echo "$pane_content" | tail -5)
 
+    # ── Idle-first check ──
+    # If the BOTTOM of the pane shows an idle prompt, the agent has finished.
+    # Past busy markers ("esc to interrupt", "Working") linger in scroll-back
+    # and cause false-busy if we only check pane_content without this guard.
+    if echo "$pane_tail" | grep -qE '(\? for shortcuts|context left)'; then
+        return 1  # idle — Codex idle prompt visible at bottom
+    fi
+    if echo "$pane_tail" | grep -qE '^(❯|›)\s*$'; then
+        return 1  # idle — Claude Code or Codex bare prompt
+    fi
+
+    # ── Busy markers ──
     # Most reliable marker across TUIs while the model is actively streaming.
     if echo "$pane_content" | grep -qiF 'esc to interrupt'; then
         return 0  # busy
