@@ -34,6 +34,10 @@ Two layers:
 The nudge is minimal: `inboxN` (e.g. `inbox3` = 3 unread). That's it.
 **Agent reads the inbox file itself.** Message content never travels through tmux — only a short wake-up signal.
 
+Safety note (shogun):
+- If the Shogun pane is active (the Lord is typing), `inbox_watcher.sh` must not inject keystrokes. It should use tmux `display-message` only.
+- Escalation keystrokes (`Escape×2`, `/clear`, `C-u`) must be suppressed for shogun to avoid clobbering human input.
+
 Special cases (CLI commands sent via `tmux send-keys`):
 - `type: clear_command` → sends `/clear` + Enter via send-keys
 - `type: model_switch` → sends the /model command via send-keys

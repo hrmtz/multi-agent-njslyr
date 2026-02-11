@@ -166,6 +166,10 @@ Two layers:
 The nudge is minimal: `inboxN` (e.g. `inbox3` = 3 unread). That's it.
 **Agent reads the inbox file itself.** Message content never travels through tmux — only a short wake-up signal.
 
+Safety note (shogun):
+- If the Shogun pane is active (the Lord is typing), `inbox_watcher.sh` must not inject keystrokes. It should use tmux `display-message` only.
+- Escalation keystrokes (`Escape×2`, `/clear`, `C-u`) must be suppressed for shogun to avoid clobbering human input.
+
 Special cases (CLI commands sent via `tmux send-keys`):
 - `type: clear_command` → sends `/clear` + Enter via send-keys
 - `type: model_switch` → sends the /model command via send-keys
@@ -560,9 +564,9 @@ Step 4: Resume work based on task status
 ### Nudge Mechanism
 
 For TUI mode with `--no-alt-screen`:
-- inbox_watcher.sh sends a nudge (e.g., `inbox3`) via tmux send-keys
-- Safety: if the Shogun pane is currently focused (the Lord is typing), the watcher avoids send-keys and shows a tmux `display-message` instead (prevents clobbering human input)
-- Codex receives it as user input and processes inbox
+- inbox_watcher.sh sends nudge text (e.g., `inbox3`) via tmux send-keys
+- Safety (shogun): if the Shogun pane is active (the Lord is typing), watcher avoids send-keys and uses tmux `display-message` only
+- After receiving a nudge, the agent reads `queue/inbox/<agent>.yaml` and processes unread messages
 
 For `codex exec` mode:
 - Each task is a separate `codex exec` invocation
