@@ -453,7 +453,19 @@ send_context_reset() {
     timeout 5 tmux send-keys -t "$PANE_TARGET" "$reset_cmd" 2>/dev/null
     sleep 0.3
     timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
-    sleep 5  # Wait for context reset to take effect (Codex /new needs ~5s to render new prompt)
+
+    # Poll until agent becomes idle (prompt ready) instead of fixed sleep.
+    # Max 15s (3 attempts × 5s). If still busy after 15s, proceed anyway.
+    local attempt
+    for attempt in 1 2 3; do
+        sleep 5
+        if ! agent_is_busy; then
+            echo "[$(date)] [CONTEXT-RESET] $AGENT_ID idle after ${attempt}×5s — ready for nudge" >&2
+            return 0
+        fi
+        echo "[$(date)] [CONTEXT-RESET] $AGENT_ID still busy after ${attempt}×5s — retrying" >&2
+    done
+    echo "[$(date)] [CONTEXT-RESET] $AGENT_ID still busy after 15s — proceeding with nudge anyway" >&2
 }
 
 # ─── Agent self-watch detection ───
