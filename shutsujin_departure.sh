@@ -540,12 +540,10 @@ if [ "$CLI_ADAPTER_LOADED" = true ]; then
         _cli=$(get_cli_type "$_agent")
         case "$_cli" in
             codex)
-                # config.tomlからモデル名と推論レベルを取得
-                _codex_model=$(grep '^model ' ~/.codex/config.toml 2>/dev/null | head -1 | sed 's/.*= *"\(.*\)"/\1/')
+                # config.tomlから推論レベルを取得（表示は短縮形）
                 _codex_effort=$(grep '^model_reasoning_effort' ~/.codex/config.toml 2>/dev/null | head -1 | sed 's/.*= *"\(.*\)"/\1/')
-                _codex_model=${_codex_model:-gpt-5.3-codex}
                 _codex_effort=${_codex_effort:-high}
-                MODEL_NAMES[$i]="${_codex_model}/${_codex_effort}"
+                MODEL_NAMES[$i]="codex/${_codex_effort}"
                 ;;
             copilot)
                 MODEL_NAMES[$i]="Copilot"
@@ -559,7 +557,7 @@ fi
 
 for i in {0..8}; do
     p=$((PANE_BASE + i))
-    tmux select-pane -t "multiagent:agents.${p}" -T "${PANE_TITLES[$i]}"
+    tmux select-pane -t "multiagent:agents.${p}" -T "${MODEL_NAMES[$i]}"
     tmux set-option -p -t "multiagent:agents.${p}" @agent_id "${AGENT_IDS[$i]}"
     tmux set-option -p -t "multiagent:agents.${p}" @model_name "${MODEL_NAMES[$i]}"
     tmux set-option -p -t "multiagent:agents.${p}" @current_task ""
