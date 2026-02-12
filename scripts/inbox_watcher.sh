@@ -373,6 +373,11 @@ send_cli_command() {
             # /clearはCodexでは未定義コマンドでCLI終了してしまうため、/newに変換
             if [[ "$cmd" == "/clear" ]]; then
                 echo "[$(date)] [SEND-KEYS] Codex /clear→/new: starting new conversation for $AGENT_ID" >&2
+                # Dismiss suggestion UI first (typing "x" clears autocomplete prompt)
+                timeout 5 tmux send-keys -t "$PANE_TARGET" "x" 2>/dev/null
+                sleep 0.3
+                timeout 5 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
+                sleep 0.3
                 timeout 5 tmux send-keys -t "$PANE_TARGET" "/new" 2>/dev/null
                 sleep 0.3
                 timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
@@ -448,6 +453,14 @@ send_context_reset() {
     esac
 
     echo "[$(date)] [CONTEXT-RESET] Sending $reset_cmd before task_assigned for $AGENT_ID ($effective_cli)" >&2
+
+    # Dismiss Codex suggestion UI before sending reset command
+    if [[ "$effective_cli" == "codex" ]]; then
+        timeout 5 tmux send-keys -t "$PANE_TARGET" "x" 2>/dev/null
+        sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
+        sleep 0.3
+    fi
 
     # Send the command (text and Enter separated for TUI compatibility)
     timeout 5 tmux send-keys -t "$PANE_TARGET" "$reset_cmd" 2>/dev/null
@@ -554,6 +567,19 @@ send_wakeup() {
 
     # 優先度3: tmux send-keys（テキストとEnterを分離 — Codex TUI対策）
     echo "[$(date)] [SEND-KEYS] Sending nudge to $PANE_TARGET for $AGENT_ID" >&2
+
+    # Codex suggestion UI dismissal: typing any character dismisses the autocomplete
+    # suggestion prompt (› Implement {feature} etc.) that traps idle agents.
+    # Sequence: "x" (dismiss suggestion) → C-u (clear input) → nudge → Enter
+    local effective_cli_for_nudge
+    effective_cli_for_nudge=$(get_effective_cli_type)
+    if [[ "$effective_cli_for_nudge" == "codex" ]]; then
+        timeout 5 tmux send-keys -t "$PANE_TARGET" "x" 2>/dev/null
+        sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
+        sleep 0.3
+    fi
+
     if timeout 5 tmux send-keys -t "$PANE_TARGET" "$nudge" 2>/dev/null; then
         sleep 0.3
         timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
