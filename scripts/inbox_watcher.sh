@@ -485,7 +485,26 @@ send_context_reset() {
 # Check if the agent has an active inotifywait on its inbox.
 # If yes, the agent will self-wake — no nudge needed.
 agent_has_self_watch() {
-    pgrep -f "inotifywait.*inbox/${AGENT_ID}.yaml" >/dev/null 2>&1
+    # Codex/Copilot/Kimi CLIs cannot run self-watch. Only Claude Code agents can.
+    local effective_cli
+    effective_cli=$(get_effective_cli_type)
+    if [[ "$effective_cli" != "claude" ]]; then
+        return 1  # non-Claude CLIs never have self-watch
+    fi
+    # For Claude Code agents: check if an inotifywait exists that is NOT
+    # a child of this inbox_watcher process (exclude our own watcher).
+    local my_pgid
+    my_pgid=$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ')
+    local found=1  # default: not found
+    while IFS= read -r pid; do
+        local pid_pgid
+        pid_pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
+        if [[ "$pid_pgid" != "$my_pgid" ]]; then
+            found=0  # found an inotifywait NOT from our process group
+            break
+        fi
+    done < <(pgrep -f "inotifywait.*inbox/${AGENT_ID}.yaml" 2>/dev/null)
+    return $found
 }
 
 # ─── Agent busy detection ───
