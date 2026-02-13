@@ -540,10 +540,15 @@ if [ "$CLI_ADAPTER_LOADED" = true ]; then
         _cli=$(get_cli_type "$_agent")
         case "$_cli" in
             codex)
-                # config.tomlから推論レベルを取得（表示は短縮形）
-                _codex_effort=$(grep '^model_reasoning_effort' ~/.codex/config.toml 2>/dev/null | head -1 | sed 's/.*= *"\(.*\)"/\1/')
-                _codex_effort=${_codex_effort:-high}
-                MODEL_NAMES[$i]="codex/${_codex_effort}"
+                # settings.yamlのmodelを優先表示、なければconfig.tomlのeffort
+                _codex_model=$(get_agent_model "$_agent")
+                if [[ -n "$_codex_model" ]]; then
+                    MODEL_NAMES[$i]="codex/${_codex_model}"
+                else
+                    _codex_effort=$(grep '^model_reasoning_effort' ~/.codex/config.toml 2>/dev/null | head -1 | sed 's/.*= *"\(.*\)"/\1/')
+                    _codex_effort=${_codex_effort:-high}
+                    MODEL_NAMES[$i]="codex/${_codex_effort}"
+                fi
                 ;;
             copilot)
                 MODEL_NAMES[$i]="Copilot"

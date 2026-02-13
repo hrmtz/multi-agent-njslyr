@@ -138,7 +138,12 @@ build_cli_command() {
             echo "$cmd"
             ;;
         codex)
-            echo "codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen"
+            local cmd="codex"
+            if [[ -n "$model" ]]; then
+                cmd="$cmd --model $model"
+            fi
+            cmd="$cmd --dangerously-bypass-approvals-and-sandbox --no-alt-screen"
+            echo "$cmd"
             ;;
         copilot)
             echo "copilot --yolo"
