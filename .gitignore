@@ -84,6 +84,11 @@
 !scripts/ntfy.sh
 !scripts/ntfy_listener.sh
 !scripts/build_instructions.sh
+!scripts/slim_yaml.sh
+!scripts/slim_yaml.py
+!scripts/seo_qc.py
+!scripts/seo_qc.sh
+!scripts/stop_hook_inbox.sh
 
 
 # SayTask (sample template only, not actual data)

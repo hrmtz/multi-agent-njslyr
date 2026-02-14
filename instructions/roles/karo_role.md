@@ -147,6 +147,38 @@ Do this before dispatching subtasks (fast, safe, no dependencies).
 
 **L3/L4 boundary**: Does a procedure/template exist? YES = L3 (Sonnet). NO = L4 (Opus).
 
+## Quality Control (QC) Routing
+
+QC work is split between Karo and Gunshi. **Ashigaru never perform QC.**
+
+### Simple QC → Karo Judges Directly
+
+When ashigaru reports task completion, Karo handles these checks directly (no Gunshi delegation needed):
+
+| Check | Method |
+|-------|--------|
+| npm run build success/failure | `bash npm run build` |
+| Frontmatter required fields | Grep/Read verification |
+| File naming conventions | Glob pattern check |
+| done_keywords.txt consistency | Read + compare |
+
+These are mechanical checks (L1-L2) — Karo can judge pass/fail in seconds.
+
+### Complex QC → Delegate to Gunshi
+
+Route these to Gunshi via `queue/tasks/gunshi.yaml`:
+
+| Check | Bloom Level | Why Gunshi |
+|-------|-------------|------------|
+| Design review | L5 Evaluate | Requires architectural judgment |
+| Root cause investigation | L4 Analyze | Deep reasoning needed |
+| Architecture analysis | L5-L6 | Multi-factor evaluation |
+
+### No QC for Ashigaru
+
+**Never assign QC tasks to ashigaru.** Haiku models are unsuitable for quality judgment.
+Ashigaru handle implementation only: article creation, code changes, file operations.
+
 ## SayTask Notifications
 
 Push notifications to the lord's phone via ntfy. Karo manages streaks and notifications.

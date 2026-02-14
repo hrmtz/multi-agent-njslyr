@@ -10,7 +10,7 @@ Run 10 AI coding agents in parallel — **Claude Code, OpenAI Codex, GitHub Copi
 
 [![GitHub Stars](https://img.shields.io/github/stars/yohey-w/multi-agent-shogun?style=social)](https://github.com/yohey-w/multi-agent-shogun)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![v3.0 Multi-CLI](https://img.shields.io/badge/v3.0-Multi--CLI_Support-ff6600?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+PHRleHQgeD0iMCIgeT0iMTIiIGZvbnQtc2l6ZT0iMTIiPuKalTwvdGV4dD48L3N2Zz4=)](https://github.com/yohey-w/multi-agent-shogun)
+[![v3.4 Stop Hook + Gunshi](https://img.shields.io/badge/v3.4-Stop_Hook_%2B_Gunshi-ff6600?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+PHRleHQgeD0iMCIgeT0iMTIiIGZvbnQtc2l6ZT0iMTIiPuKalTwvdGV4dD48L3N2Zz4=)](https://github.com/yohey-w/multi-agent-shogun)
 [![Shell](https://img.shields.io/badge/Shell%2FBash-100%25-green)]()
 
 [English](README.md) | [日本語](README_ja.md)
@@ -52,10 +52,10 @@ Run 10 AI coding agents in parallel — **Claude Code, OpenAI Codex, GitHub Copi
       │    KARO     │  ← Distributes tasks to workers
       └──────┬──────┘
              │
-    ┌─┬─┬─┬─┴─┬─┬─┬─┐
-    │1│2│3│4│5│6│7│8│  ← 8 workers execute in parallel
-    └─┴─┴─┴─┴─┴─┴─┴─┘
-         ASHIGARU
+    ┌─┬─┬─┬─┴─┬─┬─┬─┬────────┐
+    │1│2│3│4│5│6│7│ GUNSHI │  ← 7 workers + 1 strategist
+    └─┴─┴─┴─┴─┴─┴─┴────────┘
+       ASHIGARU      軍師
 ```
 
 ---
@@ -279,7 +279,16 @@ Control your AI army from your phone — bed, café, or bathroom.
    csm    # See all 9 panes
    ```
 
-**Disconnect:** Just swipe the Termux window closed. tmux sessions survive — agents keep working.
+**Disconnect:** Just swipe the Termux window closed. tmux sessions survive — agents keep working. Temporary viewer sessions are auto-cleaned (destroy-unattached).
+
+**Recommended: SSH keepalive** — prevents zombie connections when Termux is swiped away:
+```bash
+# On your server (WSL), run once:
+sudo sed -i 's/#ClientAliveInterval 0/ClientAliveInterval 15/' /etc/ssh/sshd_config
+sudo sed -i 's/#ClientAliveCountMax 3/ClientAliveCountMax 3/' /etc/ssh/sshd_config
+sudo systemctl restart ssh
+```
+This detects dead connections within 45 seconds instead of waiting for TCP timeout.
 
 **Voice input:** Use your phone's voice keyboard to speak commands. The Shogun understands natural language, so typos from speech-to-text don't matter.
 
@@ -1506,6 +1515,18 @@ tmux respawn-pane -t shogun:0.0 -k 'claude --model opus --dangerously-skip-permi
 Even if you're not comfortable with keyboard shortcuts, you can switch, scroll, and resize panes using just the mouse.
 
 ---
+
+## What's New in v3.4 — Stop Hook, Gunshi, and Stability Fixes
+
+> **Claude Code agents now receive inbox messages without `send-keys` interruption.** Plus a new strategic advisor role.
+
+- **Stop hook inbox delivery** — Claude Code agents automatically check inbox at turn end via `.claude/settings.json` Stop hook. Eliminates the `send-keys` interruption problem entirely for Claude Code agents. Codex/Copilot/Kimi still use `send-keys` (no hook equivalent)
+- **Escape escalation disabled for Claude Code** — Phase 2 escalation (Escape×2 + C-c) was interrupting active Claude Code turns. Now suppressed; Stop hook handles delivery instead
+- **Gunshi (軍師) role** — New strategic advisor agent (pane 8). Handles quality checks, dashboard updates, report aggregation, and design analysis. Replaces ashigaru8
+- **Codex CLI startup prompt** — `get_startup_prompt()` in `cli_adapter.sh` passes initial `[PROMPT]` argument to Codex CLI launch, preventing agents from getting stuck at suggestion UI after startup
+- **Session Start identity protection** — Added CRITICAL warning to CLAUDE.md and AGENTS.md: agents must complete Steps 1-3 (self-identification → memory → instructions) before processing inbox. Prevents role misidentification when nudge arrives before identity is established
+- **Codex suggestion UI dismissal** — Typing `x` + `C-u` before nudge clears Codex autocomplete suggestions that trap idle agents
+- **YAML slimming utility** — `scripts/slim_yaml.sh` archives read messages and completed commands to keep queue files performant
 
 ## What's New in v3.3.2 — GPT-5.3-Codex-Spark Support
 
