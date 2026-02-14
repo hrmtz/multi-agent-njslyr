@@ -159,8 +159,8 @@ while true; do
             continue
         fi
 
-        # Wake karo via inbox (ntfy処理は家老の責務)
-        bash "$SCRIPT_DIR/scripts/inbox_write.sh" karo \
+        # Wake shogun via inbox (ntfy処理は将軍が直接受信)
+        bash "$SCRIPT_DIR/scripts/inbox_write.sh" shogun \
             "ntfyから新しいメッセージ受信。queue/ntfy_inbox.yaml を確認し処理せよ。" \
             ntfy_received ntfy_listener
     done

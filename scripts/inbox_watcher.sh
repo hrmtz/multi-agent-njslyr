@@ -567,8 +567,15 @@ send_wakeup() {
     fi
 
     # 優先度2: Agent busy — nudge送信するとEnterが消失するためスキップ
+    # Claude Code agents: Stop hook handles delivery, no nudge needed at all.
     if agent_is_busy; then
-        echo "[$(date)] [SKIP] Agent $AGENT_ID is busy (Working), deferring nudge" >&2
+        local busy_cli_wakeup
+        busy_cli_wakeup=$(get_effective_cli_type)
+        if [[ "$busy_cli_wakeup" == "claude" ]]; then
+            echo "[$(date)] [SKIP] Agent $AGENT_ID is busy (claude) — Stop hook will deliver, no nudge" >&2
+        else
+            echo "[$(date)] [SKIP] Agent $AGENT_ID is busy ($busy_cli_wakeup), deferring nudge" >&2
+        fi
         return 0
     fi
 
@@ -631,6 +638,14 @@ send_wakeup_with_escape() {
     # Phase 2 の Escape エスカレーションは無効化し、通常 nudge のみに落とす。
     if [[ "$effective_cli" == "codex" ]]; then
         echo "[$(date)] [SKIP] codex: suppressing Escape escalation for $AGENT_ID; sending plain nudge" >&2
+        send_wakeup "$unread_count"
+        return 0
+    fi
+
+    # Claude Code: Stop hookがturn終了時にinbox未読を検出→自動処理する。
+    # Escape送信は処理中のturnを中断させるため有害。Phase 2は通常nudgeに落とす。
+    if [[ "$effective_cli" == "claude" ]]; then
+        echo "[$(date)] [SKIP] claude: suppressing Escape escalation for $AGENT_ID (Stop hook handles delivery); sending plain nudge" >&2
         send_wakeup "$unread_count"
         return 0
     fi
@@ -758,8 +773,18 @@ for s in data.get('specials', []):
         # can terminate the current thought. Also pause the escalation timer while busy so we
         # don't immediately jump to Phase 2/3 once it becomes idle.
         if agent_is_busy; then
-            FIRST_UNREAD_SEEN=$now
-            echo "[$(date)] $normal_count unread for $AGENT_ID but agent is busy — pausing escalation timer" >&2
+            local busy_cli
+            busy_cli=$(get_effective_cli_type)
+            if [[ "$busy_cli" == "claude" ]]; then
+                # Claude Code: Stop hook will catch unread messages when the agent's
+                # turn ends. No nudge needed at all — just log and skip completely.
+                # Don't reset FIRST_UNREAD_SEEN so idle-nudge works if hook misses.
+                echo "[$(date)] $normal_count unread for $AGENT_ID but agent is busy (claude) — Stop hook will deliver" >&2
+            else
+                # Codex/Copilot/Kimi: No Stop hook. Pause escalation timer while busy.
+                FIRST_UNREAD_SEEN=$now
+                echo "[$(date)] $normal_count unread for $AGENT_ID but agent is busy ($busy_cli) — pausing escalation timer" >&2
+            fi
             return 0
         fi
 
