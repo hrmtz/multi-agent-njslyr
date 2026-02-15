@@ -87,8 +87,10 @@ setup() {
 
 @test "E2E-001-B: gryakuza receives cmd, decomposes into yakuza subtask" {
     # 1. Place cmd YAML for gryakuza
-    cp "$PROJECT_ROOT/tests/e2e/fixtures/cmd_basic.yaml" \
-       "$E2E_QUEUE/queue/darkninja_to_gryakuza.yaml"
+    # TODO: Deprecated - darkninja_to_gryakuza.yaml no longer used (inbox-based system).
+    # Test should be rewritten to use inbox messages only.
+    # cp "$PROJECT_ROOT/tests/e2e/fixtures/cmd_basic.yaml" \
+    #    "$E2E_QUEUE/queue/darkninja_to_gryakuza.yaml"
 
     # 2. Write cmd_new to gryakuza's inbox
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "gryakuza" \
@@ -119,8 +121,10 @@ setup() {
 
 @test "E2E-001-C: full flow from cmd to completion report" {
     # 1. Place cmd YAML
-    cp "$PROJECT_ROOT/tests/e2e/fixtures/cmd_basic.yaml" \
-       "$E2E_QUEUE/queue/darkninja_to_gryakuza.yaml"
+    # TODO: Deprecated - darkninja_to_gryakuza.yaml no longer used (inbox-based system).
+    # Test should be rewritten to use inbox messages only.
+    # cp "$PROJECT_ROOT/tests/e2e/fixtures/cmd_basic.yaml" \
+    #    "$E2E_QUEUE/queue/darkninja_to_gryakuza.yaml"
 
     local gryakuza_pane yakuza1_pane
     gryakuza_pane=$(pane_target 0)

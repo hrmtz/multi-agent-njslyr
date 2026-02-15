@@ -230,7 +230,7 @@ When yakuza completes work, soukaiya receives report via inbox and performs qual
 
 **When Quality Check Happens:**
 - Yakuza completes task → reports to soukaiya (inbox_write)
-- Soukaiya reads yakuza_report.yaml from queue/reports/
+- Soukaiya reads yakuza{N}_report_{task_id}.yaml from queue/reports/ (file path specified in task YAML's `yakuza_report_file` field)
 - Soukaiya performs quality review (tests pass? build OK? scope met?)
 - Soukaiya updates dashboard.md with results
 - Soukaiya reports to Gryakuza: "Quality check PASS" or "Quality check FAIL + concerns"
@@ -242,7 +242,7 @@ task:
   task_id: soukaiya_qc_001
   parent_cmd: cmd_150
   type: quality_check
-  yakuza_report_id: yakuza1_report   # Points to queue/reports/yakuza{N}_report.yaml
+  yakuza_report_file: yakuza1_report_subtask_150a   # Points to queue/reports/yakuza{N}_report_{task_id}.yaml
   context_task_id: subtask_150a  # Original yakuza task ID for context
   description: |
     クローンヤクザ1号が subtask_150a を完了。品質チェックを実施。
@@ -404,7 +404,7 @@ Gryakuza: "クローンヤクザのホウコクによると原因不明のエラ
 
 ```
 Yakuza completes task → reports to Soukaiya (inbox_write)
-  → Soukaiya reads yakuza_report.yaml + original task YAML
+  → Soukaiya reads yakuza{N}_report_{task_id}.yaml (from task YAML's yakuza_report_file field) + original task YAML
   → Soukaiya performs quality check (tests? build? scope?)
   → Soukaiya updates dashboard.md with QC results
   → Soukaiya reports to Gryakuza: "QC PASS" or "QC FAIL: X,Y,Z"

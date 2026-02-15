@@ -286,37 +286,12 @@ Lord: command → Darkninja: write YAML → inbox_write → Gryakuza: decompose 
 Status is defined per YAML file type. **Keep it minimal. Simple is best.**
 
 Fixed status set (do not add casually):
-- `queue/shogun_to_karo.yaml`: `pending`, `in_progress`, `done`, `cancelled`
 - `queue/tasks/yakuzaN.yaml`: `assigned`, `blocked`, `done`, `failed`
 - `queue/tasks/pending.yaml`: `pending_blocked`
 - `queue/ntfy_inbox.yaml`: `pending`, `processed`
+- `queue/inbox/*.yaml`: `read: true/false` (not a status field, but a message state)
 
 Do NOT invent new status values without updating this section.
-
-### Command Queue: `queue/shogun_to_karo.yaml`
-
-Meanings and allowed/forbidden actions (short):
-
-- `pending`: not acknowledged yet
-  - Allowed: Gryakuza reads and immediately ACKs (`pending → in_progress`)
-  - Forbidden: dispatching subtasks while still `pending`
-
-- `in_progress`: acknowledged and being worked
-  - Allowed: decompose/dispatch/collect/consolidate
-  - Forbidden: moving goalposts (editing acceptance_criteria), or marking `done` without meeting all criteria
-
-- `done`: complete and validated
-  - Allowed: read-only (history)
-  - Forbidden: editing old cmd to "reopen" (use a new cmd instead)
-
-- `cancelled`: intentionally stopped
-  - Allowed: read-only (history)
-  - Forbidden: continuing work under this cmd (use a new cmd instead)
-
-**Gryakuza rule (ack fast)**:
-- The moment Gryakuza starts processing a cmd (after reading it), update that cmd status:
-  - `pending` → `in_progress`
-  - This prevents "nobody is working" confusion and stabilizes escalation logic.
 
 ### Yakuza Task File: `queue/tasks/yakuzaN.yaml`
 

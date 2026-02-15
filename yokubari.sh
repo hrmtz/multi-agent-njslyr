@@ -311,19 +311,14 @@ if [ "$CLEAN_MODE" = true ]; then
         fi
     fi
 
-    # 既存の dashboard.md 判定の後に追加
-    if [ -f "./queue/darkninja_to_gryakuza.yaml" ]; then
-        if grep -q "id: cmd_" "./queue/darkninja_to_gryakuza.yaml" 2>/dev/null; then
-            NEED_BACKUP=true
-        fi
-    fi
+    # darkninja_to_gryakuza.yaml is deprecated (inbox-based system now).
+    # Backup decision is based on dashboard.md and queue/tasks/ only.
 
     if [ "$NEED_BACKUP" = true ]; then
         mkdir -p "$BACKUP_DIR" || true
         cp "./dashboard.md" "$BACKUP_DIR/" 2>/dev/null || true
         cp -r "./queue/reports" "$BACKUP_DIR/" 2>/dev/null || true
         cp -r "./queue/tasks" "$BACKUP_DIR/" 2>/dev/null || true
-        cp "./queue/darkninja_to_gryakuza.yaml" "$BACKUP_DIR/" 2>/dev/null || true
         log_info "📦 前回のセンカ記録をバックアップ。インガオホー: $BACKUP_DIR"
     fi
 fi

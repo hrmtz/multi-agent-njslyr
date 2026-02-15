@@ -34,8 +34,8 @@ workflow:
     from: user
   - step: 2
     action: write_yaml
-    target: queue/shogun_to_karo.yaml
-    note: "Read file just before Edit to avoid race conditions with Gryakuza's status updates."
+    target: queue/tasks/cmd_xxx.yaml
+    note: "Create new cmd YAML in queue/tasks/ directory."
   - step: 3
     action: inbox_write
     target: multiagent:0.0
@@ -50,7 +50,7 @@ workflow:
 files:
   config: config/projects.yaml
   status: status/master_status.yaml
-  command_queue: queue/shogun_to_karo.yaml
+  command_queue: queue/tasks/
   soukaiya_report: queue/reports/soukaiya_report.yaml
 
 panes:
@@ -173,7 +173,7 @@ When a message arrives, you'll be woken with "ntfy受信あり".
 
 1. Read `queue/ntfy_inbox.yaml` — find `status: pending` entries
 2. Process each message:
-   - **Task command** ("〇〇作って", "〇〇調べて") → Write cmd to shogun_to_karo.yaml → Delegate to Gryakuza
+   - **Task command** ("〇〇作って", "〇〇調べて") → Write cmd_xxx.yaml to queue/tasks/ → Delegate to Gryakuza via inbox_write
    - **Status check** ("状況は", "ダッシュボード") → Read dashboard.md → Reply via ntfy
    - **VF task** ("〇〇する", "〇〇予約") → Register in saytask/tasks.yaml (future)
    - **Simple query** → Reply directly via ntfy
@@ -199,7 +199,7 @@ Lord's input
   │  │         Read/write saytask/tasks.yaml, update streaks, send ntfy
   │  │
   │  └─ NO → Traditional cmd pipeline
-  │           Write queue/shogun_to_karo.yaml → inbox_write to Gryakuza
+  │           Write queue/tasks/cmd_xxx.yaml → inbox_write to Gryakuza
   │
   └─ Ambiguous → Ask Lord: "クローンヤクザにやらせるか？TODOに入れるか？"
 ```
@@ -291,7 +291,7 @@ For ambiguous inputs (e.g., 「大里さんの件」):
 | VF task CRUD | **Darkninja directly** | `saytask/tasks.yaml` | No Gryakuza involvement |
 | VF task display | **Darkninja directly** | `saytask/tasks.yaml` | Read-only display |
 | VF streaks update | **Darkninja directly** | `saytask/streaks.yaml` | On VF task completion |
-| Traditional cmd | **Gryakuza via YAML** | `queue/shogun_to_karo.yaml` | Existing flow unchanged |
+| Traditional cmd | **Gryakuza via YAML** | `queue/tasks/cmd_xxx.yaml` | Existing flow unchanged |
 | cmd streaks update | **Gryakuza** | `saytask/streaks.yaml` | On cmd completion (existing) |
 | ntfy for VF | **Darkninja** | `scripts/ntfy.sh` | Direct send |
 | ntfy for cmd | **Gryakuza** | `scripts/ntfy.sh` | Via existing flow |
@@ -302,13 +302,13 @@ For ambiguous inputs (e.g., 「大里さんの件」):
 
 Recover from primary data sources:
 
-1. **queue/shogun_to_karo.yaml** — Check each cmd status (pending/done)
+1. **queue/tasks/cmd_*.yaml** — Check each cmd status (assigned/completed)
 2. **config/projects.yaml** — Project list
 3. **Memory MCP (read_graph)** — System settings, Lord's preferences
 4. **dashboard.md** — Secondary info only (Gryakuza's summary, YAML is authoritative)
 
 Actions after recovery:
-1. Check latest command status in queue/shogun_to_karo.yaml
+1. Check latest command status in queue/tasks/cmd_*.yaml
 2. If pending cmds exist → check Gryakuza state, then issue instructions
 3. If all cmds done → await Lord's next command
 

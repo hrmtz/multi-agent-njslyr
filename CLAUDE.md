@@ -15,7 +15,7 @@ files:
   config: config/projects.yaml          # Project list (summary)
   projects: "projects/<id>.yaml"        # Project details (git-ignored, contains secrets)
   context: "context/{project}.md"       # Project-specific notes for yakuza/soukaiya
-  cmd_queue: queue/shogun_to_karo.yaml  # Darkninja → Gryakuza commands
+  cmd_queue: queue/inbox/gryakuza.yaml  # Darkninja → Gryakuza commands (inbox mailbox)
   tasks: "queue/tasks/yakuza{N}.yaml" # Gryakuza → Yakuza assignments (per-yakuza)
   soukaiya_task: queue/tasks/soukaiya.yaml  # Gryakuza → Soukaiya strategic assignments
   pending_tasks: queue/tasks/pending.yaml # グレーターヤクザ管理の保留タスク（blocked未割当）

@@ -74,7 +74,6 @@ multi-agent-shogun/
 │   └── integ_*.md        # Integration report templates
 │
 ├── queue/                # Communication and task data
-│   ├── shogun_to_karo.yaml  # Command queue
 │   ├── inbox/            # Per-agent mailboxes
 │   ├── tasks/            # Per-worker task assignments
 │   └── reports/          # Completion reports

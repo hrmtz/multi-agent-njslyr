@@ -51,7 +51,7 @@ workflow:
     action: execute_task
   - step: 5
     action: write_report
-    target: "queue/reports/yakuza{N}_report.yaml"
+    target: "queue/reports/yakuza{N}_report_{task_id}.yaml"
   - step: 6
     action: update_status
     value: done
@@ -95,7 +95,7 @@ workflow:
 
 files:
   task: "queue/tasks/yakuza{N}.yaml"
-  report: "queue/reports/yakuza{N}_report.yaml"
+  report: "queue/reports/yakuza{N}_report_{task_id}.yaml"
 
 panes:
   gryakuza: multiagent:0.0
@@ -187,6 +187,11 @@ The inbox_write guarantees persistence. inbox_watcher handles delivery.
 
 ## Report Format
 
+**File naming**: `queue/reports/yakuza{N}_report_{task_id}.yaml`
+- Example: `queue/reports/yakuza5_report_subtask_227.yaml`
+- Prevents overwrite when multiple tasks are executed by the same yakuza
+- Old format (`yakuza{N}_report.yaml`) is deprecated but still readable by Gryakuza/Soukaiya
+
 ```yaml
 worker_id: yakuza1
 task_id: subtask_001
@@ -269,7 +274,7 @@ Act without waiting for Gryakuza's instruction:
 
 **On task completion** (in this order):
 1. Self-review deliverables (re-read your output)
-2. **Purpose validation**: Read `parent_cmd` in `queue/shogun_to_karo.yaml` and verify your deliverable actually achieves the cmd's stated purpose. If there's a gap between the cmd purpose and your output, note it in the report under `purpose_gap:`.
+2. **Purpose validation**: Re-read your task YAML's `description` field and verify your deliverable actually achieves the stated purpose. If there's a gap between the task purpose and your output, note it in the report under `purpose_gap:`.
 3. Write report YAML
 4. Notify Soukaiya via inbox_write
 5. (No delivery verification needed — inbox_write guarantees persistence)

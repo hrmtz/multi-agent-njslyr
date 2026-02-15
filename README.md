@@ -459,7 +459,7 @@ Open `dashboard.md` in your editor for a real-time status view:
 You: "Research the top 5 MCP servers and create a comparison table"
 ```
 
-The Darkninja writes the task to `queue/darkninja_to_gryakuza.yaml` and wakes the Gryakuza. Control returns to you immediately.
+The Darkninja sends the task to Gryakuza via inbox (`queue/inbox/gryakuza.yaml`) and wakes the Gryakuza. Control returns to you immediately.
 
 The Gryakuza breaks the task into subtasks:
 
@@ -600,7 +600,7 @@ Efficient knowledge sharing through a four-layer context system:
 |-------|----------|---------|
 | Layer 1: Memory MCP | `memory/darkninja_memory.jsonl` | Cross-project, cross-session long-term memory |
 | Layer 2: Project | `config/projects.yaml`, `projects/<id>.yaml`, `context/{project}.md` | Project-specific information and technical knowledge |
-| Layer 3: YAML Queue | `queue/darkninja_to_gryakuza.yaml`, `queue/tasks/`, `queue/reports/` | Task management — source of truth for instructions and reports |
+| Layer 3: YAML Queue | `queue/inbox/*.yaml`, `queue/tasks/`, `queue/reports/` | Task management — source of truth for instructions and reports |
 | Layer 4: Session | CLAUDE.md, instructions/*.md | Working context (wiped by `/clear`) |
 
 This design enables:
@@ -1342,7 +1342,6 @@ multi-agent-njslyr/
 │   └── <project_id>.yaml    # Full info per project (clients, tasks, Notion links, etc.)
 │
 ├── queue/                    # Communication files
-│   ├── shogun_to_karo.yaml   # Darkninja → Gryakuza commands
 │   ├── ntfy_inbox.yaml       # Incoming messages from phone (ntfy)
 │   ├── inbox/                # Per-agent inbox files
 │   │   ├── darkninja.yaml    # Messages to Darkninja

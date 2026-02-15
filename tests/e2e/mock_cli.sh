@@ -186,14 +186,18 @@ handle_clear() {
 }
 
 # ─── Gryakuza-specific: decompose cmd into subtasks ───
-# When gryakuza receives a cmd_new, it reads darkninja_to_gryakuza.yaml,
+# When gryakuza receives a cmd_new, it reads inbox messages,
 # creates task YAMLs for yakuza, and sends inbox notifications.
 gryakuza_decompose_cmd() {
-    local cmd_file="$MOCK_PROJECT_ROOT/queue/darkninja_to_gryakuza.yaml"
-    if [ ! -f "$cmd_file" ]; then
-        echo "[mock/gryakuza] No cmd file found"
-        return 1
-    fi
+    # Deprecated: darkninja_to_gryakuza.yaml no longer used (inbox-based system).
+    # TODO: Rewrite to read from queue/inbox/gryakuza.yaml instead.
+    # local cmd_file="$MOCK_PROJECT_ROOT/queue/darkninja_to_gryakuza.yaml"
+    # if [ ! -f "$cmd_file" ]; then
+    #     echo "[mock/gryakuza] No cmd file found"
+    #     return 1
+    # fi
+    echo "[mock/gryakuza] DEPRECATED: This function needs rewrite for inbox-based system."
+    return 1
 
     STATE="busy"
     show_busy "$MOCK_CLI_TYPE" 0

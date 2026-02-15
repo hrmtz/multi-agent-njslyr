@@ -37,10 +37,10 @@ workflow:
   - step: 1.5
     action: yaml_slim
     command: 'bash scripts/slim_yaml.sh gryakuza'
-    note: "Compress both shogun_to_karo.yaml and inbox to conserve tokens"
+    note: "Compress inbox to conserve tokens"
   - step: 2
-    action: read_yaml
-    target: queue/shogun_to_karo.yaml
+    action: read_inbox
+    target: queue/inbox/gryakuza.yaml
   - step: 3
     action: update_dashboard
     target: dashboard.md
@@ -65,7 +65,7 @@ workflow:
     method: "bash scripts/inbox_write.sh"
   - step: 8
     action: check_pending
-    note: "If pending cmds remain in shogun_to_karo.yaml → loop to step 2. Otherwise stop."
+    note: "If unread inbox messages remain → loop to step 2. Otherwise stop."
   # NOTE: No background monitor needed. Soukaiya sends inbox_write on QC completion.
   # Yakuza → Soukaiya (quality check) → Gryakuza (notification). Fully event-driven.
   # === Report Reception Phase ===
@@ -76,8 +76,8 @@ workflow:
     note: "Soukaiya reports QC results. Yakuza no longer reports directly to Gryakuza."
   - step: 10
     action: scan_all_reports
-    target: "queue/reports/yakuza*_report.yaml + queue/reports/soukaiya_report.yaml"
-    note: "Scan ALL reports (yakuza + soukaiya). Communication loss safety net."
+    target: "queue/reports/yakuza*_report*.yaml + queue/reports/soukaiya_report.yaml"
+    note: "Scan ALL reports (yakuza + soukaiya). Pattern matches both old (yakuza{N}_report.yaml) and new (yakuza{N}_report_{task_id}.yaml) formats."
   - step: 11
     action: update_dashboard
     target: dashboard.md
@@ -91,17 +91,18 @@ workflow:
   - step: 12
     action: check_pending_after_report
     note: |
-      After report processing, check queue/shogun_to_karo.yaml for unprocessed pending cmds.
-      If pending exists → go back to step 2 (process new cmd).
-      If no pending → stop (await next inbox wakeup).
+      After report processing, check queue/inbox/gryakuza.yaml for unread messages.
+      If unread messages exist → go back to step 2 (process new cmd).
+      If no unread messages → stop (await next inbox wakeup).
       WHY: Darkninja may have added new cmds while gryakuza was processing reports.
       Same logic as step 8's check_pending, but executed after report reception flow too.
 
 files:
-  input: queue/shogun_to_karo.yaml
+  input: queue/inbox/gryakuza.yaml
   task_template: "queue/tasks/yakuza{N}.yaml"
   soukaiya_task: queue/tasks/soukaiya.yaml
-  report_pattern: "queue/reports/yakuza{N}_report.yaml"
+  report_pattern: "queue/reports/yakuza{N}_report_{task_id}.yaml"
+  report_pattern_old: "queue/reports/yakuza{N}_report.yaml"  # Deprecated, for backward compatibility
   soukaiya_report: queue/reports/soukaiya_report.yaml
   dashboard: dashboard.md
 
@@ -233,10 +234,10 @@ Report via dashboard.md update only. Reason: interrupt prevention during lord's 
 
 ### Multiple Pending Cmds Processing
 
-1. List all pending cmds in `queue/shogun_to_karo.yaml`
+1. List all unread messages in `queue/inbox/gryakuza.yaml`
 2. For each cmd: decompose → write YAML → inbox_write → **next cmd immediately**
 3. After all cmds dispatched: **stop** (await inbox wakeup from yakuza)
-4. On wakeup: scan reports → process → check for more pending cmds → stop
+4. On wakeup: scan reports → process → check for more unread messages → stop
 
 ## Task Design: Five Questions
 
@@ -316,8 +317,12 @@ Step 9: Yakuza completes → inbox_write gryakuza → watcher nudges gryakuza
 
 ## Report Scanning (Communication Loss Safety)
 
-On every wakeup (regardless of reason), scan ALL `queue/reports/yakuza*_report.yaml`.
+On every wakeup (regardless of reason), scan ALL `queue/reports/yakuza*_report*.yaml` (matches both old and new formats).
 Cross-reference with dashboard.md — process any reports not yet reflected.
+
+**Report formats supported**:
+- New format (default): `yakuza{N}_report_{task_id}.yaml` (e.g., `yakuza5_report_subtask_227.yaml`)
+- Old format (deprecated): `yakuza{N}_report.yaml` (backward compatibility only)
 
 **Why**: Yakuza inbox messages may be delayed. Report files are already written and scannable as a safety net.
 
@@ -428,7 +433,7 @@ Push notifications to the lord's phone via ntfy. Gryakuza manages streaks and no
 1. Get `parent_cmd` of completed subtask
 2. Check all subtasks with same `parent_cmd`: `grep -l "parent_cmd: cmd_XXX" queue/tasks/yakuza*.yaml | xargs grep "status:"`
 3. Not all done → skip notification
-4. All done → **purpose validation**: Re-read the original cmd in `queue/shogun_to_karo.yaml`. Compare the cmd's stated purpose against the combined deliverables. If purpose is not achieved (subtasks completed but goal unmet), do NOT mark cmd as done — instead create additional subtasks or report the gap to darkninja via dashboard 🚨.
+4. All done → **purpose validation**: Re-read the original cmd in `queue/inbox/gryakuza.yaml` (find by parent_cmd ID). Compare the cmd's stated purpose against the combined deliverables. If purpose is not achieved (subtasks completed but goal unmet), do NOT mark cmd as done — instead create additional subtasks or report the gap to darkninja via dashboard 🚨.
 5. Purpose validated → update `saytask/streaks.yaml`:
    - `today.completed` += 1 (**per cmd**, not per subtask)
    - Streak logic: last_date=today → keep current; last_date=yesterday → current+1; else → reset to 1
@@ -610,9 +615,9 @@ Darkninja needs conversation history with the lord.
 
 Gryakuza MAY self-/clear when ALL of the following conditions are met:
 
-1. **No in_progress cmds**: All cmds in `shogun_to_karo.yaml` are `done` or `pending` (zero `in_progress`)
+1. **No unread inbox**: `queue/inbox/gryakuza.yaml` has zero `read: false` entries
 2. **No active tasks**: No `queue/tasks/yakuza*.yaml` or `queue/tasks/soukaiya.yaml` with `status: assigned` or `status: in_progress`
-3. **No unread inbox**: `queue/inbox/gryakuza.yaml` has zero `read: false` entries
+3. **No pending reports**: All reports in `queue/reports/` have been processed
 
 When conditions met → execute self-/clear:
 ```bash
@@ -825,7 +830,7 @@ External PRs are reinforcements. Treat with respect.
 
 ### Primary Data Sources
 
-1. `queue/shogun_to_karo.yaml` — current cmd (check status: pending/done)
+1. `queue/inbox/gryakuza.yaml` — unread messages (check read: false)
 2. `queue/tasks/yakuza{N}.yaml` — all yakuza assignments
 3. `queue/reports/yakuza{N}_report.yaml` — unreflected reports?
 4. `Memory MCP (read_graph)` — system settings, lord's preferences
@@ -835,7 +840,7 @@ External PRs are reinforcements. Treat with respect.
 
 ### Recovery Steps
 
-1. Check current cmd in `shogun_to_karo.yaml`
+1. Check unread messages in `queue/inbox/gryakuza.yaml`
 2. Check all yakuza assignments in `queue/tasks/`
 3. Scan `queue/reports/` for unprocessed reports
 4. Reconcile dashboard.md with YAML ground truth, update if needed
@@ -846,7 +851,7 @@ External PRs are reinforcements. Treat with respect.
 1. CLAUDE.md (auto-loaded)
 2. Memory MCP (`read_graph`)
 3. `config/projects.yaml` — project list
-4. `queue/shogun_to_karo.yaml` — current instructions
+4. `queue/inbox/gryakuza.yaml` — current instructions
 5. If task has `project` field → read `context/{project}.md`
 6. Read related files
 7. Report loading complete, then begin decomposition
