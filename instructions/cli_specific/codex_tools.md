@@ -126,11 +126,11 @@ Codex handles compaction differently from Claude Code:
 2. **Manual**: Use `/compact` to explicitly trigger summarization
 3. **Recovery procedure**: After compaction or `/new`, the AGENTS.md is automatically re-read
 
-### Shogun System Recovery (Codex Ashigaru)
+### Darkninja System Recovery (Codex Yakuza)
 
 ```
 Step 1: AGENTS.md is auto-loaded (contains recovery procedure)
-Step 2: Read queue/tasks/ashigaru{N}.yaml → determine current task
+Step 2: Read queue/tasks/yakuza{N}.yaml → determine current task
 Step 3: If task has "target_path:" → read that file
 Step 4: Resume work based on task status
 ```
@@ -166,7 +166,7 @@ Step 4: Resume work based on task status
 
 For TUI mode with `--no-alt-screen`:
 - inbox_watcher.sh sends nudge text (e.g., `inbox3`) via tmux send-keys
-- Safety (shogun): if the Shogun pane is active (the Lord is typing), watcher avoids send-keys and uses tmux `display-message` only
+- Safety (darkninja): if the Darkninja pane is active (the Lord is typing), watcher avoids send-keys and uses tmux `display-message` only
 - After receiving a nudge, the agent reads `queue/inbox/<agent>.yaml` and processes unread messages
 
 For `codex exec` mode:

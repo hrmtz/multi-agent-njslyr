@@ -26,10 +26,10 @@
 
 # Instructions (core OSS)
 !instructions/
-!instructions/shogun.md
-!instructions/karo.md
-!instructions/ashigaru.md
-!instructions/gunshi.md
+!instructions/darkninja.md
+!instructions/gryakuza.md
+!instructions/yakuza.md
+!instructions/soukaiya.md
 
 # Multi-CLI: CLI-specific tool descriptions
 !instructions/cli_specific/
@@ -57,7 +57,7 @@
 !AGENTS.md
 
 # Setup and deployment scripts
-!shutsujin_departure.sh
+!yokubari.sh
 !first_setup.sh
 !setup.sh
 !install.bat

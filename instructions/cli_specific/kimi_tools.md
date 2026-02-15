@@ -210,19 +210,19 @@ Created via CreateSubagent tool:
 | LaborMarket (subagent registry) | **Isolated** | **Shared** |
 | Approval system | Shared (via `approval.share()`) | Shared |
 
-### Comparison with Shogun System
+### Comparison with Darkninja System
 
-| Aspect | Shogun System | Kimi Agent Swarm |
+| Aspect | Darkninja System | Kimi Agent Swarm |
 |--------|--------------|-----------------|
 | Execution model | tmux panes (separate processes) | In-process (single Python process) |
-| Agent count | 10 (shogun + karo + 8 ashigaru) | Up to 100 (claimed) |
+| Agent count | 10 (darkninja + gryakuza + 8 yakuza) | Up to 100 (claimed) |
 | Communication | File-based inbox (YAML + inotifywait) | In-memory LaborMarket registry |
 | Isolation | Full OS-level (separate tmux panes) | Python-level (separate KimiSoul instances) |
 | Recovery | /clear + CLAUDE.md auto-load | Checkpoint/DenwaRenji (time travel) |
 | CLI independence | Each agent runs own CLI instance | Single CLI, multiple internal agents |
-| Orchestration | Karo (manager agent) | Main agent auto-delegates |
+| Orchestration | Gryakuza (manager agent) | Main agent auto-delegates |
 
-**Key insight**: Kimi's Agent Swarm is complementary, not competing. It could run *inside* a single ashigaru's tmux pane, providing sub-delegation within that agent.
+**Key insight**: Kimi's Agent Swarm is complementary, not competing. It could run *inside* a single yakuza's tmux pane, providing sub-delegation within that agent.
 
 ### Checkpoint / Time Travel (DenwaRenji)
 
@@ -234,11 +234,11 @@ Unique feature: AI can "send messages to its past self" to correct course. Inter
 2. **Session resume**: `--continue` to resume, `--session <id>` for specific sessions
 3. **Checkpoint system**: DenwaRenji allows state reversion
 
-### Shogun System Recovery (Kimi Ashigaru)
+### Darkninja System Recovery (Kimi Yakuza)
 
 ```
 Step 1: AGENTS.md is auto-loaded (contains recovery procedure)
-Step 2: Read queue/tasks/ashigaru{N}.yaml → determine current task
+Step 2: Read queue/tasks/yakuza{N}.yaml → determine current task
 Step 3: If task has "target_path:" → read that file
 Step 4: Resume work based on task status
 ```

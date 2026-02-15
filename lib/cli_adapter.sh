@@ -170,10 +170,10 @@ get_instruction_file() {
     local role
 
     case "$agent_id" in
-        shogun)    role="shogun" ;;
-        karo)      role="karo" ;;
-        gunshi)    role="gunshi" ;;
-        ashigaru*) role="ashigaru" ;;
+        darkninja) role="darkninja" ;;
+        gryakuza)  role="gryakuza" ;;
+        soukaiya)  role="soukaiya" ;;
+        yakuza*)   role="yakuza" ;;
         *)
             echo "" >&2
             return 1
@@ -258,18 +258,18 @@ get_agent_model() {
         kimi)
             # Kimi CLI用デフォルトモデル
             case "$agent_id" in
-                shogun|karo)    echo "k2.5" ;;
-                ashigaru*)      echo "k2.5" ;;
-                *)              echo "k2.5" ;;
+                darkninja|gryakuza) echo "k2.5" ;;
+                yakuza*)            echo "k2.5" ;;
+                *)                  echo "k2.5" ;;
             esac
             ;;
         *)
             # Claude Code/Codex/Copilot用デフォルトモデル
             case "$agent_id" in
-                shogun)         echo "opus" ;;
-                karo)           echo "sonnet" ;;
-                gunshi)         echo "opus" ;;
-                ashigaru*)      echo "sonnet" ;;
+                darkninja)      echo "opus" ;;
+                gryakuza)       echo "sonnet" ;;
+                soukaiya)       echo "opus" ;;
+                yakuza*)        echo "sonnet" ;;
                 *)              echo "sonnet" ;;
             esac
             ;;

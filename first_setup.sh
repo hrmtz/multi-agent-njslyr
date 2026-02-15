@@ -504,7 +504,7 @@ shell: bash
 
 # スキル設定
 skill:
-  # スキル保存先（スキル名に shogun- プレフィックスを付けて保存）
+  # スキル保存先（スキル名に darkninja- プレフィックスを付けて保存）
   save_path: "~/.claude/skills/"
 
   # ローカルスキル保存先（このプロジェクト専用）
@@ -562,16 +562,16 @@ fi
 RESULTS+=("設定ファイル: OK")
 
 # ============================================================
-# STEP 8: 足軽用タスク・レポートファイル初期化
+# STEP 8: ヤクザ用タスク・レポートファイル初期化
 # ============================================================
 log_step "STEP 8: キューファイル初期化"
 
-# 足軽用タスクファイル作成
+# ヤクザ用タスクファイル作成
 for i in {1..8}; do
-    TASK_FILE="$SCRIPT_DIR/queue/tasks/ashigaru${i}.yaml"
+    TASK_FILE="$SCRIPT_DIR/queue/tasks/yakuza${i}.yaml"
     if [ ! -f "$TASK_FILE" ]; then
         cat > "$TASK_FILE" << EOF
-# 足軽${i}専用タスクファイル
+# ヤクザ${i}専用タスクファイル
 task:
   task_id: null
   parent_cmd: null
@@ -582,14 +582,14 @@ task:
 EOF
     fi
 done
-log_info "足軽タスクファイル (1-8) を確認/作成しました"
+log_info "ヤクザタスクファイル (1-8) を確認/作成しました"
 
-# 足軽用レポートファイル作成
+# ヤクザ用レポートファイル作成
 for i in {1..8}; do
-    REPORT_FILE="$SCRIPT_DIR/queue/reports/ashigaru${i}_report.yaml"
+    REPORT_FILE="$SCRIPT_DIR/queue/reports/yakuza${i}_report.yaml"
     if [ ! -f "$REPORT_FILE" ]; then
         cat > "$REPORT_FILE" << EOF
-worker_id: ashigaru${i}
+worker_id: yakuza${i}
 task_id: null
 timestamp: ""
 status: idle
@@ -597,7 +597,7 @@ result: null
 EOF
     fi
 done
-log_info "足軽レポートファイル (1-8) を確認/作成しました"
+log_info "ヤクザレポートファイル (1-8) を確認/作成しました"
 
 RESULTS+=("キューファイル: OK")
 
@@ -608,7 +608,7 @@ log_step "STEP 9: 実行権限設定"
 
 SCRIPTS=(
     "setup.sh"
-    "shutsujin_departure.sh"
+    "yokubari.sh"
     "first_setup.sh"
 )
 
@@ -632,8 +632,8 @@ BASHRC_FILE="$HOME/.bashrc"
 # css/csm を関数として定義（destroy-unattached で自動掃除）
 # - 複数端末から接続しても画面サイズが干渉しない
 # - SSH切断・アプリ終了時に一時セッションが自動消滅
-# - 本体セッション (shogun/multiagent) は絶対に消えない
-CSS_FUNC='css() { local s="shogun-$$"; local cols=$(tput cols 2>/dev/null || echo 80); tmux new-session -d -t shogun -s "$s" 2>/dev/null && tmux set-option -t "$s" destroy-unattached on 2>/dev/null; if [ "$cols" -lt 80 ]; then tmux new-window -t "$s" -n mobile 2>/dev/null; tmux attach-session -t "$s:mobile" 2>/dev/null || tmux attach-session -t shogun; else tmux attach-session -t "$s" 2>/dev/null || tmux attach-session -t shogun; fi; }'
+# - 本体セッション (darkninja/multiagent) は絶対に消えない
+CSS_FUNC='css() { local s="darkninja-$$"; local cols=$(tput cols 2>/dev/null || echo 80); tmux new-session -d -t darkninja -s "$s" 2>/dev/null && tmux set-option -t "$s" destroy-unattached on 2>/dev/null; if [ "$cols" -lt 80 ]; then tmux new-window -t "$s" -n mobile 2>/dev/null; tmux attach-session -t "$s:mobile" 2>/dev/null || tmux attach-session -t darkninja; else tmux attach-session -t "$s" 2>/dev/null || tmux attach-session -t darkninja; fi; }'
 CSM_FUNC='csm() { local s="multi-$$"; local cols=$(tput cols 2>/dev/null || echo 80); tmux new-session -d -t multiagent -s "$s" 2>/dev/null && tmux set-option -t "$s" destroy-unattached on 2>/dev/null; if [ "$cols" -lt 80 ]; then tmux new-window -t "$s" -n mobile 2>/dev/null; tmux attach-session -t "$s:mobile" 2>/dev/null || tmux attach-session -t multiagent; else tmux attach-session -t "$s" 2>/dev/null || tmux attach-session -t multiagent; fi; }'
 
 ALIAS_ADDED=false
@@ -656,7 +656,7 @@ if [ -f "$BASHRC_FILE" ]; then
             echo "# multi-agent-shogun aliases (added by first_setup.sh)" >> "$BASHRC_FILE"
         fi
         echo "$CSS_FUNC" >> "$BASHRC_FILE"
-        log_info "css 関数を追加しました（将軍ウィンドウ — 自動掃除付き）"
+        log_info "css 関数を追加しました（ダークニンジャウィンドウ — 自動掃除付き）"
         ALIAS_ADDED=true
     else
         # 関数は存在する → 最新版に更新
@@ -669,7 +669,7 @@ if [ -f "$BASHRC_FILE" ]; then
     # csm 関数
     if ! grep -q "^csm()" "$BASHRC_FILE" 2>/dev/null; then
         echo "$CSM_FUNC" >> "$BASHRC_FILE"
-        log_info "csm 関数を追加しました（家老・足軽ウィンドウ — 自動掃除付き）"
+        log_info "csm 関数を追加しました（グレーターヤクザ・ヤクザウィンドウ — 自動掃除付き）"
         ALIAS_ADDED=true
     else
         sed -i '/^csm()/d' "$BASHRC_FILE"
@@ -759,7 +759,7 @@ if command -v claude &> /dev/null; then
     else
         log_info "Memory MCP を設定中..."
         if claude mcp add memory \
-            -e MEMORY_FILE_PATH="$SCRIPT_DIR/memory/shogun_memory.jsonl" \
+            -e MEMORY_FILE_PATH="$SCRIPT_DIR/memory/darkninja_memory.jsonl" \
             -- npx -y @modelcontextprotocol/server-memory 2>/dev/null; then
             log_success "Memory MCP 設定完了"
             RESULTS+=("Memory MCP: 設定完了")
@@ -832,13 +832,13 @@ echo ""
 echo "  ────────────────────────────────────────────────────────────────"
 echo ""
 echo "  出陣（全エージェント起動）:"
-echo "     ./shutsujin_departure.sh"
+echo "     ./yokubari.sh"
 echo ""
 echo "  オプション:"
-echo "     ./shutsujin_departure.sh -s            # セットアップのみ（Claude手動起動）"
-echo "     ./shutsujin_departure.sh -t            # Windows Terminalタブ展開"
-echo "     ./shutsujin_departure.sh -shell bash   # bash用プロンプトで起動"
-echo "     ./shutsujin_departure.sh -shell zsh    # zsh用プロンプトで起動"
+echo "     ./yokubari.sh -s            # セットアップのみ（Claude手動起動）"
+echo "     ./yokubari.sh -t            # Windows Terminalタブ展開"
+echo "     ./yokubari.sh -shell bash   # bash用プロンプトで起動"
+echo "     ./yokubari.sh -shell zsh    # zsh用プロンプトで起動"
 echo ""
 echo "  ※ シェル設定は config/settings.yaml の shell: でも変更可能です"
 echo ""

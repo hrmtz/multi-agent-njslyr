@@ -10,14 +10,14 @@ bash scripts/inbox_write.sh <target_agent> "<message>" <type> <from>
 
 Examples:
 ```bash
-# Shogun → Karo
-bash scripts/inbox_write.sh karo "cmd_048を書いた。実行せよ。" cmd_new shogun
+# Darkninja → Gryakuza
+bash scripts/inbox_write.sh gryakuza "cmd_048を書いた。実行せよ。" cmd_new darkninja
 
-# Ashigaru → Karo
-bash scripts/inbox_write.sh karo "足軽5号、任務完了。報告YAML確認されたし。" report_received ashigaru5
+# Yakuza → Gryakuza
+bash scripts/inbox_write.sh gryakuza "クローンヤクザ5号、ニンム完了。報告YAML確認されたし。" report_received yakuza5
 
-# Karo → Ashigaru
-bash scripts/inbox_write.sh ashigaru3 "タスクYAMLを読んで作業開始せよ。" task_assigned karo
+# Gryakuza → Yakuza
+bash scripts/inbox_write.sh yakuza3 "タスクYAMLを読んで作業開始せよ。" task_assigned gryakuza
 ```
 
 Delivery is handled by `inbox_watcher.sh` (infrastructure layer).
@@ -34,9 +34,9 @@ Two layers:
 The nudge is minimal: `inboxN` (e.g. `inbox3` = 3 unread). That's it.
 **Agent reads the inbox file itself.** Message content never travels through tmux — only a short wake-up signal.
 
-Safety note (shogun):
-- If the Shogun pane is active (the Lord is typing), `inbox_watcher.sh` must not inject keystrokes. It should use tmux `display-message` only.
-- Escalation keystrokes (`Escape×2`, `/clear`, `C-u`) must be suppressed for shogun to avoid clobbering human input.
+Safety note (darkninja):
+- If the Darkninja pane is active (the ラオモト is typing), `inbox_watcher.sh` must not inject keystrokes. It should use tmux `display-message` only.
+- Escalation keystrokes (`Escape×2`, `/clear`, `C-u`) must be suppressed for darkninja to avoid clobbering human input.
 
 Special cases (CLI commands sent via `tmux send-keys`):
 - `type: clear_command` → sends `/clear` + Enter via send-keys
@@ -64,7 +64,7 @@ Read-cost controls:
 | 2〜4 min | Escape×2 + nudge | Cursor position bug workaround |
 | 4 min+ | `/clear` sent (max once per 5 min) | Force session reset + YAML re-read |
 
-## Inbox Processing Protocol (karo/ashigaru/gunshi)
+## Inbox Processing Protocol (gryakuza/yakuza/soukaiya)
 
 When you receive `inboxN` (e.g. `inbox3`):
 1. `Read queue/inbox/{your_id}.yaml`
@@ -85,10 +85,10 @@ you will be stuck idle until the escalation sends `/clear` (~4 min).
 
 ## Redo Protocol
 
-When Karo determines a task needs to be redone:
+When Gryakuza determines a task needs to be redone:
 
-1. Karo writes new task YAML with new task_id (e.g., `subtask_097d` → `subtask_097d2`), adds `redo_of` field
-2. Karo sends `clear_command` type inbox message (NOT `task_assigned`)
+1. Gryakuza writes new task YAML with new task_id (e.g., `subtask_097d` → `subtask_097d2`), adds `redo_of` field
+2. Gryakuza sends `clear_command` type inbox message (NOT `task_assigned`)
 3. inbox_watcher delivers `/clear` to the agent → session reset
 4. Agent recovers via Session Start procedure, reads new task YAML, starts fresh
 
@@ -98,9 +98,9 @@ Race condition is eliminated: `/clear` wipes old context. Agent re-reads YAML wi
 
 | Direction | Method | Reason |
 |-----------|--------|--------|
-| Ashigaru/Gunshi → Karo | Report YAML + inbox_write | File-based notification |
-| Karo → Shogun/Lord | dashboard.md update only | **inbox to shogun FORBIDDEN** — prevents interrupting Lord's input |
-| Karo → Gunshi | YAML + inbox_write | Strategic task delegation |
+| Yakuza/Soukaiya → Gryakuza | Report YAML + inbox_write | File-based notification |
+| Gryakuza → Darkninja/ラオモト | dashboard.md update only | **inbox to darkninja FORBIDDEN** — prevents interrupting ラオモト's input |
+| Gryakuza → Soukaiya | YAML + inbox_write | Strategic task delegation |
 | Top → Down | YAML + inbox_write | Standard wake-up |
 
 ## File Operation Rule
@@ -119,10 +119,10 @@ bash scripts/inbox_write.sh <target> "<message>" <type> <from>
 
 ### Report Notification Protocol
 
-After writing report YAML, notify Karo:
+After writing report YAML, notify Soukaiya:
 
 ```bash
-bash scripts/inbox_write.sh karo "足軽{N}号、任務完了でござる。報告書を確認されよ。" report_received ashigaru{N}
+bash scripts/inbox_write.sh soukaiya "クローンヤクザ{N}号、ニンム・コンプリート。品質チェックを仰ぐ。ドーモ。" report_received yakuza{N}
 ```
 
 That's it. No state checking, no retry, no delivery verification.

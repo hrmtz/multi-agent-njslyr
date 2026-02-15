@@ -2,7 +2,7 @@
 # ═══════════════════════════════════════════════════════════════
 # inbox_watcher.sh — メールボックス監視＆起動シグナル配信
 # Usage: bash scripts/inbox_watcher.sh <agent_id> <pane_target> [cli_type]
-# Example: bash scripts/inbox_watcher.sh karo multiagent:0.0 claude
+# Example: bash scripts/inbox_watcher.sh gryakuza multiagent:0.0 claude
 #
 # 設計思想:
 #   メッセージ本体はファイル（inbox YAML）に書く = 確実
@@ -10,8 +10,8 @@
 #   エージェントが自分でinboxをReadして処理する
 #   冪等: 2回届いてもunreadがなければ何もしない
 #
-# inotifywait でファイル変更を検知（イベント駆動、ポーリングではない）
-# Fallback 1: 30秒タイムアウト（WSL2 inotify不発時の安全網）
+# ファイル変更検知: Linux→inotifywait, macOS→fswatch（イベント駆動、ポーリングではない）
+# Fallback 1: 30秒タイムアウト（WSL2 inotify不発時 / fswatch timeout の安全網）
 # Fallback 2: rc=1処理（Claude Code atomic write = tmp+rename でinode変更時）
 #
 # エスカレーション（未読メッセージが放置されている場合）:
@@ -20,12 +20,20 @@
 #   4分〜 : /clear送信（5分に1回まで。強制リセット+YAML再読）
 # ═══════════════════════════════════════════════════════════════
 
+# ─── OS detection (cross-platform) ───
+_UNAME_S=$(uname -s)
+
 # ─── Testing guard ───
 # When __INBOX_WATCHER_TESTING__=1, only function definitions are loaded.
-# Argument parsing, inotifywait check, and main loop are skipped.
+# Argument parsing, file-watch check, and main loop are skipped.
 # Test code sets variables (AGENT_ID, PANE_TARGET, CLI_TYPE, INBOX) externally.
 if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
     set -euo pipefail
+
+    # macOS (Darwin): GNU coreutils (timeout etc.) via Homebrew gnubin
+    if [[ "$_UNAME_S" == "Darwin" ]]; then
+        export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
+    fi
 
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
     AGENT_ID="$1"
@@ -48,10 +56,17 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
 
     echo "[$(date)] inbox_watcher started — agent: $AGENT_ID, pane: $PANE_TARGET, cli: $CLI_TYPE" >&2
 
-    # Ensure inotifywait is available
-    if ! command -v inotifywait &>/dev/null; then
-        echo "[inbox_watcher] ERROR: inotifywait not found. Install: sudo apt install inotify-tools" >&2
-        exit 1
+    # Ensure file-watch tool is available (fswatch on macOS, inotifywait on Linux)
+    if [[ "$_UNAME_S" == "Darwin" ]]; then
+        if ! command -v fswatch &>/dev/null; then
+            echo "[inbox_watcher] ERROR: fswatch not found. Install: brew install fswatch" >&2
+            exit 1
+        fi
+    else
+        if ! command -v inotifywait &>/dev/null; then
+            echo "[inbox_watcher] ERROR: inotifywait not found. Install: sudo apt install inotify-tools" >&2
+            exit 1
+        fi
     fi
 fi
 
@@ -358,10 +373,10 @@ send_cli_command() {
     local effective_cli
     effective_cli=$(get_effective_cli_type)
 
-    # Safety: never inject CLI commands into the shogun pane.
-    # Shogun is controlled by the Lord; keystroke injection can clobber human input.
-    if [ "$AGENT_ID" = "shogun" ]; then
-        echo "[$(date)] [SKIP] shogun: suppressing CLI command injection ($cmd)" >&2
+    # Safety: never inject CLI commands into the darkninja pane.
+    # Darkninja is controlled by the Lord; keystroke injection can clobber human input.
+    if [ "$AGENT_ID" = "darkninja" ]; then
+        echo "[$(date)] [SKIP] darkninja: suppressing CLI command injection ($cmd)" >&2
         return 0
     fi
 
@@ -437,9 +452,9 @@ send_context_reset() {
     local effective_cli
     effective_cli=$(get_effective_cli_type)
 
-    # Safety: never inject CLI commands into the shogun pane.
-    if [ "$AGENT_ID" = "shogun" ]; then
-        echo "[$(date)] [SKIP] shogun: suppressing context reset" >&2
+    # Safety: never inject CLI commands into the darkninja pane.
+    if [ "$AGENT_ID" = "darkninja" ]; then
+        echo "[$(date)] [SKIP] darkninja: suppressing context reset" >&2
         return 0
     fi
 
@@ -481,8 +496,27 @@ send_context_reset() {
     echo "[$(date)] [CONTEXT-RESET] $AGENT_ID still busy after 15s — proceeding with nudge anyway" >&2
 }
 
+# ─── Cross-platform file change wait ───
+# Darwin: fswatch -1 (one-shot), Linux: inotifywait
+# Returns: 0=event, 1=error/inode-change, 2=timeout
+_wait_for_file_change() {
+    local file="$1"
+    local sec="${2:-30}"
+    if [[ "$_UNAME_S" == "Darwin" ]]; then
+        timeout "$sec" fswatch -1 "$file" >/dev/null 2>&1
+        local rc=$?
+        if [ "$rc" -eq 124 ]; then
+            return 2  # timeout → map to inotifywait timeout code
+        fi
+        return $rc
+    else
+        inotifywait -q -t "$sec" -e modify -e close_write "$file" 2>/dev/null
+        return $?
+    fi
+}
+
 # ─── Agent self-watch detection ───
-# Check if the agent has an active inotifywait on its inbox.
+# Check if the agent has an active file-watch (inotifywait/fswatch) on its inbox.
 # If yes, the agent will self-wake — no nudge needed.
 agent_has_self_watch() {
     # Codex/Copilot/Kimi CLIs cannot run self-watch. Only Claude Code agents can.
@@ -491,19 +525,25 @@ agent_has_self_watch() {
     if [[ "$effective_cli" != "claude" ]]; then
         return 1  # non-Claude CLIs never have self-watch
     fi
-    # For Claude Code agents: check if an inotifywait exists that is NOT
+    # For Claude Code agents: check if a file-watch process exists that is NOT
     # a child of this inbox_watcher process (exclude our own watcher).
     local my_pgid
     my_pgid=$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ')
+    local _watch_pattern
+    if [[ "$_UNAME_S" == "Darwin" ]]; then
+        _watch_pattern="fswatch.*inbox/${AGENT_ID}.yaml"
+    else
+        _watch_pattern="inotifywait.*inbox/${AGENT_ID}.yaml"
+    fi
     local found=1  # default: not found
     while IFS= read -r pid; do
         local pid_pgid
         pid_pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
         if [[ "$pid_pgid" != "$my_pgid" ]]; then
-            found=0  # found an inotifywait NOT from our process group
+            found=0  # found a file-watch NOT from our process group
             break
         fi
-    done < <(pgrep -f "inotifywait.*inbox/${AGENT_ID}.yaml" 2>/dev/null)
+    done < <(pgrep -f "$_watch_pattern" 2>/dev/null)
     return $found
 }
 
@@ -583,10 +623,10 @@ send_wakeup() {
         return 0
     fi
 
-    # Shogun: if the pane is focused, never inject keys (it can clobber the Lord's input).
+    # Darkninja: if the pane is focused, never inject keys (it can clobber the Lord's input).
     # Instead, show a tmux message. If not focused, we can safely send the normal nudge.
-    if [ "$AGENT_ID" = "shogun" ] && pane_is_active; then
-        echo "[$(date)] [DISPLAY] shogun pane is active — showing nudge: inbox${unread_count}" >&2
+    if [ "$AGENT_ID" = "darkninja" ] && pane_is_active; then
+        echo "[$(date)] [DISPLAY] darkninja pane is active — showing nudge: inbox${unread_count}" >&2
         timeout 2 tmux display-message -t "$PANE_TARGET" -d 5000 "inbox${unread_count}" 2>/dev/null || true
         return 0
     fi
@@ -627,9 +667,9 @@ send_wakeup_with_escape() {
     effective_cli=$(get_effective_cli_type)
     local c_ctrl_state="skipped"
 
-    # Safety: never send Escape escalation to shogun. It can wipe the Lord's input.
-    if [ "$AGENT_ID" = "shogun" ]; then
-        echo "[$(date)] [SKIP] shogun: suppressing Escape escalation; sending plain nudge" >&2
+    # Safety: never send Escape escalation to darkninja. It can wipe the Lord's input.
+    if [ "$AGENT_ID" = "darkninja" ]; then
+        echo "[$(date)] [SKIP] darkninja: suppressing Escape escalation; sending plain nudge" >&2
         send_wakeup "$unread_count"
         return 0
     fi
@@ -705,8 +745,8 @@ process_unread() {
         FIRST_UNREAD_SEEN=0
         NEW_CONTEXT_SENT=0
         if ! agent_is_busy; then
-            # Shogun: only clear input when pane is not active (Lord is away)
-            if [ "$AGENT_ID" = "shogun" ] && pane_is_active; then
+            # Darkninja: only clear input when pane is not active (Lord is away)
+            if [ "$AGENT_ID" = "darkninja" ] && pane_is_active; then
                 : # Lord may be typing — skip C-u
             else
                 timeout 2 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
@@ -794,7 +834,7 @@ for s in data.get('specials', []):
         # Send /new or /clear once when task_assigned is first detected,
         # to clear stale context from the previous task.
         # Skip if: (1) already sent this batch, (2) clear_command already handled above,
-        #          (3) agent is shogun (human-controlled).
+        #          (3) agent is darkninja (human-controlled).
         if [ "$has_task_assigned" = "1" ] && [ "$NEW_CONTEXT_SENT" -eq 0 ] && [ "$clear_seen" -eq 0 ]; then
             send_context_reset
             NEW_CONTEXT_SENT=1
@@ -862,8 +902,8 @@ for s in data.get('specials', []):
         # Clear stale nudge text from input field (Codex CLI prefills last input on idle).
         # Only send C-u when agent is idle — during Working it would be disruptive.
         if ! agent_is_busy; then
-            # Shogun: only clear input when pane is not active (Lord is away)
-            if [ "$AGENT_ID" = "shogun" ] && pane_is_active; then
+            # Darkninja: only clear input when pane is not active (Lord is away)
+            if [ "$AGENT_ID" = "darkninja" ] && pane_is_active; then
                 : # Lord may be typing — skip C-u
             else
                 timeout 2 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
@@ -888,10 +928,10 @@ process_unread_once
 INOTIFY_TIMEOUT="${INOTIFY_TIMEOUT:-30}"
 
 while true; do
-    # Block until file is modified OR timeout (safety net for WSL2)
-    # set +e: inotifywait returns 2 on timeout, which would kill script under set -e
+    # Block until file is modified OR timeout (safety net for WSL2 / fswatch)
+    # set +e: file-watch returns 2 on timeout, which would kill script under set -e
     set +e
-    inotifywait -q -t "$INOTIFY_TIMEOUT" -e modify -e close_write "$INBOX" 2>/dev/null
+    _wait_for_file_change "$INBOX" "$INOTIFY_TIMEOUT"
     rc=$?
     set -e
 

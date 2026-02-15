@@ -18,15 +18,15 @@
 </div>
 
 <p align="center">
-  <img src="images/screenshots/hero/latest-translucent-20260210-190453.png" alt="将軍ペインでの最新半透過セッションキャプチャ" width="940">
+  <img src="images/screenshots/hero/latest-translucent-20260210-190453.png" alt="ダークニンジャペインでの最新半透過セッションキャプチャ" width="940">
 </p>
 
 <p align="center">
-  <img src="images/screenshots/hero/latest-translucent-20260208-084602.png" alt="将軍ペインでの自然言語コマンド入力" width="420">
-  <img src="images/company-creed-all-panes.png" alt="家老と足軽が全ペインで並列反応する様子" width="520">
+  <img src="images/screenshots/hero/latest-translucent-20260208-084602.png" alt="ダークニンジャペインでの自然言語コマンド入力" width="420">
+  <img src="images/company-creed-all-panes.png" alt="グレーターヤクザとクローンヤクザが全ペインで並列反応する様子" width="520">
 </p>
 
-<p align="center"><i>家老1体が足軽7体+軍師1体を統率 — 実際の稼働画面、モックデータなし</i></p>
+<p align="center"><i>グレーターヤクザ1体がクローンヤクザ7体+ソウカイヤ幹部1体を統率 — 実際の稼働画面、モックデータなし</i></p>
 
 ---
 
@@ -35,34 +35,34 @@
 **multi-agent-shogun** は、複数のAIコーディングCLIインスタンスを同時に実行し、戦国時代の軍制のように統率するシステムです。**Claude Code**、**OpenAI Codex**、**GitHub Copilot**、**Kimi Code** の4CLIに対応。
 
 **なぜ使うのか？**
-- 1つの命令で、7体のAIワーカー+1体の軍師が並列で実行
+- 1つの命令で、7体のAIワーカー+1体のソウカイヤ幹部が並列で実行
 - 待ち時間なし - タスクがバックグラウンドで実行中も次の命令を出せる
 - AIがセッションを跨いであなたの好みを記憶（Memory MCP）
 - ダッシュボードでリアルタイム進捗確認
 
 ```
-      あなた（上様）
+      あなた（ラオモト）
            │
            ▼ 命令を出す
     ┌─────────────┐
-    │   SHOGUN    │  ← 命令を受け取り、即座に委譲
+    │   DARKNINJA    │  ← 命令を受け取り、即座に委譲
     └──────┬──────┘
            │ YAMLファイル + tmux
     ┌──────▼──────┐
-    │    KARO     │  ← タスクをワーカーに分配
+    │    GRYAKUZA     │  ← タスクをワーカーに分配
     └──────┬──────┘
            │
   ┌─┬─┬─┬─┴─┬─┬─┬────────┐
-  │1│2│3│4│5│6│7│ GUNSHI │  ← 7体のワーカー + 1体の軍師
+  │1│2│3│4│5│6│7│ SOUKAIYA │  ← 7体のワーカー + 1体のソウカイヤ幹部
   └─┴─┴─┴─┴─┴─┴─┴────────┘
-     ASHIGARU      軍師
+     YAKUZA      ソウカイヤ幹部
 ```
 
 ---
 
-## なぜ Shogun なのか？
+## なぜ Darkninja なのか？
 
-多くのマルチエージェントフレームワークは、連携のためにAPIトークンを消費します。Shogunは違います。
+多くのマルチエージェントフレームワークは、連携のためにAPIトークンを消費します。Darkninjaは違います。
 
 | | Claude Code `Task` ツール | LangGraph | CrewAI | **multi-agent-shogun** |
 |---|---|---|---|---|
@@ -79,7 +79,7 @@
 
 **完全な透明性** — すべてのエージェントが見えるtmuxペインで動作。すべての指示・報告・判断がプレーンなYAMLファイルで、読んで、diffして、バージョン管理できます。ブラックボックスなし。
 
-**実戦で鍛えた階層構造** — 将軍→家老→足軽の指揮系統が設計レベルで衝突を防止：明確な責任分担、エージェントごとの専用ファイル、イベント駆動通信、ポーリングなし。
+**実戦で鍛えた階層構造** — ダークニンジャ→グレーターヤクザ→クローンヤクザの指揮系統が設計レベルで衝突を防止：明確な責任分担、エージェントごとの専用ファイル、イベント駆動通信、ポーリングなし。
 
 ---
 
@@ -94,11 +94,11 @@
 | **使用時の心理** | 1トークンが気になる | 使い放題 |
 | **実験の余地** | 制約あり | 自由に投入 |
 
-**「AIを使い倒す」思想** — 定額CLIサブスクなら、8体の足軽を気兼ねなく投入できる。1時間稼働でも24時間稼働でもコストは同じ。「まあまあ」と「徹底的に」の二択で悩む必要がない — エージェントを増やせばいい。
+**「AIを使い倒す」思想** — 定額CLIサブスクなら、8体のクローンヤクザを気兼ねなく投入できる。1時間稼働でも24時間稼働でもコストは同じ。「まあまあ」と「徹底的に」の二択で悩む必要がない — エージェントを増やせばいい。
 
 ### Multi-CLI対応
 
-将軍システムは特定ベンダーに依存しない。4つのCLIツールに対応し、それぞれの強みを活かす：
+ダークニンジャシステムは特定ベンダーに依存しない。4つのCLIツールに対応し、それぞれの強みを活かす：
 
 | CLI | 特徴 | デフォルトモデル |
 |-----|------|-----------------|
@@ -115,7 +115,7 @@ instructions/
 ├── cli_specific/        # CLI固有のツール説明
 │   ├── claude_tools.md  # Claude Code ツール・機能
 │   └── copilot_tools.md # GitHub Copilot CLI ツール・機能
-└── roles/               # ロール定義（将軍、家老、足軽）
+└── roles/               # ロール定義（ダークニンジャ、グレーターヤクザ、クローンヤクザ）
     ↓ ビルド
 CLAUDE.md / AGENTS.md / copilot-instructions.md  ← CLI別に生成
 ```
@@ -128,10 +128,10 @@ CLAUDE.md / AGENTS.md / copilot-instructions.md  ← CLI別に生成
 
 他のフレームワークにはない機能です。
 
-足軽がタスクを実行する中で、**再利用可能なパターンを自動的に発見**し、スキル候補として提案します。家老が提案を `dashboard.md` に集約し、殿（あなた）が正式なスキルに昇格させるか判断します。
+クローンヤクザがタスクを実行する中で、**再利用可能なパターンを自動的に発見**し、スキル候補として提案します。グレーターヤクザが提案を `dashboard.md` に集約し、ラオモト（あなた）が正式なスキルに昇格させるか判断します。
 
 ```
-足軽がタスクを完了
+クローンヤクザがタスクを完了
     ↓
 気づき: 「このパターン、3つのプロジェクトで同じことをした」
     ↓
@@ -140,7 +140,7 @@ YAMLで報告:  skill_candidate:
                  name: "api-endpoint-scaffold"
                  reason: "3プロジェクトで同じRESTスキャフォールドパターンを使用"
     ↓
-dashboard.md に掲載 → 殿が承認 → .claude/commands/ にスキル作成
+dashboard.md に掲載 → ラオモトが承認 → .claude/commands/ にスキル作成
     ↓
 全エージェントが /api-endpoint-scaffold を呼び出し可能に
 ```
@@ -212,7 +212,7 @@ cd /mnt/c/tools/multi-agent-shogun
 ✅ **出陣！**
 
 ```bash
-./shutsujin_departure.sh
+./yokubari.sh
 ```
 
 </td>
@@ -242,7 +242,7 @@ claude --dangerously-skip-permissions
 
 ```bash
 cd /mnt/c/tools/multi-agent-shogun
-./shutsujin_departure.sh
+./yokubari.sh
 ```
 
 ### 📱 スマホからアクセス（どこからでも指揮）
@@ -271,17 +271,17 @@ cd /mnt/c/tools/multi-agent-shogun
    ```sh
    pkg update && pkg install openssh
    ssh あなたのユーザー名@あなたのTailscale IP
-   css    # 将軍に繋がる
+   css    # ダークニンジャに繋がる
    ```
 4. ＋ボタンで新しいウィンドウを開いて、部下の様子も見る：
    ```sh
    ssh あなたのユーザー名@あなたのTailscale IP
-   csm    # 家老+足軽の9ペインが広がる
+   csm    # グレーターヤクザ+クローンヤクザの9ペインが広がる
    ```
 
 **切り方：** Termuxのウィンドウをスワイプで閉じるだけ。tmuxセッションは生き残る。AI部下は黙々と作業を続けている。
 
-**音声入力：** スマホの音声入力で喋れば、将軍が自然言語を理解して全軍に指示を出す。音声認識の誤字も文脈で解釈してくれる。
+**音声入力：** スマホの音声入力で喋れば、ダークニンジャが自然言語を理解して全軍に指示を出す。音声認識の誤字も文脈で解釈してくれる。
 
 **もっと簡単に：** ntfyを設定すると、ntfyアプリから直接通知の受信やコマンドの送信ができます。SSHは不要です。
 
@@ -308,7 +308,7 @@ chmod +x *.sh
 
 ```bash
 cd ~/multi-agent-shogun
-./shutsujin_departure.sh
+./yokubari.sh
 ```
 
 </details>
@@ -347,15 +347,15 @@ wsl --install
 |-----------|------|---------------|
 | `install.bat` | Windows: WSL2 + Ubuntu のセットアップ | 初回のみ |
 | `first_setup.sh` | tmux、Node.js、Claude Code CLI のインストール + Memory MCP設定 | 初回のみ |
-| `shutsujin_departure.sh` | tmuxセッション作成 + Claude Code起動 + 指示書読み込み + ntfyリスナー起動 | 毎日 |
+| `yokubari.sh` | tmuxセッション作成 + Claude Code起動 + 指示書読み込み + ntfyリスナー起動 | 毎日 |
 
 ### `install.bat` が自動で行うこと：
 - ✅ WSL2がインストールされているかチェック（未インストールなら案内）
 - ✅ Ubuntuがインストールされているかチェック（未インストールなら案内）
 - ✅ 次のステップ（`first_setup.sh` の実行方法）を案内
 
-### `shutsujin_departure.sh` が行うこと：
-- ✅ tmuxセッションを作成（shogun + multiagent）
+### `yokubari.sh` が行うこと：
+- ✅ tmuxセッションを作成（darkninja + multiagent）
 - ✅ 全エージェントでClaude Codeを起動
 - ✅ 各エージェントに指示書を自動読み込み
 - ✅ キューファイルをリセットして新しい状態に
@@ -390,43 +390,43 @@ wsl --install
 
 | エージェント | 役割 | 数 |
 |-------------|------|-----|
-| 🏯 将軍（Shogun） | 総大将 - あなたの命令を受ける | 1 |
-| 📋 家老（Karo） | 管理者 - タスク分配・簡易QC・ダッシュボード管理 | 1 |
-| ⚔️ 足軽（Ashigaru） | ワーカー - 実装タスクを並列実行 | 7 |
-| 🧠 軍師（Gunshi） | 参謀 - 分析・評価・設計など高度な思考タスク | 1 |
+| 🏯 ダークニンジャ（Darkninja） | 総大将 - あなたの命令を受ける | 1 |
+| 📋 グレーターヤクザ（Gryakuza） | 管理者 - タスク分配・簡易QC・ダッシュボード管理 | 1 |
+| ⚔️ クローンヤクザ（Yakuza） | ワーカー - 実装タスクを並列実行 | 7 |
+| 🧠 ソウカイヤ幹部（Soukaiya） | 参謀 - 分析・評価・設計など高度な思考タスク | 1 |
 
 tmuxセッションが作成されます：
-- `shogun` - ここに接続してコマンドを出す
-- `multiagent` - 家老・足軽・軍師がバックグラウンドで稼働
+- `darkninja` - ここに接続してコマンドを出す
+- `multiagent` - グレーターヤクザ・クローンヤクザ・ソウカイヤ幹部がバックグラウンドで稼働
 
 ---
 
 ## 📖 基本的な使い方
 
-### Step 1: 将軍に接続
+### Step 1: ダークニンジャに接続
 
-`shutsujin_departure.sh` 実行後、全エージェントが自動的に指示書を読み込み、作業準備完了となります。
+`yokubari.sh` 実行後、全エージェントが自動的に指示書を読み込み、作業準備完了となります。
 
-新しいターミナルを開いて将軍に接続：
+新しいターミナルを開いてダークニンジャに接続：
 
 ```bash
-tmux attach-session -t shogun
+tmux attach-session -t darkninja
 ```
 
 ### Step 2: 最初の命令を出す
 
-将軍は既に初期化済み！そのまま命令を出せます：
+ダークニンジャは既に初期化済み！そのまま命令を出せます：
 
 ```
 JavaScriptフレームワーク上位5つを調査して比較表を作成せよ
 ```
 
-将軍は：
+ダークニンジャは：
 1. タスクをYAMLファイルに書き込む
-2. 家老（管理者）に通知
+2. グレーターヤクザ（管理者）に通知
 3. 即座にあなたに制御を返す（待つ必要なし！）
 
-その間、家老はタスクを足軽ワーカーに分配し、並列実行します。
+その間、グレーターヤクザはタスクをクローンヤクザワーカーに分配し、並列実行します。
 
 ### Step 3: 進捗を確認
 
@@ -436,9 +436,9 @@ JavaScriptフレームワーク上位5つを調査して比較表を作成せよ
 ## 進行中
 | ワーカー | タスク | 状態 |
 |----------|--------|------|
-| 足軽 1 | React調査 | 実行中 |
-| 足軽 2 | Vue調査 | 実行中 |
-| 足軽 3 | Angular調査 | 完了 |
+| クローンヤクザ 1 | React調査 | 実行中 |
+| クローンヤクザ 2 | Vue調査 | 実行中 |
+| クローンヤクザ 3 | Angular調査 | 完了 |
 ```
 
 ### 詳細なフロー
@@ -447,22 +447,22 @@ JavaScriptフレームワーク上位5つを調査して比較表を作成せよ
 あなた: 「トップ5のMCPサーバを調査して比較表を作成せよ」
 ```
 
-将軍がタスクを `queue/shogun_to_karo.yaml` に書き込み、家老を起動。あなたには即座に制御が戻ります。
+ダークニンジャがタスクを `queue/shogun_to_gryakuza.yaml` に書き込み、グレーターヤクザを起動。あなたには即座に制御が戻ります。
 
-家老がタスクをサブタスクに分解：
+グレーターヤクザがタスクをサブタスクに分解：
 
 | ワーカー | 割当内容 |
 |----------|----------|
-| 足軽 1 | Notion MCP調査 |
-| 足軽 2 | GitHub MCP調査 |
-| 足軽 3 | Playwright MCP調査 |
-| 足軽 4 | Memory MCP調査 |
-| 足軽 5 | Sequential Thinking MCP調査 |
+| クローンヤクザ 1 | Notion MCP調査 |
+| クローンヤクザ 2 | GitHub MCP調査 |
+| クローンヤクザ 3 | Playwright MCP調査 |
+| クローンヤクザ 4 | Memory MCP調査 |
+| クローンヤクザ 5 | Sequential Thinking MCP調査 |
 
-5体の足軽が同時に調査開始。リアルタイムで作業を見ることができます。
+5体のクローンヤクザが同時に調査開始。リアルタイムで作業を見ることができます。
 
 <p align="center">
-  <img src="images/company-creed-all-panes.png" alt="足軽がtmux全ペインで並列実行する様子" width="900">
+  <img src="images/company-creed-all-panes.png" alt="クローンヤクザがtmux全ペインで並列実行する様子" width="900">
 </p>
 
 結果は完了次第 `dashboard.md` に表示されます。
@@ -477,16 +477,16 @@ JavaScriptフレームワーク上位5つを調査して比較表を作成せよ
 
 ```
 あなた: 「5つのMCPサーバを調査せよ」
-→ 5体の足軽が同時に調査開始
+→ 5体のクローンヤクザが同時に調査開始
 → 数時間ではなく数分で結果が出る
 ```
 
 ### 🔄 2. ノンブロッキングワークフロー
 
-将軍は即座に委譲して、あなたに制御を返します：
+ダークニンジャは即座に委譲して、あなたに制御を返します：
 
 ```
-あなた: 命令 → 将軍: 委譲 → あなた: 次の命令をすぐ出せる
+あなた: 命令 → ダークニンジャ: 委譲 → あなた: 次の命令をすぐ出せる
                                     ↓
                     ワーカー: バックグラウンドで実行
                                     ↓
@@ -512,14 +512,14 @@ AIがあなたの好みを記憶します：
 エージェント同士はYAMLファイルを書いて通信します — メモを渡すイメージ。**ポーリングなし、APIコールの浪費なし。**
 
 ```
-家老が足軽3号を起こしたい場合:
+グレーターヤクザがクローンヤクザ3号を起こしたい場合:
 
 Step 1: メッセージを書く            Step 2: エージェントを起こす
 ┌──────────────────────┐           ┌──────────────────────────┐
 │ inbox_write.sh       │           │ inbox_watcher.sh         │
 │                      │           │                          │
 │ メッセージ全文を     │  ファイル │ ファイル変更を検知       │
-│ ashigaru3.yaml に    │──変更────▶│ (inotifywait、ポーリング │
+│ yakuza3.yaml に    │──変更────▶│ (inotifywait、ポーリング │
 │ flock付きで書き込み  │           │  ではなくカーネルイベント)│
 └──────────────────────┘           │                          │
                                    │ 起床方法:                │
@@ -530,7 +530,7 @@ Step 1: メッセージを書く            Step 2: エージェントを起こ�
 
 Step 3: エージェントが自分のinboxを読む
 ┌──────────────────────────────────┐
-│ 足軽3号が ashigaru3.yaml を読む  │
+│ クローンヤクザ3号が yakuza3.yaml を読む  │
 │ → 未読メッセージを発見           │
 │ → 処理する                       │
 │ → 既読にする                     │
@@ -566,7 +566,7 @@ VSCode拡張のClaude Codeはスクショを貼り付けて事象を説明でき
 screenshot:
   path: "/mnt/c/Users/あなたの名前/Pictures/Screenshots"
 
-# 将軍に伝えるだけ:
+# ダークニンジャに伝えるだけ:
 あなた: 「最新のスクショを見ろ」
 あなた: 「スクショ2枚見ろ」
 → AIが即座にスクリーンショットを読み取って分析
@@ -585,13 +585,13 @@ screenshot:
 
 | レイヤー | 場所 | 用途 |
 |---------|------|------|
-| Layer 1: Memory MCP | `memory/shogun_memory.jsonl` | プロジェクト横断・セッションを跨ぐ長期記憶 |
+| Layer 1: Memory MCP | `memory/darkninja_memory.jsonl` | プロジェクト横断・セッションを跨ぐ長期記憶 |
 | Layer 2: Project | `config/projects.yaml`, `projects/<id>.yaml`, `context/{project}.md` | プロジェクト固有情報・技術知見 |
-| Layer 3: YAML Queue | `queue/shogun_to_karo.yaml`, `queue/tasks/`, `queue/reports/` | タスク管理・指示と報告の正データ |
+| Layer 3: YAML Queue | `queue/shogun_to_gryakuza.yaml`, `queue/tasks/`, `queue/reports/` | タスク管理・指示と報告の正データ |
 | Layer 4: Session | CLAUDE.md, instructions/*.md | 作業中コンテキスト（/clearで破棄） |
 
 この設計により：
-- どの足軽でも任意のプロジェクトを担当可能
+- どのクローンヤクザでも任意のプロジェクトを担当可能
 - エージェント切り替え時もコンテキスト継続
 - 関心の分離が明確
 - セッション間の知識永続化
@@ -604,7 +604,7 @@ screenshot:
 
 1. CLAUDE.md（自動読み込み）→ shogunシステムの一員と認識
 2. `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'` → 自分の番号を確認
-3. Memory MCP 読み込み → 殿の好みを復元（~700トークン）
+3. Memory MCP 読み込み → ラオモトの好みを復元（~700トークン）
 4. タスクYAML 読み込み → 次の仕事を確認（~800トークン）
 
 「何を読ませないか」の設計がコスト削減に効いている。
@@ -626,23 +626,23 @@ screenshot:
 この統一フォーマットにより：
 - どのエージェントでも素早くオンボーディング可能
 - すべてのプロジェクトで一貫した情報管理
-- 足軽間の作業引き継ぎが容易
+- クローンヤクザ間の作業引き継ぎが容易
 
 ### 📱 7. スマホ通知（ntfy）
 
-スマホと将軍の間で双方向通信 — SSH不要、Tailscale不要、サーバ不要。
+スマホとダークニンジャの間で双方向通信 — SSH不要、Tailscale不要、サーバ不要。
 
 | 方向 | 仕組み |
 |------|--------|
-| **スマホ → 将軍** | ntfyアプリからメッセージを送信 → `ntfy_listener.sh` がストリーミングで受信 → 将軍が自動処理 |
-| **家老 → スマホ（直接）** | 家老が `dashboard.md` を更新する際、`scripts/ntfy.sh` 経由で直接プッシュ通知を送信 — **将軍を経由しない**（将軍は人間との対話用、進捗報告用ではない） |
+| **スマホ → ダークニンジャ** | ntfyアプリからメッセージを送信 → `ntfy_listener.sh` がストリーミングで受信 → ダークニンジャが自動処理 |
+| **グレーターヤクザ → スマホ（直接）** | グレーターヤクザが `dashboard.md` を更新する際、`scripts/ntfy.sh` 経由で直接プッシュ通知を送信 — **ダークニンジャを経由しない**（ダークニンジャは人間との対話用、進捗報告用ではない） |
 
 ```
-📱 あなた（ベッドから）       🏯 将軍
+📱 あなた（ベッドから）       🏯 ダークニンジャ
     │                          │
     │  "React 19を調査せよ"    │
     ├─────────────────────────►│
-    │    (ntfyメッセージ)      │  → 家老に委譲 → 足軽が作業
+    │    (ntfyメッセージ)      │  → グレーターヤクザに委譲 → クローンヤクザが作業
     │                          │
     │  "✅ cmd_042 完了"       │
     │◄─────────────────────────┤
@@ -650,9 +650,9 @@ screenshot:
 ```
 
 **セットアップ：**
-1. `config/settings.yaml` に `ntfy_topic: "shogun-yourname"` を追加
+1. `config/settings.yaml` に `ntfy_topic: "darkninja-yourname"` を追加
 2. スマホに [ntfyアプリ](https://ntfy.sh) をインストールし、同じトピックをサブスクライブ
-3. `shutsujin_departure.sh` がリスナーを自動起動 — 追加手順なし
+3. `yokubari.sh` がリスナーを自動起動 — 追加手順なし
 
 **通知の例：**
 
@@ -665,13 +665,13 @@ screenshot:
 
 無料、アカウント不要、サーバ管理不要。[ntfy.sh](https://ntfy.sh) — オープンソースのプッシュ通知サービスを利用。
 
-> **⚠️ セキュリティ注意:** トピック名がそのままパスワードです。知っている人は誰でも通知を読んだり、将軍にメッセージを送れてしまいます。推測されにくい名前を選び、**スクリーンショットやブログ、GitHubコミットなどで公開しないでください**。
+> **⚠️ セキュリティ注意:** トピック名がそのままパスワードです。知っている人は誰でも通知を読んだり、ダークニンジャにメッセージを送れてしまいます。推測されにくい名前を選び、**スクリーンショットやブログ、GitHubコミットなどで公開しないでください**。
 
 **動作確認:**
 
 ```bash
 # テスト通知をスマホに送信
-bash scripts/ntfy.sh "将軍システムからのテスト通知 🏯"
+bash scripts/ntfy.sh "ダークニンジャシステムからのテスト通知 🏯"
 ```
 
 スマホに通知が届けば設定完了です。届かない場合:
@@ -679,17 +679,17 @@ bash scripts/ntfy.sh "将軍システムからのテスト通知 🏯"
 - スマホのntfyアプリで**完全に同じトピック名**を購読しているか
 - スマホがインターネットに接続されており、ntfyの通知が有効か
 
-**スマホから将軍に指示を送る方法:**
+**スマホからダークニンジャに指示を送る方法:**
 
 1. スマホでntfyアプリを開く
 2. 購読しているトピックをタップ
 3. メッセージを入力（例: `React 19のベストプラクティスを調査して`）して送信
-4. `ntfy_listener.sh` が受信 → `queue/ntfy_inbox.yaml` に書き込み → 将軍を起こす
-5. 将軍がメッセージを読み、通常の家老→足軽パイプラインで処理
+4. `ntfy_listener.sh` が受信 → `queue/ntfy_inbox.yaml` に書き込み → ダークニンジャを起こす
+5. ダークニンジャがメッセージを読み、通常のグレーターヤクザ→クローンヤクザパイプラインで処理
 
-送信したテキストがそのままコマンドになります。将軍に話しかけるように書けばOK — 特別な構文は不要です。
+送信したテキストがそのままコマンドになります。ダークニンジャに話しかけるように書けばOK — 特別な構文は不要です。
 
-**リスナーの手動起動**（`shutsujin_departure.sh` を使わない場合）:
+**リスナーの手動起動**（`yokubari.sh` を使わない場合）:
 
 ```bash
 # バックグラウンドでリスナーを起動
@@ -702,7 +702,7 @@ pgrep -f ntfy_listener.sh
 bash scripts/ntfy_listener.sh
 ```
 
-リスナーは接続が切れても自動的に再接続します。`shutsujin_departure.sh` で出陣すれば自動起動されるため、手動起動は出陣スクリプトを使わない場合のみ必要です。
+リスナーは接続が切れても自動的に再接続します。`yokubari.sh` で出陣すれば自動起動されるため、手動起動は出陣スクリプトを使わない場合のみ必要です。
 
 **トラブルシューティング:**
 
@@ -710,10 +710,10 @@ bash scripts/ntfy_listener.sh
 |------|------|
 | スマホに通知が来ない | `settings.yaml` とntfyアプリのトピック名が完全に一致しているか確認 |
 | リスナーが起動しない | `bash scripts/ntfy_listener.sh` をフォアグラウンドで実行してエラーを確認 |
-| スマホ→将軍が動かない | リスナーが稼働中か確認: `pgrep -f ntfy_listener.sh` |
-| メッセージが将軍に届かない | `queue/ntfy_inbox.yaml` を確認 — メッセージがあれば将軍が処理中の可能性 |
+| スマホ→ダークニンジャが動かない | リスナーが稼働中か確認: `pgrep -f ntfy_listener.sh` |
+| メッセージがダークニンジャに届かない | `queue/ntfy_inbox.yaml` を確認 — メッセージがあればダークニンジャが処理中の可能性 |
 | "ntfy_topic not configured" エラー | `config/settings.yaml` に `ntfy_topic: "your-topic"` を追加 |
-| 通知が重複する | 再接続時の正常動作 — 将軍がメッセージIDで重複排除します |
+| 通知が重複する | 再接続時の正常動作 — ダークニンジャがメッセージIDで重複排除します |
 | トピック名を変更したのに通知が来ない | リスナーの再起動が必要: `pkill -f ntfy_listener.sh && nohup bash scripts/ntfy_listener.sh &>/dev/null &` |
 
 #### SayTask通知
@@ -729,30 +729,30 @@ bash scripts/ntfy_listener.sh
 各tmuxペインのボーダーにエージェントの現在のタスクを表示：
 
 ```
-┌ ashigaru1 (Sonnet) VF requirements ─┬ ashigaru3 (Opus) API research ──────┐
+┌ yakuza1 (Sonnet) VF requirements ─┬ yakuza3 (Opus) API research ──────┐
 │                                      │                                     │
 │  Working on SayTask requirements     │  Researching REST API patterns      │
 │                                      │                                     │
-├ ashigaru2 (Sonnet) ─────────────────┼ ashigaru4 (Opus) DB schema design ──┤
+├ yakuza2 (Sonnet) ─────────────────┼ yakuza4 (Opus) DB schema design ──┤
 │                                      │                                     │
 │  (idle — waiting for assignment)     │  Designing database schema          │
 │                                      │                                     │
 └──────────────────────────────────────┴─────────────────────────────────────┘
 ```
 
-- **作業中**: `ashigaru1 (Sonnet) VF requirements` — エージェント名、モデル、タスク概要
-- **待機中**: `ashigaru1 (Sonnet)` — モデル名のみ、タスクなし
-- 家老がタスク割当・完了時に自動更新
+- **作業中**: `yakuza1 (Sonnet) VF requirements` — エージェント名、モデル、タスク概要
+- **待機中**: `yakuza1 (Sonnet)` — モデル名のみ、タスクなし
+- グレーターヤクザがタスク割当・完了時に自動更新
 - 9ペインを一目見れば、誰が何をしているか即座にわかる
 
 ### 🔊 9. シャウトモード（戦国エコー）
 
-足軽がタスクを完了すると、パーソナライズされた戦国風の叫びをtmuxペインに表示します — 部下が働いている実感を得られる。
+クローンヤクザがタスクを完了すると、パーソナライズされた戦国風の叫びをtmuxペインに表示します — 部下が働いている実感を得られる。
 
 ```
-┌ ashigaru1 (Sonnet) ──────────┬ ashigaru2 (Sonnet) ──────────┐
+┌ yakuza1 (Sonnet) ──────────┬ yakuza2 (Sonnet) ──────────┐
 │                               │                               │
-│  ⚔️ 足軽1号、任を果たし待機！ │  🔥 足軽2号、二番槍の意地！   │
+│  ⚔️ クローンヤクザ1号、任を果たし待機！ │  🔥 クローンヤクザ2号、二番槍の意地！   │
 │  八刃一志の志、胸に刻む！     │  八刃一志！共に城を落とせ！   │
 │  ❯                            │  ❯                            │
 └───────────────────────────────┴───────────────────────────────┘
@@ -760,24 +760,24 @@ bash scripts/ntfy_listener.sh
 
 **仕組み:**
 
-家老がタスクYAMLに `echo_message` フィールドを記述。足軽は全作業完了後（レポート + inbox通知の後）、**最後のアクション**として `echo` を実行。メッセージは `❯` プロンプト直上に残る。
+グレーターヤクザがタスクYAMLに `echo_message` フィールドを記述。クローンヤクザは全作業完了後（レポート + inbox通知の後）、**最後のアクション**として `echo` を実行。メッセージは `❯` プロンプト直上に残る。
 
 ```yaml
-# タスクYAML（家老が記述）
+# タスクYAML（グレーターヤクザが記述）
 task:
   task_id: subtask_001
   description: "比較表を作成"
-  echo_message: "🔥 足軽1号、先陣を切って参る！八刃一志！"
+  echo_message: "🔥 クローンヤクザ1号、先陣を切って参る！八刃一志！"
 ```
 
 **シャウトモードがデフォルト。** 無効にする場合（echoのAPIトークン節約）:
 
 ```bash
-./shutsujin_departure.sh --silent    # 戦国エコーなし
-./shutsujin_departure.sh             # デフォルト: シャウトモード（戦国エコー有効）
+./yokubari.sh --silent    # 戦国エコーなし
+./yokubari.sh             # デフォルト: シャウトモード（戦国エコー有効）
 ```
 
-サイレントモードは `DISPLAY_MODE=silent` をtmux環境変数に設定。家老がタスクYAML作成時にこれを確認し、`echo_message` フィールドを省略する。
+サイレントモードは `DISPLAY_MODE=silent` をtmux環境変数に設定。グレーターヤクザがタスクYAML作成時にこれを確認し、`echo_message` フィールドを省略する。
 
 ---
 
@@ -806,7 +806,7 @@ task:
        │
        ▼
  ┌──────────────────┐
- │  ntfy → 将軍     │  AIが自動分類、日付解析、優先度設定
+ │  ntfy → ダークニンジャ     │  AIが自動分類、日付解析、優先度設定
  └────────┬─────────┘
           │
           ▼
@@ -841,8 +841,8 @@ task:
 **Q: 他のタスクアプリと何が違う？**
 A: アプリを開かない。ただ話すだけ。摩擦ゼロ。多くのタスクアプリは、人々が開かなくなるから失敗する。SayTaskはそのステップ自体を取り除いた。
 
-**Q: Shogunシステム全体なしでSayTaskだけ使える？**
-A: SayTaskはShogunの機能の一部。Shogunはスタンドアロンのマルチエージェント開発プラットフォームとしても機能する — 1つのシステムで両方の機能が手に入る。
+**Q: Darkninjaシステム全体なしでSayTaskだけ使える？**
+A: SayTaskはDarkninjaの機能の一部。Darkninjaはスタンドアロンのマルチエージェント開発プラットフォームとしても機能する — 1つのシステムで両方の機能が手に入る。
 
 **Q: 🐸 Frogって何？**
 A: 毎朝、AIがあなたの一番大変なタスクを選ぶ — 避けたいやつ。最初に倒す（「Eat the Frog」方式）か無視するか。あなた次第。
@@ -858,7 +858,7 @@ A: AIがベストを尽くして分類・スケジュールする。後で修正
 
 ### SayTask vs cmdパイプライン
 
-将軍システムには2つの補完的なタスクシステムがある：
+ダークニンジャシステムには2つの補完的なタスクシステムがある：
 
 | 機能 | SayTask（音声レイヤー） | cmdパイプライン（AI実行） |
 |---|:-:|:-:|
@@ -877,12 +877,12 @@ SayTaskは個人の生産性を担当（キャプチャ → スケジュール �
 
 | エージェント | モデル | 思考モード | 役割 |
 |-------------|--------|----------|------|
-| 将軍 | Opus | **有効（high）** | 殿の参謀。`--shogun-no-thinking` で中継専用モードに |
-| 家老 | Sonnet | 有効 | タスク分配・簡易QC・ダッシュボード管理 |
-| 軍師 | Opus | 有効 | 深い分析・設計レビュー・アーキテクチャ評価 |
-| 足軽1-7 | Sonnet | 有効 | 実装：コード・リサーチ・ファイル操作 |
+| ダークニンジャ | Opus | **有効（high）** | ラオモトの参謀。`--darkninja-no-thinking` で中継専用モードに |
+| グレーターヤクザ | Sonnet | 有効 | タスク分配・簡易QC・ダッシュボード管理 |
+| ソウカイヤ幹部 | Opus | 有効 | 深い分析・設計レビュー・アーキテクチャ評価 |
+| クローンヤクザ1-7 | Sonnet | 有効 | 実装：コード・リサーチ・ファイル操作 |
 
-**認知的複雑さ**でタスクを分割するのがこのシステムの設計思想。足軽が実装（L1-L3）を担当し、軍師が深い推論（L4-L6）を担当する。モデルの動的切り替えは不要 — 最初から適切なエージェントに適切なタスクが届く。
+**認知的複雑さ**でタスクを分割するのがこのシステムの設計思想。クローンヤクザが実装（L1-L3）を担当し、ソウカイヤ幹部が深い推論（L4-L6）を担当する。モデルの動的切り替えは不要 — 最初から適切なエージェントに適切なタスクが届く。
 
 ### Bloom's Taxonomy → エージェントルーティング
 
@@ -890,28 +890,28 @@ SayTaskは個人の生産性を担当（キャプチャ → スケジュール �
 
 | レベル | カテゴリ | 内容 | ルーティング先 |
 |--------|----------|------|---------------|
-| L1 | 記憶 | 事実の想起、コピー、一覧化 | **足軽** |
-| L2 | 理解 | 説明、要約、言い換え | **足軽** |
-| L3 | 応用 | 手順の実行、既知パターンの実装 | **足軽** |
-| L4 | 分析 | 比較、調査、構造の分解 | **軍師** |
-| L5 | 評価 | 判断、批評、推奨 | **軍師** |
-| L6 | 創造 | 設計、構築、新しいソリューションの統合 | **軍師** |
+| L1 | 記憶 | 事実の想起、コピー、一覧化 | **クローンヤクザ** |
+| L2 | 理解 | 説明、要約、言い換え | **クローンヤクザ** |
+| L3 | 応用 | 手順の実行、既知パターンの実装 | **クローンヤクザ** |
+| L4 | 分析 | 比較、調査、構造の分解 | **ソウカイヤ幹部** |
+| L5 | 評価 | 判断、批評、推奨 | **ソウカイヤ幹部** |
+| L6 | 創造 | 設計、構築、新しいソリューションの統合 | **ソウカイヤ幹部** |
 
-家老が各サブタスクにBloomレベルを付与し、適切なエージェントにルーティング。L1-L3は足軽に並列分配、L4-L6は軍師へ。簡単なL4タスク（小規模なコードレビュー等）は、家老の判断で足軽に回すこともある。
+グレーターヤクザが各サブタスクにBloomレベルを付与し、適切なエージェントにルーティング。L1-L3はクローンヤクザに並列分配、L4-L6はソウカイヤ幹部へ。簡単なL4タスク（小規模なコードレビュー等）は、グレーターヤクザの判断でクローンヤクザに回すこともある。
 
 ### タスク依存関係（blockedBy）
 
 タスクは `blockedBy` を使って他タスクへの依存を宣言できます：
 
 ```yaml
-# queue/tasks/ashigaru2.yaml
+# queue/tasks/yakuza2.yaml
 task:
   task_id: subtask_010b
-  blockedBy: ["subtask_010a"]  # 足軽1のタスク完了を待つ
+  blockedBy: ["subtask_010a"]  # クローンヤクザ1のタスク完了を待つ
   description: "subtask_010aで構築したAPIクライアントを統合"
 ```
 
-ブロック元のタスクが完了すると、家老が自動的に依存タスクのブロックを解除し、空いている足軽に割り当てます。これにより待機時間が削減され、依存タスクの効率的なパイプライン処理が可能になります。
+ブロック元のタスクが完了すると、グレーターヤクザが自動的に依存タスクのブロックを解除し、空いているクローンヤクザに割り当てます。これにより待機時間が削減され、依存タスクの効率的なパイプライン処理が可能になります。
 
 ---
 
@@ -919,7 +919,7 @@ task:
 
 > **「脳死で依頼をこなすな。最速×最高のアウトプットを常に念頭に置け。」**
 
-将軍システムは5つの核心原則に基づいて設計されている：
+ダークニンジャシステムは5つの核心原則に基づいて設計されている：
 
 | 原則 | 説明 |
 |------|------|
@@ -935,14 +935,14 @@ task:
 
 ## 🎯 設計思想
 
-### なぜ階層構造（将軍→家老→足軽）なのか
+### なぜ階層構造（ダークニンジャ→グレーターヤクザ→クローンヤクザ）なのか
 
-1. **即座の応答**: 将軍は即座に委譲し、あなたに制御を返す
-2. **並列実行**: 家老が複数の足軽に同時分配
+1. **即座の応答**: ダークニンジャは即座に委譲し、あなたに制御を返す
+2. **並列実行**: グレーターヤクザが複数のクローンヤクザに同時分配
 3. **単一責任**: 各役割が明確に分離され、混乱しない
-4. **スケーラビリティ**: 足軽を増やしても構造が崩れない
-5. **障害分離**: 1体の足軽が失敗しても他に影響しない
-6. **人間への報告一元化**: 将軍だけが人間とやり取りするため、情報が整理される
+4. **スケーラビリティ**: クローンヤクザを増やしても構造が崩れない
+5. **障害分離**: 1体のクローンヤクザが失敗しても他に影響しない
+6. **人間への報告一元化**: ダークニンジャだけが人間とやり取りするため、情報が整理される
 
 ### なぜメールボックスシステムなのか
 
@@ -959,7 +959,7 @@ task:
 
 ### エージェント識別（@agent_id）
 
-各ペインに `@agent_id` というtmuxユーザーオプションを設定（例: `karo`, `ashigaru1`）。`pane_index` はペイン再配置でズレるが、`@agent_id` は `shutsujin_departure.sh` が起動時に固定設定するため変わらない。
+各ペインに `@agent_id` というtmuxユーザーオプションを設定（例: `gryakuza`, `yakuza1`）。`pane_index` はペイン再配置でズレるが、`@agent_id` は `yokubari.sh` が起動時に固定設定するため変わらない。
 
 エージェントの自己識別:
 ```bash
@@ -969,12 +969,12 @@ tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'
 
 モデル名は `@model_name`、現在のタスクの要約は `@current_task` として保存され、いずれも `pane-border-format` で常時表示されます。Claude Codeがペインタイトルを上書きしても、これらのユーザーオプションは消えません。
 
-### なぜ dashboard.md は家老のみが更新するのか
+### なぜ dashboard.md はグレーターヤクザのみが更新するのか
 
 1. **単一更新者**: 競合を防ぐため、更新責任者を1人に限定
-2. **情報集約**: 家老は全足軽の報告を受ける立場なので全体像を把握
+2. **情報集約**: グレーターヤクザは全クローンヤクザの報告を受ける立場なので全体像を把握
 3. **一貫性**: すべての更新が1つの品質ゲートを通過
-4. **割り込み防止**: 将軍が更新すると、殿の入力中に割り込む恐れあり
+4. **割り込み防止**: ダークニンジャが更新すると、ラオモトの入力中に割り込む恐れあり
 
 ---
 
@@ -983,7 +983,7 @@ tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'
 初期状態ではスキルはありません。
 運用中にダッシュボード（dashboard.md）の「スキル化候補」から承認して増やしていきます。
 
-スキルは `/スキル名` で呼び出し可能。将軍に「/スキル名 を実行」と伝えるだけ。
+スキルは `/スキル名` で呼び出し可能。ダークニンジャに「/スキル名 を実行」と伝えるだけ。
 
 ### スキルの思想
 
@@ -996,13 +996,13 @@ tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'
 **2. スキル取得の手順**
 
 ```
-足軽が作業中にパターンを発見
+クローンヤクザが作業中にパターンを発見
     ↓
 dashboard.md の「スキル化候補」に上がる
     ↓
-殿（あなた）が内容を確認
+ラオモト（あなた）が内容を確認
     ↓
-承認すれば家老に指示してスキルを作成
+承認すればグレーターヤクザに指示してスキルを作成
 ```
 
 スキルはユーザ主導で増やすもの。自動で増えると管理不能になるため、「これは便利」と判断したものだけを残す。
@@ -1041,7 +1041,7 @@ claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequen
 # 5. Memory - セッション間の長期記憶（推奨！）
 # ✅ first_setup.sh で自動設定済み
 # 手動で再設定する場合:
-claude mcp add memory -e MEMORY_FILE_PATH="$PWD/memory/shogun_memory.jsonl" -- npx -y @modelcontextprotocol/server-memory
+claude mcp add memory -e MEMORY_FILE_PATH="$PWD/memory/darkninja_memory.jsonl" -- npx -y @modelcontextprotocol/server-memory
 ```
 
 ### インストール確認
@@ -1062,13 +1062,13 @@ claude mcp list
 あなた: 「AIコーディングアシスタント上位5つを調査して比較せよ」
 
 実行される処理:
-1. 将軍が家老に委譲
-2. 家老が割り当て:
-   - 足軽1: GitHub Copilotを調査
-   - 足軽2: Cursorを調査
-   - 足軽3: Claude Codeを調査
-   - 足軽4: Codeiumを調査
-   - 足軽5: Amazon CodeWhispererを調査
+1. ダークニンジャがグレーターヤクザに委譲
+2. グレーターヤクザが割り当て:
+   - クローンヤクザ1: GitHub Copilotを調査
+   - クローンヤクザ2: Cursorを調査
+   - クローンヤクザ3: Claude Codeを調査
+   - クローンヤクザ4: Codeiumを調査
+   - クローンヤクザ5: Amazon CodeWhispererを調査
 3. 5体が同時に調査
 4. 結果がdashboard.mdに集約
 ```
@@ -1079,10 +1079,10 @@ claude mcp list
 あなた: 「このNotionページのプロジェクトでPoC準備: [URL]」
 
 実行される処理:
-1. 家老がMCP経由でNotionコンテンツを取得
-2. 足軽2: 確認すべき項目をリスト化
-3. 足軽3: 技術的な実現可能性を調査
-4. 足軽4: PoC計画書を作成
+1. グレーターヤクザがMCP経由でNotionコンテンツを取得
+2. クローンヤクザ2: 確認すべき項目をリスト化
+3. クローンヤクザ3: 技術的な実現可能性を調査
+4. クローンヤクザ4: PoC計画書を作成
 5. 全結果がdashboard.mdに集約、会議の準備完了
 ```
 
@@ -1106,16 +1106,16 @@ screenshot:
   path: "/mnt/c/Users/あなたの名前/Pictures/Screenshots"
 ```
 
-将軍に「最新のスクショを見ろ」と伝えるだけで、スクリーンキャプチャを読み取って分析します。（Windowsでは `Win+Shift+S`）
+ダークニンジャに「最新のスクショを見ろ」と伝えるだけで、スクリーンキャプチャを読み取って分析します。（Windowsでは `Win+Shift+S`）
 
 ### ntfy（スマホ通知）
 
 ```yaml
 # config/settings.yaml
-ntfy_topic: "shogun-yourname"
+ntfy_topic: "darkninja-yourname"
 ```
 
-スマホの [ntfyアプリ](https://ntfy.sh) で同じトピックをサブスクライブしてください。リスナーは `shutsujin_departure.sh` で自動起動します。
+スマホの [ntfyアプリ](https://ntfy.sh) で同じトピックをサブスクライブしてください。リスナーは `yokubari.sh` で自動起動します。
 
 #### ntfy認証（セルフホストサーバ向け）
 
@@ -1169,10 +1169,10 @@ cp config/ntfy_auth.env.sample config/ntfy_auth.env
 │                      毎日の起動（毎日実行）                           │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  shutsujin_departure.sh                                             │
+│  yokubari.sh                                             │
 │      │                                                              │
 │      ├──▶ tmuxセッションを作成                                       │
-│      │         • "shogun"セッション（1ペイン）                        │
+│      │         • "darkninja"セッション（1ペイン）                        │
 │      │         • "multiagent"セッション（9ペイン、3x3グリッド）        │
 │      │                                                              │
 │      ├──▶ キューファイルとダッシュボードをリセット                     │
@@ -1185,38 +1185,38 @@ cp config/ntfy_auth.env.sample config/ntfy_auth.env
 </details>
 
 <details>
-<summary><b>shutsujin_departure.sh オプション</b>（クリックで展開）</summary>
+<summary><b>yokubari.sh オプション</b>（クリックで展開）</summary>
 
 ```bash
 # デフォルト: フル起動（tmuxセッション + Claude Code起動）
-./shutsujin_departure.sh
+./yokubari.sh
 
 # セッションセットアップのみ（Claude Code起動なし）
-./shutsujin_departure.sh -s
-./shutsujin_departure.sh --setup-only
+./yokubari.sh -s
+./yokubari.sh --setup-only
 
 # タスクキューをクリア（指令履歴は保持）
-./shutsujin_departure.sh -c
-./shutsujin_departure.sh --clean
+./yokubari.sh -c
+./yokubari.sh --clean
 
-# 決戦の陣: 全足軽をOpusで起動（最大能力・高コスト）
-./shutsujin_departure.sh -k
-./shutsujin_departure.sh --kessen
+# 決戦の陣: 全クローンヤクザをOpusで起動（最大能力・高コスト）
+./yokubari.sh -k
+./yokubari.sh --kessen
 
 # サイレントモード: 戦国エコーを無効化（echoのAPIトークン節約）
-./shutsujin_departure.sh -S
-./shutsujin_departure.sh --silent
+./yokubari.sh -S
+./yokubari.sh --silent
 
 # フル起動 + Windows Terminalタブを開く
-./shutsujin_departure.sh -t
-./shutsujin_departure.sh --terminal
+./yokubari.sh -t
+./yokubari.sh --terminal
 
-# 将軍中継専用モード: 将軍のThinkingを無効化（コスト節約）
-./shutsujin_departure.sh --shogun-no-thinking
+# ダークニンジャ中継専用モード: ダークニンジャのThinkingを無効化（コスト節約）
+./yokubari.sh --darkninja-no-thinking
 
 # ヘルプを表示
-./shutsujin_departure.sh -h
-./shutsujin_departure.sh --help
+./yokubari.sh -h
+./yokubari.sh --help
 ```
 
 </details>
@@ -1226,27 +1226,27 @@ cp config/ntfy_auth.env.sample config/ntfy_auth.env
 
 **通常の毎日の使用：**
 ```bash
-./shutsujin_departure.sh          # 全て起動
-tmux attach-session -t shogun     # 接続してコマンドを出す
+./yokubari.sh          # 全て起動
+tmux attach-session -t darkninja     # 接続してコマンドを出す
 ```
 
 **デバッグモード（手動制御）：**
 ```bash
-./shutsujin_departure.sh -s       # セッションのみ作成
+./yokubari.sh -s       # セッションのみ作成
 
 # 特定のエージェントでClaude Codeを手動起動
-tmux send-keys -t shogun:0 'claude --dangerously-skip-permissions' Enter
+tmux send-keys -t darkninja:0 'claude --dangerously-skip-permissions' Enter
 tmux send-keys -t multiagent:0.0 'claude --dangerously-skip-permissions' Enter
 ```
 
 **クラッシュ後の再起動：**
 ```bash
 # 既存セッションを終了
-tmux kill-session -t shogun
+tmux kill-session -t darkninja
 tmux kill-session -t multiagent
 
 # 新しく起動
-./shutsujin_departure.sh
+./yokubari.sh
 ```
 
 </details>
@@ -1257,9 +1257,9 @@ tmux kill-session -t multiagent
 `first_setup.sh` を実行すると、以下のエイリアスが `~/.bashrc` に自動追加されます：
 
 ```bash
-alias csst='cd /mnt/c/tools/multi-agent-shogun && ./shutsujin_departure.sh'
-alias css='tmux attach-session -t shogun'      # 将軍ウィンドウの起動
-alias csm='tmux attach-session -t multiagent'  # 家老・足軽ウィンドウの起動
+alias csst='cd /mnt/c/tools/multi-agent-shogun && ./yokubari.sh'
+alias css='tmux attach-session -t darkninja'      # ダークニンジャウィンドウの起動
+alias csm='tmux attach-session -t multiagent'  # グレーターヤクザ・クローンヤクザウィンドウの起動
 ```
 
 ※ エイリアスを反映するには `source ~/.bashrc` を実行するか、PowerShellで `wsl --shutdown` してからターミナルを開き直してください。
@@ -1279,14 +1279,14 @@ multi-agent-shogun/
 │  ┌─────────────────── セットアップスクリプト ───────────────────┐
 ├── install.bat               # Windows: 初回セットアップ
 ├── first_setup.sh            # Ubuntu/Mac: 初回セットアップ
-├── shutsujin_departure.sh    # 毎日の起動（指示書自動読み込み）
+├── yokubari.sh    # 毎日の起動（指示書自動読み込み）
 │  └────────────────────────────────────────────────────────────┘
 │
 ├── instructions/             # エージェント指示書
-│   ├── shogun.md             # 将軍の指示書
-│   ├── karo.md               # 家老の指示書
-│   ├── ashigaru.md           # 足軽の指示書
-│   ├── gunshi.md             # 軍師の指示書
+│   ├── darkninja.md             # ダークニンジャの指示書
+│   ├── gryakuza.md               # グレーターヤクザの指示書
+│   ├── yakuza.md           # クローンヤクザの指示書
+│   ├── soukaiya.md             # ソウカイヤ幹部の指示書
 │   └── cli_specific/         # CLI固有のツール説明
 │       ├── claude_tools.md   # Claude Code ツール・機能
 │       └── copilot_tools.md  # GitHub Copilot CLI ツール・機能
@@ -1310,12 +1310,12 @@ multi-agent-shogun/
 │   └── <project_id>.yaml    # 各プロジェクトの全情報（クライアント、タスク、Notion連携等）
 │
 ├── queue/                    # 通信ファイル
-│   ├── shogun_to_karo.yaml   # 将軍から家老へのコマンド
+│   ├── shogun_to_gryakuza.yaml   # ダークニンジャからグレーターヤクザへのコマンド
 │   ├── ntfy_inbox.yaml       # スマホからの受信メッセージ（ntfy）
 │   ├── inbox/                # エージェント別inboxファイル
-│   │   ├── shogun.yaml       # 将軍へのメッセージ
-│   │   ├── karo.yaml         # 家老へのメッセージ
-│   │   └── ashigaru{1-8}.yaml # 各足軽へのメッセージ
+│   │   ├── darkninja.yaml       # ダークニンジャへのメッセージ
+│   │   ├── gryakuza.yaml         # グレーターヤクザへのメッセージ
+│   │   └── yakuza{1-8}.yaml # 各クローンヤクザへのメッセージ
 │   ├── tasks/                # 各ワーカーのタスクファイル
 │   └── reports/              # ワーカーレポート
 │
@@ -1378,7 +1378,7 @@ current_tasks:
     status: in_progress
 ```
 
-この分離設計により、将軍システムは複数の外部プロジェクトを横断的に統率しつつ、プロジェクトの詳細情報はバージョン管理の対象外に保つことができる。
+この分離設計により、ダークニンジャシステムは複数の外部プロジェクトを横断的に統率しつつ、プロジェクトの詳細情報はバージョン管理の対象外に保つことができる。
 
 ---
 
@@ -1442,7 +1442,7 @@ tmux attach-session -t multiagent
 </details>
 
 <details>
-<summary><b>将軍やエージェントが落ちた？（Claude Codeプロセスがkillされた）</b></summary>
+<summary><b>ダークニンジャやエージェントが落ちた？（Claude Codeプロセスがkillされた）</b></summary>
 
 **`css` 等のtmuxセッション起動エイリアスを使って再起動してはいけません。** これらのエイリアスはtmuxセッションを作成するため、既存のtmuxペイン内で実行するとセッションがネスト（入れ子）になり、入力が壊れてペインが使用不能になります。
 
@@ -1452,8 +1452,8 @@ tmux attach-session -t multiagent
 # 方法1: ペイン内でclaudeを直接実行
 claude --model opus --dangerously-skip-permissions
 
-# 方法2: 家老がrespawn-paneで強制再起動（ネストも解消される）
-tmux respawn-pane -t shogun:0.0 -k 'claude --model opus --dangerously-skip-permissions'
+# 方法2: グレーターヤクザがrespawn-paneで強制再起動（ネストも解消される）
+tmux respawn-pane -t darkninja:0.0 -k 'claude --model opus --dangerously-skip-permissions'
 ```
 
 **誤ってtmuxをネストしてしまった場合：**
@@ -1469,11 +1469,11 @@ tmux respawn-pane -t shogun:0.0 -k 'claude --model opus --dangerously-skip-permi
 
 | コマンド | 説明 |
 |----------|------|
-| `tmux attach -t shogun` | 将軍に接続 |
+| `tmux attach -t darkninja` | ダークニンジャに接続 |
 | `tmux attach -t multiagent` | ワーカーに接続 |
 | `Ctrl+B` の後 `0-8` | ペイン間を切り替え |
 | `Ctrl+B` の後 `d` | デタッチ（実行継続） |
-| `tmux kill-session -t shogun` | 将軍セッションを停止 |
+| `tmux kill-session -t darkninja` | ダークニンジャセッションを停止 |
 | `tmux kill-session -t multiagent` | ワーカーセッションを停止 |
 
 ### 🖱️ マウス操作
@@ -1494,11 +1494,11 @@ tmux respawn-pane -t shogun:0.0 -k 'claude --model opus --dangerously-skip-permi
 
 > **タスクは認知的複雑さに応じて適切なエージェントにルーティングされる。** モデル切り替えではなく、エージェントルーティングへ。
 
-- **Bloom→エージェントルーティング** — 動的モデル切り替えをエージェントレベルのルーティングに置換。L1-L3タスク→足軽（Sonnet）、L4-L6タスク→軍師（Opus）。セッション中の `/model opus` 昇格は不要に — 家老が最初から適切なエージェントにルーティング
-- **軍師（Gunshi）がファーストクラスエージェントに** — ペイン8の戦略参謀。深い分析、設計レビュー、アーキテクチャ評価、複雑なQCを担当。足軽は実装に専念
+- **Bloom→エージェントルーティング** — 動的モデル切り替えをエージェントレベルのルーティングに置換。L1-L3タスク→クローンヤクザ（Sonnet）、L4-L6タスク→ソウカイヤ幹部（Opus）。セッション中の `/model opus` 昇格は不要に — グレーターヤクザが最初から適切なエージェントにルーティング
+- **ソウカイヤ幹部（Soukaiya）がファーストクラスエージェントに** — ペイン8の戦略参謀。深い分析、設計レビュー、アーキテクチャ評価、複雑なQCを担当。クローンヤクザは実装に専念
 - **E2Eテストスイート（19テスト、7シナリオ）** — モックCLIフレームワークが分離されたtmuxセッションでエージェント動作をシミュレート。基本フロー、inbox配信、/clearリカバリ、エスカレーション、redo、並列タスク、blocked_by依存関係をカバー
 - **Stop hook inbox配信** — Claude Codeエージェントが `.claude/settings.json` のStop hookでターン終了時に自動的にinboxを確認。`send-keys` 割り込み問題を根絶
-- **モデルデフォルト更新** — 家老: Opus→Sonnet。全足軽: Sonnet（統一）。軍師: Opus（深い推論）
+- **モデルデフォルト更新** — グレーターヤクザ: Opus→Sonnet。全クローンヤクザ: Sonnet（統一）。ソウカイヤ幹部: Opus（深い推論）
 
 <details>
 <summary><b>v3.0の機能 — Multi-CLI</b></summary>
@@ -1516,10 +1516,10 @@ tmux respawn-pane -t shogun:0.0 -k 'claude --model opus --dangerously-skip-permi
 - **ntfy双方向通信** — スマホからコマンドを送信、タスク完了時にプッシュ通知を受信
 - **SayTask通知** — ストリーク追跡、Eat the Frog、行動心理学に基づくモチベーション管理
 - **ペインボーダータスク表示** — tmuxペインボーダーで各エージェントの現在のタスクを一目で確認
-- **シャウトモード**（デフォルト）— 足軽がタスク完了時にパーソナライズされた戦国風の叫びを表示。`--silent` で無効化
+- **シャウトモード**（デフォルト）— クローンヤクザがタスク完了時にパーソナライズされた戦国風の叫びを表示。`--silent` で無効化
 - **エージェント自己監視+エスカレーション（v3.2）** — 各エージェントが自分のinboxファイルを `inotifywait` で監視（ポーリングゼロ、即座に起床）。フォールバック: `tmux send-keys` で短いnudge（テキストとEnterを分離送信、Codex CLI対応）。3段階エスカレーション: 標準nudge（0-2分）→ Escape×2+nudge（2-4分）→ `/clear` 強制リセット（4分以上）。Linux FSシンボリックリンクでWSL2の9P FS inotify問題を解決
 - **エージェント自己識別**（`@agent_id`）— tmuxユーザーオプションによる安定したID、ペイン再配置の影響を受けない
-- **決戦モード**（`-k` フラグ）— 全足軽Opusの最大能力陣形
+- **決戦モード**（`-k` フラグ）— 全クローンヤクザOpusの最大能力陣形
 - **タスク依存関係システム**（`blockedBy`）— 依存タスクの自動ブロック解除
 
 </details>

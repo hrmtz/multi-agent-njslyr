@@ -9,7 +9,7 @@
 # as its next action without any tmux send-keys interruption.
 #
 # This eliminates the "思考中にinboxをぶちこまれると思考が止まる" problem
-# for Claude Code agents (karo, gunshi).
+# for Claude Code agents (gryakuza, soukaiya).
 #
 # Usage: Registered as a Stop hook in .claude/settings.json
 #   The hook receives JSON on stdin; outputs JSON to stdout.
@@ -44,8 +44,8 @@ if [ -z "$AGENT_ID" ]; then
     exit 0
 fi
 
-# ─── Shogun: always approve (human-controlled) ───
-if [ "$AGENT_ID" = "shogun" ]; then
+# ─── Darkninja: always approve (human-controlled) ───
+if [ "$AGENT_ID" = "darkninja" ]; then
     exit 0
 fi
 

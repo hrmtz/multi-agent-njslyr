@@ -18,15 +18,15 @@ Run 10 AI coding agents in parallel — **Claude Code, OpenAI Codex, GitHub Copi
 </div>
 
 <p align="center">
-  <img src="images/screenshots/hero/latest-translucent-20260210-190453.png" alt="Latest translucent command session in the Shogun pane" width="940">
+  <img src="images/screenshots/hero/latest-translucent-20260210-190453.png" alt="Latest translucent command session in the Darkninja pane" width="940">
 </p>
 
 <p align="center">
-  <img src="images/screenshots/hero/latest-translucent-20260208-084602.png" alt="Quick natural-language command in the Shogun pane" width="420">
-  <img src="images/company-creed-all-panes.png" alt="Karo and Ashigaru panes reacting in parallel" width="520">
+  <img src="images/screenshots/hero/latest-translucent-20260208-084602.png" alt="Quick natural-language command in the Darkninja pane" width="420">
+  <img src="images/company-creed-all-panes.png" alt="Gryakuza and Yakuza panes reacting in parallel" width="520">
 </p>
 
-<p align="center"><i>One Karo (manager) coordinating 7 Ashigaru (workers) + 1 Gunshi (strategist) — real session, no mock data.</i></p>
+<p align="center"><i>One Gryakuza (manager) coordinating 7 Yakuza (workers) + 1 Soukaiya (strategist) — real session, no mock data.</i></p>
 
 ---
 
@@ -35,34 +35,34 @@ Run 10 AI coding agents in parallel — **Claude Code, OpenAI Codex, GitHub Copi
 **multi-agent-shogun** is a system that runs multiple AI coding CLI instances simultaneously, orchestrating them like a feudal Japanese army. Supports **Claude Code**, **OpenAI Codex**, **GitHub Copilot**, and **Kimi Code**.
 
 **Why use it?**
-- One command spawns 7 AI workers + 1 strategist executing in parallel
+- One command spawns 7 AI workers + 1 strategist executing in parallel (Yakuza + Soukaiya)
 - Zero wait time — give your next order while tasks run in the background
 - AI remembers your preferences across sessions (Memory MCP)
 - Real-time progress on a dashboard
 
 ```
-        You (上様 / The Lord)
+        You (ラオモト / The Lord)
              │
              ▼  Give orders
       ┌─────────────┐
-      │   SHOGUN    │  ← Receives your command, delegates instantly
+      │  DARKNINJA  │  ← Receives your command, delegates instantly
       └──────┬──────┘
              │  YAML + tmux
       ┌──────▼──────┐
-      │    KARO     │  ← Distributes tasks to workers
+      │  GRYAKUZA   │  ← Distributes tasks to workers
       └──────┬──────┘
              │
-    ┌─┬─┬─┬─┴─┬─┬─┬─┬────────┐
-    │1│2│3│4│5│6│7│ GUNSHI │  ← 7 workers + 1 strategist
-    └─┴─┴─┴─┴─┴─┴─┴────────┘
-       ASHIGARU      軍師
+    ┌─┬─┬─┬─┴─┬─┬─┬─┬──────────┐
+    │1│2│3│4│5│6│7│ SOUKAIYA │  ← 7 workers + 1 strategist
+    └─┴─┴─┴─┴─┴─┴─┴──────────┘
+       YAKUZA     ソウカイヤ幹部
 ```
 
 ---
 
 ## Why Shogun?
 
-Most multi-agent frameworks burn API tokens on coordination. Shogun doesn't.
+Most multi-agent frameworks burn API tokens on coordination. This system doesn't.
 
 | | Claude Code `Task` tool | LangGraph | CrewAI | **multi-agent-shogun** |
 |---|---|---|---|---|
@@ -79,7 +79,7 @@ Most multi-agent frameworks burn API tokens on coordination. Shogun doesn't.
 
 **Full transparency** — Every agent runs in a visible tmux pane. Every instruction, report, and decision is a plain YAML file you can read, diff, and version-control. No black boxes.
 
-**Battle-tested hierarchy** — The Shogun → Karo → Ashigaru chain of command prevents conflicts by design: clear ownership, dedicated files per agent, event-driven communication, no polling.
+**Battle-tested hierarchy** — The Darkninja → Gryakuza → Yakuza chain of command prevents conflicts by design: clear ownership, dedicated files per agent, event-driven communication, no polling.
 
 ---
 
@@ -98,7 +98,7 @@ Most AI coding tools charge per token. Running 8 Opus-grade agents through the A
 
 ### Multi-CLI Support
 
-Shogun isn't locked to one vendor. The system supports 4 CLI tools, each with unique strengths:
+The system isn't locked to one vendor. It supports 4 CLI tools, each with unique strengths:
 
 | CLI | Key Strength | Default Model |
 |-----|-------------|---------------|
@@ -115,7 +115,7 @@ instructions/
 ├── cli_specific/        # CLI-specific tool descriptions
 │   ├── claude_tools.md  # Claude Code tools & features
 │   └── copilot_tools.md # GitHub Copilot CLI tools & features
-└── roles/               # Role definitions (shogun, karo, ashigaru)
+└── roles/               # Role definitions (darkninja, gryakuza, yakuza)
     ↓ build
 CLAUDE.md / AGENTS.md / copilot-instructions.md  ← Generated per CLI
 ```
@@ -128,10 +128,10 @@ One source of truth, zero sync drift. Change a rule once, all CLIs get it.
 
 This is the feature no other framework has.
 
-As Ashigaru execute tasks, they **automatically identify reusable patterns** and propose them as skill candidates. The Karo aggregates these proposals in `dashboard.md`, and you — the Lord — decide what gets promoted to a permanent skill.
+As Yakuza execute tasks, they **automatically identify reusable patterns** and propose them as skill candidates. The Gryakuza aggregates these proposals in `dashboard.md`, and you — the Lord — decide what gets promoted to a permanent skill.
 
 ```
-Ashigaru finishes a task
+Yakuza finishes a task
     ↓
 Notices: "I've done this pattern 3 times across different projects"
     ↓
@@ -212,7 +212,7 @@ cd /mnt/c/tools/multi-agent-shogun
 ✅ **Deploy!**
 
 ```bash
-./shutsujin_departure.sh
+./yokubari.sh
 ```
 
 </td>
@@ -242,7 +242,7 @@ Open an **Ubuntu terminal** (WSL) and run:
 
 ```bash
 cd /mnt/c/tools/multi-agent-shogun
-./shutsujin_departure.sh
+./yokubari.sh
 ```
 
 ### 📱 Mobile Access (Command from anywhere)
@@ -271,7 +271,7 @@ Control your AI army from your phone — bed, café, or bathroom.
    ```sh
    pkg update && pkg install openssh
    ssh youruser@your-tailscale-ip
-   css    # Connect to Shogun
+   css    # Connect to Darkninja
    ```
 4. Open a new Termux window (+ button) for workers:
    ```sh
@@ -290,14 +290,14 @@ sudo systemctl restart ssh
 ```
 This detects dead connections within 45 seconds instead of waiting for TCP timeout.
 
-**Voice input:** Use your phone's voice keyboard to speak commands. The Shogun understands natural language, so typos from speech-to-text don't matter.
+**Voice input:** Use your phone's voice keyboard to speak commands. The Darkninja understands natural language, so typos from speech-to-text don't matter.
 
 **Even simpler:** With ntfy configured, you can receive notifications and send commands directly from the ntfy app — no SSH required.
 
 ---
 
 <details>
-<summary>🐧 <b>Linux / macOS</b> (click to expand)</summary>
+<summary> <b>Linux / macOS</b> (click to expand)</summary>
 
 ### First-time setup
 
@@ -317,7 +317,7 @@ chmod +x *.sh
 
 ```bash
 cd ~/multi-agent-shogun
-./shutsujin_departure.sh
+./yokubari.sh
 ```
 
 </details>
@@ -356,15 +356,15 @@ Then restart your computer and run `install.bat` again.
 |--------|---------|-------------|
 | `install.bat` | Windows: WSL2 + Ubuntu setup | First time only |
 | `first_setup.sh` | Install tmux, Node.js, Claude Code CLI + Memory MCP config | First time only |
-| `shutsujin_departure.sh` | Create tmux sessions + launch Claude Code + load instructions + start ntfy listener | Daily |
+| `yokubari.sh` | Create tmux sessions + launch Claude Code + load instructions + start ntfy listener | Daily |
 
 ### What `install.bat` does automatically:
 - ✅ Checks if WSL2 is installed (guides you if not)
 - ✅ Checks if Ubuntu is installed (guides you if not)
 - ✅ Shows next steps (how to run `first_setup.sh`)
 
-### What `shutsujin_departure.sh` does:
-- ✅ Creates tmux sessions (shogun + multiagent)
+### What `yokubari.sh` does:
+- ✅ Creates tmux sessions (darkninja + multiagent)
 - ✅ Launches Claude Code on all agents
 - ✅ Auto-loads instruction files for each agent
 - ✅ Resets queue files for a fresh state
@@ -399,43 +399,43 @@ Whichever option you chose, **10 AI agents** are automatically launched:
 
 | Agent | Role | Count |
 |-------|------|-------|
-| 🏯 Shogun | Supreme commander — receives your orders | 1 |
-| 📋 Karo | Manager — distributes tasks, quality checks | 1 |
-| ⚔️ Ashigaru | Workers — execute implementation tasks in parallel | 7 |
-| 🧠 Gunshi | Strategist — handles analysis, evaluation, and design | 1 |
+| 🏯 Darkninja | Supreme commander — receives your orders | 1 |
+| 📋 Gryakuza | Manager — distributes tasks, quality checks | 1 |
+| ⚔️ Yakuza | Workers — execute implementation tasks in parallel | 7 |
+| 🧠 Soukaiya | Strategist — handles analysis, evaluation, and design | 1 |
 
 Two tmux sessions are created:
-- `shogun` — connect here to give commands
-- `multiagent` — Karo, Ashigaru, and Gunshi running in the background
+- `darkninja` — connect here to give commands
+- `multiagent` — Gryakuza, Yakuza, and Soukaiya running in the background
 
 ---
 
 ## How It Works
 
-### Step 1: Connect to the Shogun
+### Step 1: Connect to the Darkninja
 
-After running `shutsujin_departure.sh`, all agents automatically load their instructions and are ready.
+After running `yokubari.sh`, all agents automatically load their instructions and are ready.
 
 Open a new terminal and connect:
 
 ```bash
-tmux attach-session -t shogun
+tmux attach-session -t darkninja
 ```
 
 ### Step 2: Give your first order
 
-The Shogun is already initialized — just give a command:
+The Darkninja is already initialized — just give a command:
 
 ```
 Research the top 5 JavaScript frameworks and create a comparison table
 ```
 
-The Shogun will:
+The Darkninja will:
 1. Write the task to a YAML file
-2. Notify the Karo (manager)
+2. Notify the Gryakuza (manager)
 3. Return control to you immediately — no waiting!
 
-Meanwhile, the Karo distributes tasks to Ashigaru workers for parallel execution.
+Meanwhile, the Gryakuza distributes tasks to Yakuza workers for parallel execution.
 
 ### Step 3: Check progress
 
@@ -445,9 +445,9 @@ Open `dashboard.md` in your editor for a real-time status view:
 ## In Progress
 | Worker | Task | Status |
 |--------|------|--------|
-| Ashigaru 1 | Research React | Running |
-| Ashigaru 2 | Research Vue | Running |
-| Ashigaru 3 | Research Angular | Completed |
+| Yakuza 1 | Research React | Running |
+| Yakuza 2 | Research Vue | Running |
+| Yakuza 3 | Research Angular | Completed |
 ```
 
 ### Detailed flow
@@ -456,22 +456,22 @@ Open `dashboard.md` in your editor for a real-time status view:
 You: "Research the top 5 MCP servers and create a comparison table"
 ```
 
-The Shogun writes the task to `queue/shogun_to_karo.yaml` and wakes the Karo. Control returns to you immediately.
+The Darkninja writes the task to `queue/shogun_to_karo.yaml` and wakes the Gryakuza. Control returns to you immediately.
 
-The Karo breaks the task into subtasks:
+The Gryakuza breaks the task into subtasks:
 
 | Worker | Assignment |
 |--------|-----------|
-| Ashigaru 1 | Research Notion MCP |
-| Ashigaru 2 | Research GitHub MCP |
-| Ashigaru 3 | Research Playwright MCP |
-| Ashigaru 4 | Research Memory MCP |
-| Ashigaru 5 | Research Sequential Thinking MCP |
+| Yakuza 1 | Research Notion MCP |
+| Yakuza 2 | Research GitHub MCP |
+| Yakuza 3 | Research Playwright MCP |
+| Yakuza 4 | Research Memory MCP |
+| Yakuza 5 | Research Sequential Thinking MCP |
 
-All 5 Ashigaru research simultaneously. You can watch them work in real time:
+All 5 Yakuza research simultaneously. You can watch them work in real time:
 
 <p align="center">
-  <img src="images/company-creed-all-panes.png" alt="Ashigaru agents working in parallel across tmux panes" width="900">
+  <img src="images/company-creed-all-panes.png" alt="Yakuza agents working in parallel across tmux panes" width="900">
 </p>
 
 Results appear in `dashboard.md` as they complete.
@@ -486,16 +486,16 @@ One command spawns up to 8 parallel tasks:
 
 ```
 You: "Research 5 MCP servers"
-→ 5 Ashigaru start researching simultaneously
+→ 5 Yakuza start researching simultaneously
 → Results in minutes, not hours
 ```
 
 ### 🔄 2. Non-Blocking Workflow
 
-The Shogun delegates instantly and returns control to you:
+The Darkninja delegates instantly and returns control to you:
 
 ```
-You: Command → Shogun: Delegates → You: Give next command immediately
+You: Command → Darkninja: Delegates → You: Give next command immediately
                                        ↓
                        Workers: Execute in background
                                        ↓
@@ -521,14 +521,14 @@ Session 2: AI loads memory on startup
 Agents talk to each other by writing YAML files — like passing notes. **No polling loops, no wasted API calls.**
 
 ```
-Karo wants to wake Ashigaru 3:
+Gryakuza wants to wake Yakuza 3:
 
 Step 1: Write the message          Step 2: Wake the agent up
 ┌──────────────────────┐           ┌──────────────────────────┐
 │ inbox_write.sh       │           │ inbox_watcher.sh         │
 │                      │           │                          │
 │ Writes full message  │  file     │ Detects file change      │
-│ to ashigaru3.yaml    │──change──▶│ (inotifywait, not poll)  │
+│ to yakuza3.yaml      │──change──▶│ (inotifywait, not poll)  │
 │ with flock (no race) │           │                          │
 └──────────────────────┘           │ Wakes agent via:         │
                                    │  1. Self-watch (skip)    │
@@ -538,7 +538,7 @@ Step 1: Write the message          Step 2: Wake the agent up
 
 Step 3: Agent reads its own inbox
 ┌──────────────────────────────────┐
-│ Ashigaru 3 reads ashigaru3.yaml  │
+│ Yakuza 3 reads yakuza3.yaml      │
 │ → Finds unread messages          │
 │ → Processes them                 │
 │ → Marks as read                  │
@@ -576,7 +576,7 @@ screenshot:
 ```
 
 ```
-# Just tell the Shogun:
+# Just tell the Darkninja:
 You: "Check the latest screenshot"
 You: "Look at the last 2 screenshots"
 → AI instantly reads and analyzes your screen captures
@@ -595,13 +595,13 @@ Efficient knowledge sharing through a four-layer context system:
 
 | Layer | Location | Purpose |
 |-------|----------|---------|
-| Layer 1: Memory MCP | `memory/shogun_memory.jsonl` | Cross-project, cross-session long-term memory |
+| Layer 1: Memory MCP | `memory/darkninja_memory.jsonl` | Cross-project, cross-session long-term memory |
 | Layer 2: Project | `config/projects.yaml`, `projects/<id>.yaml`, `context/{project}.md` | Project-specific information and technical knowledge |
 | Layer 3: YAML Queue | `queue/shogun_to_karo.yaml`, `queue/tasks/`, `queue/reports/` | Task management — source of truth for instructions and reports |
 | Layer 4: Session | CLAUDE.md, instructions/*.md | Working context (wiped by `/clear`) |
 
 This design enables:
-- Any Ashigaru can work on any project
+- Any Yakuza can work on any project
 - Context persists across agent switches
 - Clear separation of concerns
 - Knowledge survives across sessions
@@ -612,9 +612,9 @@ As agents work, their session context (Layer 4) grows, increasing API costs. `/c
 
 Recovery cost after `/clear`: **~6,800 tokens** (42% improved from v1 — CLAUDE.md YAML conversion + English-only instructions reduced token cost by 70%)
 
-1. CLAUDE.md (auto-loaded) → recognizes itself as part of the Shogun System
+1. CLAUDE.md (auto-loaded) → recognizes itself as part of the multi-agent system
 2. `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'` → identifies its own number
-3. Memory MCP read → restores the Lord's preferences (~700 tokens)
+3. Memory MCP read → restores ラオモト's preferences (~700 tokens)
 4. Task YAML read → picks up the next assignment (~800 tokens)
 
 The key insight: designing **what not to load** is what drives cost savings.
@@ -636,23 +636,23 @@ All projects use the same 7-section template:
 This unified format enables:
 - Quick onboarding for any agent
 - Consistent information management across all projects
-- Easy handoff between Ashigaru workers
+- Easy handoff between Yakuza workers
 
 ### 📱 7. Phone Notifications (ntfy)
 
-Two-way communication between your phone and the Shogun — no SSH, no Tailscale, no server needed.
+Two-way communication between your phone and the Darkninja — no SSH, no Tailscale, no server needed.
 
 | Direction | How it works |
 |-----------|-------------|
-| **Phone → Shogun** | Send a message from the ntfy app → `ntfy_listener.sh` receives it via streaming → Shogun processes automatically |
-| **Karo → Phone (direct)** | When Karo updates `dashboard.md`, it sends push notifications directly via `scripts/ntfy.sh` — **Shogun is bypassed** (Shogun is for human interaction, not progress reporting) |
+| **Phone → Darkninja** | Send a message from the ntfy app → `ntfy_listener.sh` receives it via streaming → Darkninja processes automatically |
+| **Gryakuza → Phone (direct)** | When Gryakuza updates `dashboard.md`, it sends push notifications directly via `scripts/ntfy.sh` — **Darkninja is bypassed** (Darkninja is for human interaction, not progress reporting) |
 
 ```
-📱 You (from bed)          🏯 Shogun
+📱 You (from bed)          🏯 Darkninja
     │                          │
     │  "Research React 19"     │
     ├─────────────────────────►│
-    │    (ntfy message)        │  → Delegates to Karo → Ashigaru work
+    │    (ntfy message)        │  → Delegates to Gryakuza → Yakuza work
     │                          │
     │  "✅ cmd_042 complete"   │
     │◄─────────────────────────┤
@@ -660,9 +660,9 @@ Two-way communication between your phone and the Shogun — no SSH, no Tailscale
 ```
 
 **Setup:**
-1. Add `ntfy_topic: "shogun-yourname"` to `config/settings.yaml`
+1. Add `ntfy_topic: "darkninja-yourname"` to `config/settings.yaml`
 2. Install the [ntfy app](https://ntfy.sh) on your phone and subscribe to the same topic
-3. `shutsujin_departure.sh` automatically starts the listener — no extra steps
+3. `yokubari.sh` automatically starts the listener — no extra steps
 
 **Notification examples:**
 
@@ -675,13 +675,13 @@ Two-way communication between your phone and the Shogun — no SSH, no Tailscale
 
 Free, no account required, no server to maintain. Uses [ntfy.sh](https://ntfy.sh) — an open-source push notification service.
 
-> **⚠️ Security:** Your topic name is your password. Anyone who knows it can read your notifications and send messages to your Shogun. Choose a hard-to-guess name and **never share it publicly** (e.g., in screenshots, blog posts, or GitHub commits).
+> **⚠️ Security:** Your topic name is your password. Anyone who knows it can read your notifications and send messages to your Darkninja. Choose a hard-to-guess name and **never share it publicly** (e.g., in screenshots, blog posts, or GitHub commits).
 
 **Verify it works:**
 
 ```bash
 # Send a test notification to your phone
-bash scripts/ntfy.sh "Test notification from Shogun 🏯"
+bash scripts/ntfy.sh "Test notification from Darkninja 🏯"
 ```
 
 If your phone receives the notification, you're all set. If not, check:
@@ -694,12 +694,12 @@ If your phone receives the notification, you're all set. If not, check:
 1. Open the ntfy app on your phone
 2. Tap your subscribed topic
 3. Type a message (e.g., `Research React 19 best practices`) and send
-4. `ntfy_listener.sh` receives it, writes to `queue/ntfy_inbox.yaml`, and wakes the Shogun
-5. The Shogun reads the message and processes it through the normal Karo → Ashigaru pipeline
+4. `ntfy_listener.sh` receives it, writes to `queue/ntfy_inbox.yaml`, and wakes the Darkninja
+5. The Darkninja reads the message and processes it through the normal Gryakuza → Yakuza pipeline
 
-Any text you send becomes a command. Write it like you'd talk to the Shogun — no special syntax needed.
+Any text you send becomes a command. Write it like you'd talk to the Darkninja — no special syntax needed.
 
-**Manual listener start** (if not using `shutsujin_departure.sh`):
+**Manual listener start** (if not using `yokubari.sh`):
 
 ```bash
 # Start the listener in the background
@@ -712,7 +712,7 @@ pgrep -f ntfy_listener.sh
 bash scripts/ntfy_listener.sh  # Run in foreground to see logs
 ```
 
-The listener automatically reconnects if the connection drops. `shutsujin_departure.sh` starts it automatically on deployment — you only need manual start if you skipped the deployment script.
+The listener automatically reconnects if the connection drops. `yokubari.sh` starts it automatically on deployment — you only need manual start if you skipped the deployment script.
 
 **Troubleshooting:**
 
@@ -720,10 +720,10 @@ The listener automatically reconnects if the connection drops. `shutsujin_depart
 |---------|-----|
 | No notifications on phone | Check topic name matches exactly in `settings.yaml` and ntfy app |
 | Listener not starting | Run `bash scripts/ntfy_listener.sh` in foreground to see errors |
-| Phone → Shogun not working | Verify listener is running: `pgrep -f ntfy_listener.sh` |
-| Messages not reaching Shogun | Check `queue/ntfy_inbox.yaml` — if message is there, Shogun may be busy |
+| Phone → Darkninja not working | Verify listener is running: `pgrep -f ntfy_listener.sh` |
+| Messages not reaching Darkninja | Check `queue/ntfy_inbox.yaml` — if message is there, Darkninja may be busy |
 | "ntfy_topic not configured" error | Add `ntfy_topic: "your-topic"` to `config/settings.yaml` |
-| Duplicate notifications | Normal on reconnect — Shogun deduplicates by message ID |
+| Duplicate notifications | Normal on reconnect — Darkninja deduplicates by message ID |
 | Changed topic name but no notifications | The listener must be restarted: `pkill -f ntfy_listener.sh && nohup bash scripts/ntfy_listener.sh &>/dev/null &` |
 
 **Real-world notification screenshots:**
@@ -733,14 +733,14 @@ The listener automatically reconnects if the connection drops. `shutsujin_depart
   &nbsp;&nbsp;
   <img src="images/screenshots/masked/ntfy_cmd043_progress.jpg" alt="Progress notification" width="300">
 </p>
-<p align="center"><i>Left: Bidirectional phone ↔ Shogun communication · Right: Real-time progress report from Ashigaru</i></p>
+<p align="center"><i>Left: Bidirectional phone ↔ Darkninja communication · Right: Real-time progress report from Yakuza</i></p>
 
 <p align="center">
   <img src="images/screenshots/masked/ntfy_bloom_oc_test.jpg" alt="Command completion notification" width="300">
   &nbsp;&nbsp;
   <img src="images/screenshots/masked/ntfy_persona_eval_complete.jpg" alt="8-agent parallel completion" width="300">
 </p>
-<p align="center"><i>Left: Command completion notification · Right: All 8 Ashigaru completing in parallel</i></p>
+<p align="center"><i>Left: Command completion notification · Right: All 8 Yakuza completing in parallel</i></p>
 
 > *Note: Topic names shown in screenshots are examples. Use your own unique topic name.*
 
@@ -757,28 +757,28 @@ Behavioral psychology-driven motivation through your notification feed:
 Each tmux pane shows the agent's current task directly on its border:
 
 ```
-┌ ashigaru1 (Sonnet) VF requirements ─┬ ashigaru3 (Opus) API research ──────┐
+┌ yakuza1 (Sonnet) VF requirements ─┬ yakuza3 (Opus) API research ──────┐
 │                                      │                                     │
 │  Working on SayTask requirements     │  Researching REST API patterns      │
 │                                      │                                     │
-├ ashigaru2 (Sonnet) ─────────────────┼ ashigaru4 (Opus) DB schema design ──┤
+├ yakuza2 (Sonnet) ─────────────────┼ yakuza4 (Opus) DB schema design ──┤
 │                                      │                                     │
 │  (idle — waiting for assignment)     │  Designing database schema          │
 │                                      │                                     │
 └──────────────────────────────────────┴─────────────────────────────────────┘
 ```
 
-- **Working**: `ashigaru1 (Sonnet) VF requirements` — agent name, model, and task summary
-- **Idle**: `ashigaru1 (Sonnet)` — model name only, no task
-- Updated automatically by the Karo when assigning or completing tasks
+- **Working**: `yakuza1 (Sonnet) VF requirements` — agent name, model, and task summary
+- **Idle**: `yakuza1 (Sonnet)` — model name only, no task
+- Updated automatically by the Gryakuza when assigning or completing tasks
 - Glance at all 9 panes to instantly know who's doing what
 
 ### 🔊 9. Shout Mode (Battle Cries)
 
-When an Ashigaru completes a task, it shouts a personalized battle cry in the tmux pane — a visual reminder that your army is working hard.
+When a Yakuza completes a task, it shouts a personalized battle cry in the tmux pane — a visual reminder that your army is working hard.
 
 ```
-┌ ashigaru1 (Sonnet) ──────────┬ ashigaru2 (Sonnet) ──────────┐
+┌ yakuza1 (Sonnet) ──────────┬ yakuza2 (Sonnet) ──────────┐
 │                               │                               │
 │  ⚔️ 足軽1号、先陣切った！     │  🔥 足軽2号、二番槍の意地！   │
 │  八刃一志！                   │  八刃一志！                   │
@@ -788,10 +788,10 @@ When an Ashigaru completes a task, it shouts a personalized battle cry in the tm
 
 **How it works:**
 
-The Karo writes an `echo_message` field in each task YAML. After completing all work (report + inbox notification), the Ashigaru runs `echo` as its **final action**. The message stays visible above the `❯` prompt.
+The Gryakuza writes an `echo_message` field in each task YAML. After completing all work (report + inbox notification), the Yakuza runs `echo` as its **final action**. The message stays visible above the `❯` prompt.
 
 ```yaml
-# In the task YAML (written by Karo)
+# In the task YAML (written by Gryakuza)
 task:
   task_id: subtask_001
   description: "Create comparison table"
@@ -801,11 +801,11 @@ task:
 **Shout mode is the default.** To disable (saves API tokens on the echo call):
 
 ```bash
-./shutsujin_departure.sh --silent    # No battle cries
-./shutsujin_departure.sh             # Default: shout mode (battle cries enabled)
+./yokubari.sh --silent    # No battle cries
+./yokubari.sh             # Default: shout mode (battle cries enabled)
 ```
 
-Silent mode sets `DISPLAY_MODE=silent` as a tmux environment variable. The Karo checks this when writing task YAMLs and omits the `echo_message` field.
+Silent mode sets `DISPLAY_MODE=silent` as a tmux environment variable. The Gryakuza checks this when writing task YAMLs and omits the `echo_message` field.
 
 ---
 
@@ -834,7 +834,7 @@ Silent mode sets `DISPLAY_MODE=silent` as a tmux environment variable. The Karo 
        │
        ▼
  ┌──────────────────┐
- │  ntfy → Shogun   │  AI auto-categorize, parse dates, set priorities
+ │  ntfy → Darkninja│  AI auto-categorize, parse dates, set priorities
  └────────┬─────────┘
           │
           ▼
@@ -869,8 +869,8 @@ Silent mode sets `DISPLAY_MODE=silent` as a tmux environment variable. The Karo 
 **Q: How is this different from other task apps?**
 A: You never open an app. Just speak. Zero friction. Most task apps fail because people stop opening them. SayTask removes that step entirely.
 
-**Q: Can I use SayTask without the full Shogun system?**
-A: SayTask is a feature of Shogun. Shogun also works as a standalone multi-agent development platform — you get both capabilities in one system.
+**Q: Can I use SayTask without the full multi-agent-shogun system?**
+A: SayTask is a feature of multi-agent-shogun. The system also works as a standalone multi-agent development platform — you get both capabilities in one system.
 
 **Q: What's the Frog 🐸?**
 A: Every morning, AI picks your hardest task — the one you'd rather avoid. Tackle it first (the "Eat the Frog" method) or ignore it. Your call.
@@ -886,7 +886,7 @@ A: AI does its best to categorize and schedule it. You can always refine later �
 
 ### SayTask vs cmd Pipeline
 
-Shogun has two complementary task systems:
+The system has two complementary task systems:
 
 | Capability | SayTask (Voice Layer) | cmd Pipeline (AI Execution) |
 |---|:-:|:-:|
@@ -905,12 +905,12 @@ SayTask handles personal productivity (capture → schedule → remind). The cmd
 
 | Agent | Default Model | Thinking | Role |
 |-------|--------------|----------|------|
-| Shogun | Opus | **Enabled (high)** | Strategic advisor to the Lord. Use `--shogun-no-thinking` for relay-only mode |
-| Karo | Sonnet | Enabled | Task distribution, simple QC, dashboard management |
-| Gunshi | Opus | Enabled | Deep analysis, design review, architecture evaluation |
-| Ashigaru 1–7 | Sonnet | Enabled | Implementation: code, research, file operations |
+| Darkninja | Opus | **Enabled (high)** | Strategic advisor to ラオモト. Use `--darkninja-no-thinking` for relay-only mode |
+| Gryakuza | Sonnet | Enabled | Task distribution, simple QC, dashboard management |
+| Soukaiya | Opus | Enabled | Deep analysis, design review, architecture evaluation |
+| Yakuza 1–7 | Sonnet | Enabled | Implementation: code, research, file operations |
 
-The system splits work by **cognitive complexity**, not model tier. Ashigaru handle implementation (L1–L3), while the Gunshi handles tasks requiring deep reasoning (L4–L6). This eliminates the need for dynamic model switching — the right agent gets the right task from the start.
+The system splits work by **cognitive complexity**, not model tier. Yakuza handle implementation (L1–L3), while the Soukaiya handles tasks requiring deep reasoning (L4–L6). This eliminates the need for dynamic model switching — the right agent gets the right task from the start.
 
 ### Bloom's Taxonomy → Agent Routing
 
@@ -918,28 +918,28 @@ Tasks are classified using Bloom's Taxonomy and routed to the appropriate **agen
 
 | Level | Category | Description | Routed To |
 |-------|----------|-------------|-----------|
-| L1 | Remember | Recall facts, copy, list | **Ashigaru** |
-| L2 | Understand | Explain, summarize, paraphrase | **Ashigaru** |
-| L3 | Apply | Execute procedures, implement known patterns | **Ashigaru** |
-| L4 | Analyze | Compare, investigate, deconstruct | **Gunshi** |
-| L5 | Evaluate | Judge, critique, recommend | **Gunshi** |
-| L6 | Create | Design, build, synthesize new solutions | **Gunshi** |
+| L1 | Remember | Recall facts, copy, list | **Yakuza** |
+| L2 | Understand | Explain, summarize, paraphrase | **Yakuza** |
+| L3 | Apply | Execute procedures, implement known patterns | **Yakuza** |
+| L4 | Analyze | Compare, investigate, deconstruct | **Soukaiya** |
+| L5 | Evaluate | Judge, critique, recommend | **Soukaiya** |
+| L6 | Create | Design, build, synthesize new solutions | **Soukaiya** |
 
-The Karo assigns each subtask a Bloom level and routes it to the appropriate agent. L1–L3 tasks go to Ashigaru for parallel execution; L4–L6 tasks go to the Gunshi for deeper analysis. Simple L4 tasks (e.g., small code review) may still go to Ashigaru when the Karo judges it appropriate.
+The Gryakuza assigns each subtask a Bloom level and routes it to the appropriate agent. L1–L3 tasks go to Yakuza for parallel execution; L4–L6 tasks go to the Soukaiya for deeper analysis. Simple L4 tasks (e.g., small code review) may still go to Yakuza when the Gryakuza judges it appropriate.
 
 ### Task Dependencies (blockedBy)
 
 Tasks can declare dependencies on other tasks using `blockedBy`:
 
 ```yaml
-# queue/tasks/ashigaru2.yaml
+# queue/tasks/yakuza2.yaml
 task:
   task_id: subtask_010b
-  blockedBy: ["subtask_010a"]  # Waits for ashigaru1's task to complete
+  blockedBy: ["subtask_010a"]  # Waits for yakuza1's task to complete
   description: "Integrate the API client built by subtask_010a"
 ```
 
-When a blocking task completes, the Karo automatically unblocks dependent tasks and assigns them to available Ashigaru. This prevents idle waiting and enables efficient pipelining of dependent work.
+When a blocking task completes, the Gryakuza automatically unblocks dependent tasks and assigns them to available Yakuza. This prevents idle waiting and enables efficient pipelining of dependent work.
 
 ---
 
@@ -947,7 +947,7 @@ When a blocking task completes, the Karo automatically unblocks dependent tasks 
 
 > "Don't execute tasks mindlessly. Always keep 'fastest × best output' in mind."
 
-The Shogun System is built on five core principles:
+The system is built on five core principles:
 
 | Principle | Description |
 |-----------|-------------|
@@ -963,14 +963,14 @@ These principles are documented in detail: **[docs/philosophy.md](docs/philosoph
 
 ## Design Philosophy
 
-### Why a hierarchy (Shogun → Karo → Ashigaru)?
+### Why a hierarchy (Darkninja → Gryakuza → Yakuza)?
 
-1. **Instant response**: The Shogun delegates immediately, returning control to you
-2. **Parallel execution**: The Karo distributes to multiple Ashigaru simultaneously
+1. **Instant response**: The Darkninja delegates immediately, returning control to you
+2. **Parallel execution**: The Gryakuza distributes to multiple Yakuza simultaneously
 3. **Single responsibility**: Each role is clearly separated — no confusion
-4. **Scalability**: Adding more Ashigaru doesn't break the structure
-5. **Fault isolation**: One Ashigaru failing doesn't affect the others
-6. **Unified reporting**: Only the Shogun communicates with you, keeping information organized
+4. **Scalability**: Adding more Yakuza doesn't break the structure
+5. **Fault isolation**: One Yakuza failing doesn't affect the others
+6. **Unified reporting**: Only the Darkninja communicates with you, keeping information organized
 
 ### Why Mailbox System?
 
@@ -987,7 +987,7 @@ Why use files instead of direct messaging between agents?
 
 ### Agent Identification (@agent_id)
 
-Each pane has a `@agent_id` tmux user option (e.g., `karo`, `ashigaru1`). While `pane_index` can shift when panes are rearranged, `@agent_id` is set at startup by `shutsujin_departure.sh` and never changes.
+Each pane has a `@agent_id` tmux user option (e.g., `gryakuza`, `yakuza1`). While `pane_index` can shift when panes are rearranged, `@agent_id` is set at startup by `yokubari.sh` and never changes.
 
 Agent self-identification:
 ```bash
@@ -997,12 +997,12 @@ The `-t "$TMUX_PANE"` is required. Omitting it returns the active pane's value (
 
 Model names are stored as `@model_name` and current task summaries as `@current_task` — both displayed in the `pane-border-format`. Even if Claude Code overwrites the pane title, these user options persist.
 
-### Why only the Karo updates dashboard.md
+### Why only the Gryakuza updates dashboard.md
 
 1. **Single writer**: Prevents conflicts by limiting updates to one agent
-2. **Information aggregation**: The Karo receives all Ashigaru reports, so it has the full picture
+2. **Information aggregation**: The Gryakuza receives all Yakuza reports, so it has the full picture
 3. **Consistency**: All updates pass through a single quality gate
-4. **No interruptions**: If the Shogun updated it, it could interrupt the Lord's input
+4. **No interruptions**: If the Darkninja updated it, it could interrupt ラオモト's input
 
 ---
 
@@ -1010,7 +1010,7 @@ Model names are stored as `@model_name` and current task summaries as `@current_
 
 No skills are included out of the box. Skills emerge organically during operation — you approve candidates from `dashboard.md` as they're discovered.
 
-Invoke skills with `/skill-name`. Just tell the Shogun: "run /skill-name".
+Invoke skills with `/skill-name`. Just tell the Darkninja: "run /skill-name".
 
 ### Skill Philosophy
 
@@ -1023,13 +1023,13 @@ Skills in `.claude/commands/` are excluded from version control by design:
 **2. How skills are discovered**
 
 ```
-Ashigaru notices a pattern during work
+Yakuza notices a pattern during work
     ↓
 Appears in dashboard.md under "Skill Candidates"
     ↓
-You (the Lord) review the proposal
+You (ラオモト) review the proposal
     ↓
-If approved, instruct the Karo to create the skill
+If approved, instruct the Gryakuza to create the skill
 ```
 
 Skills are user-driven. Automatic creation would lead to unmanageable bloat — only keep what you find genuinely useful.
@@ -1068,7 +1068,7 @@ claude mcp add sequential-thinking -- npx -y @modelcontextprotocol/server-sequen
 # 5. Memory - Cross-session long-term memory (recommended!)
 # ✅ Auto-configured by first_setup.sh
 # To reconfigure manually:
-claude mcp add memory -e MEMORY_FILE_PATH="$PWD/memory/shogun_memory.jsonl" -- npx -y @modelcontextprotocol/server-memory
+claude mcp add memory -e MEMORY_FILE_PATH="$PWD/memory/darkninja_memory.jsonl" -- npx -y @modelcontextprotocol/server-memory
 ```
 
 ### Verify installation
@@ -1091,13 +1091,13 @@ This system manages **all white-collar tasks**, not just code. Projects can live
 You: "Research the top 5 AI coding assistants and compare them"
 
 What happens:
-1. Shogun delegates to Karo
-2. Karo assigns:
-   - Ashigaru 1: Research GitHub Copilot
-   - Ashigaru 2: Research Cursor
-   - Ashigaru 3: Research Claude Code
-   - Ashigaru 4: Research Codeium
-   - Ashigaru 5: Research Amazon CodeWhisperer
+1. Darkninja delegates to Gryakuza
+2. Gryakuza assigns:
+   - Yakuza 1: Research GitHub Copilot
+   - Yakuza 2: Research Cursor
+   - Yakuza 3: Research Claude Code
+   - Yakuza 4: Research Codeium
+   - Yakuza 5: Research Amazon CodeWhisperer
 3. All 5 research simultaneously
 4. Results compiled in dashboard.md
 ```
@@ -1108,10 +1108,10 @@ What happens:
 You: "Prepare a PoC for the project on this Notion page: [URL]"
 
 What happens:
-1. Karo fetches Notion content via MCP
-2. Ashigaru 2: Lists items to verify
-3. Ashigaru 3: Investigates technical feasibility
-4. Ashigaru 4: Drafts a PoC plan
+1. Gryakuza fetches Notion content via MCP
+2. Yakuza 2: Lists items to verify
+3. Yakuza 3: Investigates technical feasibility
+4. Yakuza 4: Drafts a PoC plan
 5. All results compiled in dashboard.md — meeting prep done
 ```
 
@@ -1135,16 +1135,16 @@ screenshot:
   path: "/mnt/c/Users/YourName/Pictures/Screenshots"
 ```
 
-Tell the Shogun "check the latest screenshot" and it reads your screen captures for visual context. (`Win+Shift+S` on Windows.)
+Tell the Darkninja "check the latest screenshot" and it reads your screen captures for visual context. (`Win+Shift+S` on Windows.)
 
 ### ntfy (Phone Notifications)
 
 ```yaml
 # config/settings.yaml
-ntfy_topic: "shogun-yourname"
+ntfy_topic: "darkninja-yourname"
 ```
 
-Subscribe to the same topic in the [ntfy app](https://ntfy.sh) on your phone. The listener starts automatically with `shutsujin_departure.sh`.
+Subscribe to the same topic in the [ntfy app](https://ntfy.sh) on your phone. The listener starts automatically with `yokubari.sh`.
 
 #### ntfy Authentication (Self-Hosted Servers)
 
@@ -1198,10 +1198,10 @@ Priority: Token > Basic > None. If neither is set, no auth headers are sent (bac
 │                    Daily Startup (run every day)                     │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  shutsujin_departure.sh                                             │
+│  yokubari.sh                                             │
 │      │                                                              │
 │      ├──▶ Create tmux sessions                                      │
-│      │         • "shogun" session (1 pane)                          │
+│      │         • "darkninja" session (1 pane)                          │
 │      │         • "multiagent" session (9 panes, 3x3 grid)          │
 │      │                                                              │
 │      ├──▶ Reset queue files and dashboard                           │
@@ -1214,38 +1214,38 @@ Priority: Token > Basic > None. If neither is set, no auth headers are sent (bac
 </details>
 
 <details>
-<summary><b>shutsujin_departure.sh Options</b> (click to expand)</summary>
+<summary><b>yokubari.sh Options</b> (click to expand)</summary>
 
 ```bash
 # Default: Full startup (tmux sessions + Claude Code launch)
-./shutsujin_departure.sh
+./yokubari.sh
 
 # Session setup only (no Claude Code launch)
-./shutsujin_departure.sh -s
-./shutsujin_departure.sh --setup-only
+./yokubari.sh -s
+./yokubari.sh --setup-only
 
 # Clean task queues (preserves command history)
-./shutsujin_departure.sh -c
-./shutsujin_departure.sh --clean
+./yokubari.sh -c
+./yokubari.sh --clean
 
-# Battle formation: All Ashigaru on Opus (max capability, higher cost)
-./shutsujin_departure.sh -k
-./shutsujin_departure.sh --kessen
+# Battle formation: All Yakuza on Opus (max capability, higher cost)
+./yokubari.sh -k
+./yokubari.sh --kessen
 
 # Silent mode: Disable battle cries (saves API tokens on echo calls)
-./shutsujin_departure.sh -S
-./shutsujin_departure.sh --silent
+./yokubari.sh -S
+./yokubari.sh --silent
 
 # Full startup + open Windows Terminal tabs
-./shutsujin_departure.sh -t
-./shutsujin_departure.sh --terminal
+./yokubari.sh -t
+./yokubari.sh --terminal
 
-# Shogun relay-only mode: Disable Shogun's thinking (cost savings)
-./shutsujin_departure.sh --shogun-no-thinking
+# Darkninja relay-only mode: Disable Darkninja's thinking (cost savings)
+./yokubari.sh --darkninja-no-thinking
 
 # Show help
-./shutsujin_departure.sh -h
-./shutsujin_departure.sh --help
+./yokubari.sh -h
+./yokubari.sh --help
 ```
 
 </details>
@@ -1255,27 +1255,27 @@ Priority: Token > Basic > None. If neither is set, no auth headers are sent (bac
 
 **Normal daily use:**
 ```bash
-./shutsujin_departure.sh          # Launch everything
-tmux attach-session -t shogun     # Connect and give commands
+./yokubari.sh          # Launch everything
+tmux attach-session -t darkninja     # Connect and give commands
 ```
 
 **Debug mode (manual control):**
 ```bash
-./shutsujin_departure.sh -s       # Create sessions only
+./yokubari.sh -s       # Create sessions only
 
 # Manually launch Claude Code on specific agents
-tmux send-keys -t shogun:0 'claude --dangerously-skip-permissions' Enter
+tmux send-keys -t darkninja:0 'claude --dangerously-skip-permissions' Enter
 tmux send-keys -t multiagent:0.0 'claude --dangerously-skip-permissions' Enter
 ```
 
 **Restart after crash:**
 ```bash
 # Kill existing sessions
-tmux kill-session -t shogun
+tmux kill-session -t darkninja
 tmux kill-session -t multiagent
 
 # Fresh start
-./shutsujin_departure.sh
+./yokubari.sh
 ```
 
 </details>
@@ -1286,9 +1286,9 @@ tmux kill-session -t multiagent
 Running `first_setup.sh` automatically adds these aliases to `~/.bashrc`:
 
 ```bash
-alias csst='cd /mnt/c/tools/multi-agent-shogun && ./shutsujin_departure.sh'
-alias css='tmux attach-session -t shogun'      # Connect to Shogun
-alias csm='tmux attach-session -t multiagent'  # Connect to Karo + Ashigaru
+alias csst='cd /mnt/c/tools/multi-agent-shogun && ./yokubari.sh'
+alias css='tmux attach-session -t darkninja'      # Connect to Darkninja
+alias csm='tmux attach-session -t multiagent'  # Connect to Gryakuza + Yakuza
 ```
 
 To apply aliases: run `source ~/.bashrc` or restart your terminal (PowerShell: `wsl --shutdown` then reopen).
@@ -1308,14 +1308,14 @@ multi-agent-shogun/
 │  ┌──────────────── Setup Scripts ────────────────────┐
 ├── install.bat               # Windows: First-time setup
 ├── first_setup.sh            # Ubuntu/Mac: First-time setup
-├── shutsujin_departure.sh    # Daily deployment (auto-loads instructions)
+├── yokubari.sh    # Daily deployment (auto-loads instructions)
 │  └──────────────────────────────────────────────────┘
 │
 ├── instructions/             # Agent behavior definitions
-│   ├── shogun.md             # Shogun instructions
-│   ├── karo.md               # Karo instructions
-│   ├── ashigaru.md           # Ashigaru instructions
-│   ├── gunshi.md             # Gunshi (strategist) instructions
+│   ├── darkninja.md          # Darkninja instructions
+│   ├── gryakuza.md           # Gryakuza instructions
+│   ├── yakuza.md             # Yakuza instructions
+│   ├── soukaiya.md           # Soukaiya (strategist) instructions
 │   └── cli_specific/         # CLI-specific tool descriptions
 │       ├── claude_tools.md   # Claude Code tools & features
 │       └── copilot_tools.md  # GitHub Copilot CLI tools & features
@@ -1339,12 +1339,12 @@ multi-agent-shogun/
 │   └── <project_id>.yaml    # Full info per project (clients, tasks, Notion links, etc.)
 │
 ├── queue/                    # Communication files
-│   ├── shogun_to_karo.yaml   # Shogun → Karo commands
+│   ├── shogun_to_karo.yaml   # Darkninja → Gryakuza commands
 │   ├── ntfy_inbox.yaml       # Incoming messages from phone (ntfy)
 │   ├── inbox/                # Per-agent inbox files
-│   │   ├── shogun.yaml       # Messages to Shogun
-│   │   ├── karo.yaml         # Messages to Karo
-│   │   └── ashigaru{1-8}.yaml # Messages to each Ashigaru
+│   │   ├── darkninja.yaml    # Messages to Darkninja
+│   │   ├── gryakuza.yaml    # Messages to Gryakuza
+│   │   └── yakuza{1-8}.yaml # Messages to each Yakuza
 │   ├── tasks/                # Per-worker task files
 │   └── reports/              # Worker reports
 │
@@ -1407,7 +1407,7 @@ current_tasks:
     status: in_progress
 ```
 
-This separation lets the Shogun System coordinate across multiple external projects while keeping project details out of version control.
+This separation lets the system coordinate across multiple external projects while keeping project details out of version control.
 
 ---
 
@@ -1446,7 +1446,7 @@ mcp__memory__read_graph()
 <details>
 <summary><b>Agents asking for permissions?</b></summary>
 
-Agents should start with `--dangerously-skip-permissions`. This is handled automatically by `shutsujin_departure.sh`.
+Agents should start with `--dangerously-skip-permissions`. This is handled automatically by `yokubari.sh`.
 
 </details>
 
@@ -1471,8 +1471,8 @@ tmux attach-session -t multiagent
 # Method 1: Run claude directly in the pane
 claude --model opus --dangerously-skip-permissions
 
-# Method 2: Karo force-restarts via respawn-pane (also fixes nesting)
-tmux respawn-pane -t shogun:0.0 -k 'claude --model opus --dangerously-skip-permissions'
+# Method 2: Gryakuza force-restarts via respawn-pane (also fixes nesting)
+tmux respawn-pane -t darkninja:0.0 -k 'claude --model opus --dangerously-skip-permissions'
 ```
 
 **If you accidentally nested tmux:**
@@ -1488,11 +1488,11 @@ tmux respawn-pane -t shogun:0.0 -k 'claude --model opus --dangerously-skip-permi
 
 | Command | Description |
 |---------|-------------|
-| `tmux attach -t shogun` | Connect to the Shogun |
+| `tmux attach -t darkninja` | Connect to the Darkninja |
 | `tmux attach -t multiagent` | Connect to workers |
 | `Ctrl+B` then `0`–`8` | Switch panes |
 | `Ctrl+B` then `d` | Detach (agents keep running) |
-| `tmux kill-session -t shogun` | Stop the Shogun session |
+| `tmux kill-session -t darkninja` | Stop the Darkninja session |
 | `tmux kill-session -t multiagent` | Stop the worker session |
 
 ### Mouse Support
@@ -1513,18 +1513,18 @@ Even if you're not comfortable with keyboard shortcuts, you can switch, scroll, 
 
 > **Tasks are now routed by cognitive complexity to the right agent — not by switching models.** Plus comprehensive E2E test coverage and zero-interruption inbox delivery.
 
-- **Bloom → Agent routing** — Replaced dynamic model switching with agent-level routing. L1–L3 tasks go to Ashigaru (Sonnet), L4–L6 tasks go to Gunshi (Opus). No more mid-session `/model opus` promotions — the Karo routes to the right agent from the start
-- **Gunshi (軍師) as first-class agent** — Strategic advisor on pane 8. Handles deep analysis, design review, architecture evaluation, and complex QC. Ashigaru focus on implementation only
+- **Bloom → Agent routing** — Replaced dynamic model switching with agent-level routing. L1–L3 tasks go to Yakuza (Sonnet), L4–L6 tasks go to Soukaiya (Opus). No more mid-session `/model opus` promotions — the Gryakuza routes to the right agent from the start
+- **Soukaiya (ソウカイヤ幹部) as first-class agent** — Strategic advisor on pane 8. Handles deep analysis, design review, architecture evaluation, and complex QC. Yakuza focus on implementation only
 - **E2E test suite (19 tests, 7 scenarios)** — Mock CLI framework simulates agent behavior in isolated tmux sessions. Covers: basic flow, inbox delivery, /clear recovery, escalation, redo, parallel tasks, and blocked_by dependencies
 - **Stop hook inbox delivery** — Claude Code agents automatically check inbox at turn end via `.claude/settings.json` Stop hook. Eliminates the `send-keys` interruption problem entirely for Claude Code agents
-- **Model defaults updated** — Karo: Opus → Sonnet (task distribution doesn't need Opus). All Ashigaru: Sonnet (uniform tier). Gunshi: Opus (deep reasoning)
+- **Model defaults updated** — Gryakuza: Opus → Sonnet (task distribution doesn't need Opus). All Yakuza: Sonnet (uniform tier). Soukaiya: Opus (deep reasoning)
 
 <details>
 <summary><b>What was in v3.4</b></summary>
 
 - **Stop hook inbox delivery** — Claude Code agents automatically check inbox at turn end via `.claude/settings.json` Stop hook
 - **Escape escalation disabled for Claude Code** — Phase 2 escalation (Escape×2 + C-c) was interrupting active Claude Code turns. Now suppressed; Stop hook handles delivery instead
-- **Gunshi (軍師) role introduced** — New strategic advisor agent (pane 8). Replaces ashigaru8
+- **Soukaiya (ソウカイヤ幹部) role introduced** — New strategic advisor agent (pane 8). Replaces yakuza8
 - **Codex CLI startup prompt** — `get_startup_prompt()` in `cli_adapter.sh` passes initial `[PROMPT]` argument to Codex CLI launch
 - **Session Start identity protection** — Agents must complete Steps 1-3 before processing inbox
 - **YAML slimming utility** — `scripts/slim_yaml.sh` archives read messages and completed commands
@@ -1536,17 +1536,17 @@ Even if you're not comfortable with keyboard shortcuts, you can switch, scroll, 
 > **New model, same YAML.** Add `model: gpt-5.3-codex-spark` to any Codex agent in `settings.yaml`.
 
 - **Codex `--model` flag support** — `build_cli_command()` now passes `settings.yaml` model config to the Codex CLI via `--model`. Supports `gpt-5.3-codex-spark` and any future Codex models
-- **Separate rate limit** — Spark runs on its own rate limit quota, independent of GPT-5.3-Codex. Run both models in parallel across different Ashigaru to **double your effective throughput**
-- **Startup display** — `shutsujin_departure.sh` now shows the actual model name (e.g., `codex/gpt-5.3-codex-spark`) instead of the generic effort level
+- **Separate rate limit** — Spark runs on its own rate limit quota, independent of GPT-5.3-Codex. Run both models in parallel across different Yakuza to **double your effective throughput**
+- **Startup display** — `yokubari.sh` now shows the actual model name (e.g., `codex/gpt-5.3-codex-spark`) instead of the generic effort level
 
 ## What's New in v3.0 — Multi-CLI
 
-> **Shogun is no longer Claude-only.** Mix and match 4 AI coding CLIs in a single army.
+> **The system is no longer Claude-only.** Mix and match 4 AI coding CLIs in a single army.
 
 - **Multi-CLI as first-class architecture** — `lib/cli_adapter.sh` dynamically selects CLI per agent. Change one line in `settings.yaml` to swap any worker between Claude Code, Codex, Copilot, or Kimi
 - **OpenAI Codex CLI integration** — GPT-5.3-codex with `--dangerously-bypass-approvals-and-sandbox` for true autonomous execution. `--no-alt-screen` makes agent activity visible in tmux
 - **CLI bypass flag discovery** — `--full-auto` is NOT fully automatic (it's `-a on-request`). Documented the correct flags for all 4 CLIs
-- **Hybrid architecture** — Command layer (Shogun + Karo) stays on Claude Code for Memory MCP and mailbox integration. Worker layer (Ashigaru) is CLI-agnostic
+- **Hybrid architecture** — Command layer (Darkninja + Gryakuza) stays on Claude Code for Memory MCP and mailbox integration. Worker layer (Yakuza) is CLI-agnostic
 - **Community-contributed CLI adapters** — Thanks to [@yuto-ts](https://github.com/yuto-ts) (cli_adapter.sh), [@circlemouth](https://github.com/circlemouth) (Codex support), [@koba6316](https://github.com/koba6316) (task routing)
 
 <details>
@@ -1555,10 +1555,10 @@ Even if you're not comfortable with keyboard shortcuts, you can switch, scroll, 
 - **ntfy bidirectional communication** — Send commands from your phone, receive push notifications for task completion
 - **SayTask notifications** — Streak tracking, Eat the Frog, behavioral psychology-driven motivation
 - **Pane border task display** — See each agent's current task at a glance on the tmux pane border
-- **Shout mode** (default) — Ashigaru shout personalized battle cries after completing tasks. Disable with `--silent`
+- **Shout mode** (default) — Yakuza shout personalized battle cries after completing tasks. Disable with `--silent`
 - **Agent self-watch + escalation (v3.2)** — Each agent monitors its own inbox file with `inotifywait` (zero-polling, instant wake-up). Fallback: `tmux send-keys` short nudge (text/Enter sent separately for Codex CLI). 3-phase escalation: standard nudge (0-2min) → Escape×2+nudge (2-4min) → `/clear` force reset (4min+). Linux FS symlink resolves WSL2 9P inotify issues.
 - **Agent self-identification** (`@agent_id`) — Stable identity via tmux user options, immune to pane reordering
-- **Battle mode** (`-k` flag) — All-Opus formation for maximum capability
+- **Battle mode** (`-k` flag) — All-Yakuza-Opus formation for maximum capability
 - **Task dependency system** (`blockedBy`) — Automatic unblocking of dependent tasks
 
 </details>

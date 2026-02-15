@@ -29,31 +29,31 @@ YAML
 cli:
   default: claude
   agents:
-    shogun:
+    darkninja:
       type: claude
       model: opus
-    karo:
+    gryakuza:
       type: claude
       model: opus
-    ashigaru1:
+    yakuza1:
       type: claude
       model: sonnet
-    ashigaru2:
+    yakuza2:
       type: claude
       model: sonnet
-    ashigaru3:
+    yakuza3:
       type: claude
       model: sonnet
-    ashigaru4:
+    yakuza4:
       type: claude
       model: sonnet
-    ashigaru5:
+    yakuza5:
       type: codex
-    ashigaru6:
+    yakuza6:
       type: codex
-    ashigaru7:
+    yakuza7:
       type: copilot
-    ashigaru8:
+    yakuza8:
       type: copilot
 YAML
 
@@ -62,8 +62,8 @@ YAML
 cli:
   default: claude
   agents:
-    ashigaru5: codex
-    ashigaru7: copilot
+    yakuza5: codex
+    yakuza7: copilot
 YAML
 
     # 不正CLI名
@@ -71,7 +71,7 @@ YAML
 cli:
   default: claudee
   agents:
-    ashigaru1: invalid_cli
+    yakuza1: invalid_cli
 YAML
 
     # codexデフォルト
@@ -96,14 +96,14 @@ YAML
 cli:
   default: claude
   agents:
-    ashigaru1:
+    yakuza1:
       type: claude
       model: haiku
-    ashigaru5:
+    yakuza5:
       type: codex
       model: gpt-5
 models:
-  karo: sonnet
+  gryakuza: sonnet
 YAML
 
     # kimi CLI settings
@@ -111,10 +111,10 @@ YAML
 cli:
   default: claude
   agents:
-    ashigaru3:
+    yakuza3:
       type: kimi
       model: k2.5
-    ashigaru4:
+    yakuza4:
       type: kimi
 YAML
 
@@ -144,73 +144,73 @@ load_adapter_with() {
 
 @test "get_cli_type: cliセクションなし → claude (後方互換)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
-    result=$(get_cli_type "shogun")
+    result=$(get_cli_type "darkninja")
     [ "$result" = "claude" ]
 }
 
 @test "get_cli_type: claude only設定 → claude" {
     load_adapter_with "${TEST_TMP}/settings_claude_only.yaml"
-    result=$(get_cli_type "ashigaru1")
+    result=$(get_cli_type "yakuza1")
     [ "$result" = "claude" ]
 }
 
-@test "get_cli_type: mixed設定 shogun → claude" {
+@test "get_cli_type: mixed設定 darkninja → claude" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
-    result=$(get_cli_type "shogun")
+    result=$(get_cli_type "darkninja")
     [ "$result" = "claude" ]
 }
 
-@test "get_cli_type: mixed設定 ashigaru5 → codex" {
+@test "get_cli_type: mixed設定 yakuza5 → codex" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
-    result=$(get_cli_type "ashigaru5")
+    result=$(get_cli_type "yakuza5")
     [ "$result" = "codex" ]
 }
 
-@test "get_cli_type: mixed設定 ashigaru7 → copilot" {
+@test "get_cli_type: mixed設定 yakuza7 → copilot" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
-    result=$(get_cli_type "ashigaru7")
+    result=$(get_cli_type "yakuza7")
     [ "$result" = "copilot" ]
 }
 
-@test "get_cli_type: mixed設定 ashigaru1 → claude (個別設定)" {
+@test "get_cli_type: mixed設定 yakuza1 → claude (個別設定)" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
-    result=$(get_cli_type "ashigaru1")
+    result=$(get_cli_type "yakuza1")
     [ "$result" = "claude" ]
 }
 
-@test "get_cli_type: 文字列形式 ashigaru5 → codex" {
+@test "get_cli_type: 文字列形式 yakuza5 → codex" {
     load_adapter_with "${TEST_TMP}/settings_string_agents.yaml"
-    result=$(get_cli_type "ashigaru5")
+    result=$(get_cli_type "yakuza5")
     [ "$result" = "codex" ]
 }
 
-@test "get_cli_type: 文字列形式 ashigaru7 → copilot" {
+@test "get_cli_type: 文字列形式 yakuza7 → copilot" {
     load_adapter_with "${TEST_TMP}/settings_string_agents.yaml"
-    result=$(get_cli_type "ashigaru7")
+    result=$(get_cli_type "yakuza7")
     [ "$result" = "copilot" ]
 }
 
-@test "get_cli_type: kimi設定 ashigaru3 → kimi" {
+@test "get_cli_type: kimi設定 yakuza3 → kimi" {
     load_adapter_with "${TEST_TMP}/settings_kimi.yaml"
-    result=$(get_cli_type "ashigaru3")
+    result=$(get_cli_type "yakuza3")
     [ "$result" = "kimi" ]
 }
 
-@test "get_cli_type: kimi設定 ashigaru4 → kimi (モデル指定なし)" {
+@test "get_cli_type: kimi設定 yakuza4 → kimi (モデル指定なし)" {
     load_adapter_with "${TEST_TMP}/settings_kimi.yaml"
-    result=$(get_cli_type "ashigaru4")
+    result=$(get_cli_type "yakuza4")
     [ "$result" = "kimi" ]
 }
 
 @test "get_cli_type: kimiデフォルト設定 → kimi" {
     load_adapter_with "${TEST_TMP}/settings_kimi_default.yaml"
-    result=$(get_cli_type "ashigaru1")
+    result=$(get_cli_type "yakuza1")
     [ "$result" = "kimi" ]
 }
 
 @test "get_cli_type: 未定義agent → default継承" {
     load_adapter_with "${TEST_TMP}/settings_codex_default.yaml"
-    result=$(get_cli_type "ashigaru3")
+    result=$(get_cli_type "yakuza3")
     [ "$result" = "codex" ]
 }
 
@@ -220,49 +220,49 @@ load_adapter_with() {
     [ "$result" = "claude" ]
 }
 
-# --- 全ashigaru パターン ---
+# --- 全yakuza パターン ---
 
-@test "get_cli_type: mixed設定 ashigaru1-8全パターン" {
+@test "get_cli_type: mixed設定 yakuza1-8全パターン" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
-    [ "$(get_cli_type ashigaru1)" = "claude" ]
-    [ "$(get_cli_type ashigaru2)" = "claude" ]
-    [ "$(get_cli_type ashigaru3)" = "claude" ]
-    [ "$(get_cli_type ashigaru4)" = "claude" ]
-    [ "$(get_cli_type ashigaru5)" = "codex" ]
-    [ "$(get_cli_type ashigaru6)" = "codex" ]
-    [ "$(get_cli_type ashigaru7)" = "copilot" ]
-    [ "$(get_cli_type ashigaru8)" = "copilot" ]
+    [ "$(get_cli_type yakuza1)" = "claude" ]
+    [ "$(get_cli_type yakuza2)" = "claude" ]
+    [ "$(get_cli_type yakuza3)" = "claude" ]
+    [ "$(get_cli_type yakuza4)" = "claude" ]
+    [ "$(get_cli_type yakuza5)" = "codex" ]
+    [ "$(get_cli_type yakuza6)" = "codex" ]
+    [ "$(get_cli_type yakuza7)" = "copilot" ]
+    [ "$(get_cli_type yakuza8)" = "copilot" ]
 }
 
 # --- エラー系 ---
 
 @test "get_cli_type: 不正CLI名 → claude フォールバック" {
     load_adapter_with "${TEST_TMP}/settings_invalid_cli.yaml"
-    result=$(get_cli_type "ashigaru1")
+    result=$(get_cli_type "yakuza1")
     [ "$result" = "claude" ]
 }
 
 @test "get_cli_type: 不正default → claude フォールバック" {
     load_adapter_with "${TEST_TMP}/settings_invalid_cli.yaml"
-    result=$(get_cli_type "karo")
+    result=$(get_cli_type "gryakuza")
     [ "$result" = "claude" ]
 }
 
 @test "get_cli_type: 空YAMLファイル → claude" {
     load_adapter_with "${TEST_TMP}/settings_empty.yaml"
-    result=$(get_cli_type "shogun")
+    result=$(get_cli_type "darkninja")
     [ "$result" = "claude" ]
 }
 
 @test "get_cli_type: YAML構文エラー → claude" {
     load_adapter_with "${TEST_TMP}/settings_broken.yaml"
-    result=$(get_cli_type "ashigaru1")
+    result=$(get_cli_type "yakuza1")
     [ "$result" = "claude" ]
 }
 
 @test "get_cli_type: 存在しないファイル → claude" {
     load_adapter_with "/nonexistent/path/settings.yaml"
-    result=$(get_cli_type "shogun")
+    result=$(get_cli_type "darkninja")
     [ "$result" = "claude" ]
 }
 
@@ -272,43 +272,43 @@ load_adapter_with() {
 
 @test "build_cli_command: claude + model → claude --model opus --dangerously-skip-permissions" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
-    result=$(build_cli_command "shogun")
+    result=$(build_cli_command "darkninja")
     [ "$result" = "claude --model opus --dangerously-skip-permissions" ]
 }
 
 @test "build_cli_command: codex + default model → codex --model sonnet ..." {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
-    result=$(build_cli_command "ashigaru5")
+    result=$(build_cli_command "yakuza5")
     [ "$result" = "codex --model sonnet --dangerously-bypass-approvals-and-sandbox --no-alt-screen" ]
 }
 
 @test "build_cli_command: copilot → copilot --yolo" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
-    result=$(build_cli_command "ashigaru7")
+    result=$(build_cli_command "yakuza7")
     [ "$result" = "copilot --yolo" ]
 }
 
 @test "build_cli_command: kimi + model → kimi --yolo --model k2.5" {
     load_adapter_with "${TEST_TMP}/settings_kimi.yaml"
-    result=$(build_cli_command "ashigaru3")
+    result=$(build_cli_command "yakuza3")
     [ "$result" = "kimi --yolo --model k2.5" ]
 }
 
 @test "build_cli_command: kimi (モデル指定なし) → kimi --yolo --model k2.5" {
     load_adapter_with "${TEST_TMP}/settings_kimi.yaml"
-    result=$(build_cli_command "ashigaru4")
+    result=$(build_cli_command "yakuza4")
     [ "$result" = "kimi --yolo --model k2.5" ]
 }
 
 @test "build_cli_command: cliセクションなし → claude フォールバック" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
-    result=$(build_cli_command "ashigaru1")
+    result=$(build_cli_command "yakuza1")
     [[ "$result" == claude*--dangerously-skip-permissions ]]
 }
 
 @test "build_cli_command: settings読取失敗 → claude フォールバック" {
     load_adapter_with "/nonexistent/settings.yaml"
-    result=$(build_cli_command "ashigaru1")
+    result=$(build_cli_command "yakuza1")
     [[ "$result" == claude*--dangerously-skip-permissions ]]
 }
 
@@ -316,78 +316,78 @@ load_adapter_with() {
 # get_instruction_file テスト
 # =============================================================================
 
-@test "get_instruction_file: shogun + claude → instructions/shogun.md" {
+@test "get_instruction_file: darkninja + claude → instructions/darkninja.md" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
-    result=$(get_instruction_file "shogun")
-    [ "$result" = "instructions/shogun.md" ]
+    result=$(get_instruction_file "darkninja")
+    [ "$result" = "instructions/darkninja.md" ]
 }
 
-@test "get_instruction_file: karo + claude → instructions/karo.md" {
+@test "get_instruction_file: gryakuza + claude → instructions/gryakuza.md" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
-    result=$(get_instruction_file "karo")
-    [ "$result" = "instructions/karo.md" ]
+    result=$(get_instruction_file "gryakuza")
+    [ "$result" = "instructions/gryakuza.md" ]
 }
 
-@test "get_instruction_file: ashigaru1 + claude → instructions/ashigaru.md" {
+@test "get_instruction_file: yakuza1 + claude → instructions/yakuza.md" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
-    result=$(get_instruction_file "ashigaru1")
-    [ "$result" = "instructions/ashigaru.md" ]
+    result=$(get_instruction_file "yakuza1")
+    [ "$result" = "instructions/yakuza.md" ]
 }
 
-@test "get_instruction_file: ashigaru5 + codex → instructions/codex-ashigaru.md" {
+@test "get_instruction_file: yakuza5 + codex → instructions/codex-yakuza.md" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
-    result=$(get_instruction_file "ashigaru5")
-    [ "$result" = "instructions/codex-ashigaru.md" ]
+    result=$(get_instruction_file "yakuza5")
+    [ "$result" = "instructions/codex-yakuza.md" ]
 }
 
-@test "get_instruction_file: ashigaru7 + copilot → .github/copilot-instructions-ashigaru.md" {
+@test "get_instruction_file: yakuza7 + copilot → .github/copilot-instructions-yakuza.md" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
-    result=$(get_instruction_file "ashigaru7")
-    [ "$result" = ".github/copilot-instructions-ashigaru.md" ]
+    result=$(get_instruction_file "yakuza7")
+    [ "$result" = ".github/copilot-instructions-yakuza.md" ]
 }
 
-@test "get_instruction_file: ashigaru3 + kimi → instructions/generated/kimi-ashigaru.md" {
+@test "get_instruction_file: yakuza3 + kimi → instructions/generated/kimi-yakuza.md" {
     load_adapter_with "${TEST_TMP}/settings_kimi.yaml"
-    result=$(get_instruction_file "ashigaru3")
-    [ "$result" = "instructions/generated/kimi-ashigaru.md" ]
+    result=$(get_instruction_file "yakuza3")
+    [ "$result" = "instructions/generated/kimi-yakuza.md" ]
 }
 
-@test "get_instruction_file: shogun + kimi → instructions/generated/kimi-shogun.md" {
+@test "get_instruction_file: darkninja + kimi → instructions/generated/kimi-darkninja.md" {
     load_adapter_with "${TEST_TMP}/settings_kimi_default.yaml"
-    result=$(get_instruction_file "shogun")
-    [ "$result" = "instructions/generated/kimi-shogun.md" ]
+    result=$(get_instruction_file "darkninja")
+    [ "$result" = "instructions/generated/kimi-darkninja.md" ]
 }
 
 @test "get_instruction_file: cli_type引数で明示指定 (codex)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
-    result=$(get_instruction_file "shogun" "codex")
-    [ "$result" = "instructions/codex-shogun.md" ]
+    result=$(get_instruction_file "darkninja" "codex")
+    [ "$result" = "instructions/codex-darkninja.md" ]
 }
 
 @test "get_instruction_file: cli_type引数で明示指定 (copilot)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
-    result=$(get_instruction_file "karo" "copilot")
-    [ "$result" = ".github/copilot-instructions-karo.md" ]
+    result=$(get_instruction_file "gryakuza" "copilot")
+    [ "$result" = ".github/copilot-instructions-gryakuza.md" ]
 }
 
 @test "get_instruction_file: 全CLI × 全role組み合わせ" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
     # claude
-    [ "$(get_instruction_file shogun claude)" = "instructions/shogun.md" ]
-    [ "$(get_instruction_file karo claude)" = "instructions/karo.md" ]
-    [ "$(get_instruction_file ashigaru1 claude)" = "instructions/ashigaru.md" ]
+    [ "$(get_instruction_file darkninja claude)" = "instructions/darkninja.md" ]
+    [ "$(get_instruction_file gryakuza claude)" = "instructions/gryakuza.md" ]
+    [ "$(get_instruction_file yakuza1 claude)" = "instructions/yakuza.md" ]
     # codex
-    [ "$(get_instruction_file shogun codex)" = "instructions/codex-shogun.md" ]
-    [ "$(get_instruction_file karo codex)" = "instructions/codex-karo.md" ]
-    [ "$(get_instruction_file ashigaru3 codex)" = "instructions/codex-ashigaru.md" ]
+    [ "$(get_instruction_file darkninja codex)" = "instructions/codex-darkninja.md" ]
+    [ "$(get_instruction_file gryakuza codex)" = "instructions/codex-gryakuza.md" ]
+    [ "$(get_instruction_file yakuza3 codex)" = "instructions/codex-yakuza.md" ]
     # copilot
-    [ "$(get_instruction_file shogun copilot)" = ".github/copilot-instructions-shogun.md" ]
-    [ "$(get_instruction_file karo copilot)" = ".github/copilot-instructions-karo.md" ]
-    [ "$(get_instruction_file ashigaru5 copilot)" = ".github/copilot-instructions-ashigaru.md" ]
+    [ "$(get_instruction_file darkninja copilot)" = ".github/copilot-instructions-darkninja.md" ]
+    [ "$(get_instruction_file gryakuza copilot)" = ".github/copilot-instructions-gryakuza.md" ]
+    [ "$(get_instruction_file yakuza5 copilot)" = ".github/copilot-instructions-yakuza.md" ]
     # kimi
-    [ "$(get_instruction_file shogun kimi)" = "instructions/generated/kimi-shogun.md" ]
-    [ "$(get_instruction_file karo kimi)" = "instructions/generated/kimi-karo.md" ]
-    [ "$(get_instruction_file ashigaru7 kimi)" = "instructions/generated/kimi-ashigaru.md" ]
+    [ "$(get_instruction_file darkninja kimi)" = "instructions/generated/kimi-darkninja.md" ]
+    [ "$(get_instruction_file gryakuza kimi)" = "instructions/generated/kimi-gryakuza.md" ]
+    [ "$(get_instruction_file yakuza7 kimi)" = "instructions/generated/kimi-yakuza.md" ]
 }
 
 @test "get_instruction_file: 不明なagent_id → 空文字 + return 1" {
@@ -476,45 +476,45 @@ load_adapter_with() {
 # get_agent_model テスト
 # =============================================================================
 
-@test "get_agent_model: cliセクションなし shogun → opus (デフォルト)" {
+@test "get_agent_model: cliセクションなし darkninja → opus (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
-    result=$(get_agent_model "shogun")
+    result=$(get_agent_model "darkninja")
     [ "$result" = "opus" ]
 }
 
-@test "get_agent_model: cliセクションなし karo → sonnet (デフォルト)" {
+@test "get_agent_model: cliセクションなし gryakuza → sonnet (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
-    result=$(get_agent_model "karo")
+    result=$(get_agent_model "gryakuza")
     [ "$result" = "sonnet" ]
 }
 
-@test "get_agent_model: cliセクションなし ashigaru1 → sonnet (デフォルト)" {
+@test "get_agent_model: cliセクションなし yakuza1 → sonnet (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
-    result=$(get_agent_model "ashigaru1")
+    result=$(get_agent_model "yakuza1")
     [ "$result" = "sonnet" ]
 }
 
-@test "get_agent_model: cliセクションなし ashigaru5 → sonnet (デフォルト)" {
+@test "get_agent_model: cliセクションなし yakuza5 → sonnet (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
-    result=$(get_agent_model "ashigaru5")
+    result=$(get_agent_model "yakuza5")
     [ "$result" = "sonnet" ]
 }
 
-@test "get_agent_model: YAML指定 ashigaru1 → haiku (オーバーライド)" {
+@test "get_agent_model: YAML指定 yakuza1 → haiku (オーバーライド)" {
     load_adapter_with "${TEST_TMP}/settings_with_models.yaml"
-    result=$(get_agent_model "ashigaru1")
+    result=$(get_agent_model "yakuza1")
     [ "$result" = "haiku" ]
 }
 
-@test "get_agent_model: modelsセクションから取得 karo → sonnet" {
+@test "get_agent_model: modelsセクションから取得 gryakuza → sonnet" {
     load_adapter_with "${TEST_TMP}/settings_with_models.yaml"
-    result=$(get_agent_model "karo")
+    result=$(get_agent_model "gryakuza")
     [ "$result" = "sonnet" ]
 }
 
-@test "get_agent_model: codexエージェントのmodel ashigaru5 → gpt-5" {
+@test "get_agent_model: codexエージェントのmodel yakuza5 → gpt-5" {
     load_adapter_with "${TEST_TMP}/settings_with_models.yaml"
-    result=$(get_agent_model "ashigaru5")
+    result=$(get_agent_model "yakuza5")
     [ "$result" = "gpt-5" ]
 }
 
@@ -524,26 +524,26 @@ load_adapter_with() {
     [ "$result" = "sonnet" ]
 }
 
-@test "get_agent_model: kimi CLI ashigaru3 → k2.5 (YAML指定)" {
+@test "get_agent_model: kimi CLI yakuza3 → k2.5 (YAML指定)" {
     load_adapter_with "${TEST_TMP}/settings_kimi.yaml"
-    result=$(get_agent_model "ashigaru3")
+    result=$(get_agent_model "yakuza3")
     [ "$result" = "k2.5" ]
 }
 
-@test "get_agent_model: kimi CLI ashigaru4 → k2.5 (デフォルト)" {
+@test "get_agent_model: kimi CLI yakuza4 → k2.5 (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_kimi.yaml"
-    result=$(get_agent_model "ashigaru4")
+    result=$(get_agent_model "yakuza4")
     [ "$result" = "k2.5" ]
 }
 
-@test "get_agent_model: kimi CLI shogun → k2.5 (デフォルト)" {
+@test "get_agent_model: kimi CLI darkninja → k2.5 (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_kimi_default.yaml"
-    result=$(get_agent_model "shogun")
+    result=$(get_agent_model "darkninja")
     [ "$result" = "k2.5" ]
 }
 
-@test "get_agent_model: kimi CLI karo → k2.5 (デフォルト)" {
+@test "get_agent_model: kimi CLI gryakuza → k2.5 (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_kimi_default.yaml"
-    result=$(get_agent_model "karo")
+    result=$(get_agent_model "gryakuza")
     [ "$result" = "k2.5" ]
 }

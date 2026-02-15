@@ -60,26 +60,26 @@ Don't save: temporary task details (use YAML), file contents (just read them), i
 
 ## Model Switching
 
-Ashigaru models are set in `config/settings.yaml` and applied at startup.
-Runtime switching is available but rarely needed (Gunshi handles L4+ tasks instead):
+Yakuza models are set in `config/settings.yaml` and applied at startup.
+Runtime switching is available but rarely needed (Soukaiya handles L4+ tasks instead):
 
 ```bash
 # Manual override only — not for Bloom-based auto-switching
-bash scripts/inbox_write.sh ashigaru{N} "/model <new_model>" model_switch karo
+bash scripts/inbox_write.sh yakuza{N} "/model <new_model>" model_switch gryakuza
 tmux set-option -p -t multiagent:0.{N} @model_name '<DisplayName>'
 ```
 
-For Ashigaru: You don't switch models yourself. Karo manages this.
+For Yakuza: You don't switch models yourself. Gryakuza manages this.
 
 ## /clear Protocol
 
-For Karo only: Send `/clear` to ashigaru for context reset:
+For Gryakuza only: Send `/clear` to yakuza for context reset:
 
 ```bash
-bash scripts/inbox_write.sh ashigaru{N} "タスクYAMLを読んで作業開始せよ。" clear_command karo
+bash scripts/inbox_write.sh yakuza{N} "タスクYAMLを読んで作業開始せよ。" clear_command gryakuza
 ```
 
-For Ashigaru: After `/clear`, follow CLAUDE.md /clear recovery procedure. Do NOT read instructions/ashigaru.md for the first task (cost saving).
+For Yakuza: After `/clear`, follow CLAUDE.md /clear recovery procedure. Do NOT read instructions/yakuza.md for the first task (cost saving).
 
 ## Compaction Recovery
 
@@ -87,6 +87,6 @@ All agents: Follow the Session Start / Recovery procedure in CLAUDE.md. Key step
 
 1. Identify self: `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'`
 2. `mcp__memory__read_graph` — restore rules, preferences, lessons
-3. Read your instructions file (shogun→instructions/shogun.md, karo→instructions/karo.md, ashigaru→instructions/ashigaru.md)
+3. Read your instructions file (darkninja→instructions/darkninja.md, gryakuza→instructions/gryakuza.md, yakuza→instructions/yakuza.md)
 4. Rebuild state from primary YAML data (queue/, tasks/, reports/)
 5. Review forbidden actions, then start work

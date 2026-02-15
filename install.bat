@@ -4,7 +4,7 @@ title multi-agent-shogun Installer
 
 echo.
 echo   +============================================================+
-echo   ^|  [SHOGUN] multi-agent-shogun - WSL Installer                ^|
+echo   ^|  [DARKNINJA] multi-agent-shogun - WSL Installer             ^|
 echo   ^|           WSL2 + Ubuntu セットアップ                       ^|
 echo   +============================================================+
 echo.
@@ -131,7 +131,7 @@ echo   ^|    3. ./first_setup.sh                                    ^|
 echo   ^|                                                            ^|
 echo   ^|  Every time you use / 使うたびに:                          ^|
 echo   ^|    cd /mnt/c/tools/feature-shogun                          ^|
-echo   ^|    ./shutsujin_departure.sh                                ^|
+echo   ^|    ./yokubari.sh                                ^|
 echo   ^|                                                            ^|
 echo   +------------------------------------------------------------+
 echo.

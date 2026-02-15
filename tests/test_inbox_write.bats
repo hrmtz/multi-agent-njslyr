@@ -75,7 +75,7 @@ teardown() {
 # =============================================================================
 
 @test "T-003: normal write to new inbox file → messages array with correct fields" {
-    run bash "$TEST_INBOX_WRITE" "test_agent" "テストメッセージ" "cmd_new" "shogun"
+    run bash "$TEST_INBOX_WRITE" "test_agent" "テストメッセージ" "cmd_new" "darkninja"
     [ "$status" -eq 0 ]
 
     # YAMLファイルが作成されていることを確認
@@ -100,7 +100,7 @@ for field in required_fields:
     assert field in msg, f'Field {field} not found in message'
 
 # フィールド値の検証
-assert msg['from'] == 'shogun', f'Expected from=shogun, got {msg["from"]}'
+assert msg['from'] == 'darkninja', f'Expected from=darkninja, got {msg["from"]}'
 assert msg['type'] == 'cmd_new', f'Expected type=cmd_new, got {msg["type"]}'
 assert msg['content'] == 'テストメッセージ', f'Expected content=テストメッセージ, got {msg["content"]}'
 assert msg['read'] == False, f'Expected read=False, got {msg["read"]}'

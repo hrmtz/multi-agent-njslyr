@@ -57,9 +57,9 @@ multi-agent-shogun/
 │   └── build_instructions.sh  # Generate CLI-specific instructions
 │
 ├── instructions/         # Agent behavior definitions
-│   ├── shogun.md         # Shogun (commander) instructions
-│   ├── karo.md           # Karo (manager) instructions
-│   ├── ashigaru.md       # Ashigaru (worker) instructions
+│   ├── darkninja.md         # Darkninja (commander) instructions
+│   ├── gryakuza.md           # Gryakuza (manager) instructions
+│   ├── yakuza.md       # Yakuza (worker) instructions
 │   ├── cli_specific/     # CLI-specific tool descriptions
 │   │   ├── claude_tools.md
 │   │   ├── codex_tools.md
@@ -94,7 +94,7 @@ multi-agent-shogun/
 │   └── workflows/        # CI/CD pipelines
 │       └── test.yml      # GitHub Actions test suite
 │
-├── shutsujin_departure.sh  # Daily deployment script
+├── yokubari.sh  # Daily deployment script
 ├── first_setup.sh          # First-time setup
 ├── CLAUDE.md               # Core system instructions (auto-loaded)
 ├── AGENTS.md               # Codex auto-load file
@@ -193,7 +193,7 @@ All shell scripts must adhere to these standards:
    # Function: send_message
    # Description: Writes a message to an agent's inbox
    # Arguments:
-   #   $1 - target_agent (shogun|karo|ashigaru1-8)
+   #   $1 - target_agent (darkninja|gryakuza|yakuza1-8)
    #   $2 - message content
    # Returns: 0 on success, 1 on error
    send_message() {
@@ -228,7 +228,7 @@ All shell scripts must adhere to these standards:
 
 Example:
 ```yaml
-# Task assignment for ashigaru1
+# Task assignment for yakuza1
 task:
   task_id: subtask_001
   description: "Research React 19 features"
@@ -255,7 +255,7 @@ The project uses a three-tier testing strategy:
 |-------|------|------|----------|-------------|
 | L1 | Unit | bats | `tests/unit/` | `make test` |
 | L2 | Integration | bats | `tests/integration/` | `make test-int` |
-| L3 | End-to-End | Manual | N/A | Karo executes |
+| L3 | End-to-End | Manual | N/A | Gryakuza executes |
 
 ### SKIP = FAIL Policy
 
@@ -303,9 +303,9 @@ teardown() {
 }
 
 @test "inbox_write.sh creates inbox file" {
-    run bash scripts/inbox_write.sh karo "test message" cmd_new shogun
+    run bash scripts/inbox_write.sh gryakuza "test message" cmd_new darkninja
     [ "$status" -eq 0 ]
-    [ -f "queue/inbox/karo.yaml" ]
+    [ -f "queue/inbox/gryakuza.yaml" ]
 }
 ```
 
@@ -333,7 +333,7 @@ teardown() {
    }
    ```
 
-4. **E2E tests**: Only Karo can execute E2E tests (requires multi-agent control)
+4. **E2E tests**: Only Gryakuza can execute E2E tests (requires multi-agent control)
 
 ---
 

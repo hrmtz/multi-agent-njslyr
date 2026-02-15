@@ -51,10 +51,10 @@ claude mcp add github -e GITHUB_PERSONAL_ACCESS_TOKEN=ghp_1234567890abcdef -- np
 
 Your **ntfy topic name is your password**. Anyone who knows your topic can:
 - Read your notifications
-- Send commands to your Shogun
+- Send commands to your Darkninja
 
 **Best practices**:
-- Use a hard-to-guess topic name (e.g., `shogun-random-string-12345`, not `shogun` or `my-tasks`)
+- Use a hard-to-guess topic name (e.g., `darkninja-random-string-12345`, not `darkninja` or `my-tasks`)
 - Never share your topic in screenshots, blog posts, or GitHub commits
 - Keep `config/settings.yaml` (which contains your topic) excluded from git
 
@@ -110,7 +110,7 @@ All scripts must pass `shellcheck` to catch common security issues.
 tmux sessions run locally and are accessible to anyone with access to your machine:
 - Do not run multi-agent-shogun on shared/untrusted systems
 - Be aware that tmux sessions persist after logout (unless explicitly killed)
-- Use `tmux kill-session -t shogun` to clean up after use
+- Use `tmux kill-session -t darkninja` to clean up after use
 
 ---
 
@@ -156,7 +156,7 @@ arbitrary commands on the host system.
 Steps to Reproduce:
 1. Send the following ntfy message: `$(rm -rf /)`
 2. inbox_listener.sh receives and writes to ntfy_inbox.yaml
-3. Shogun reads the YAML file and executes the embedded command
+3. Darkninja reads the YAML file and executes the embedded command
 
 Environment:
 - OS: WSL2 Ubuntu 22.04
@@ -254,13 +254,13 @@ To keep your multi-agent-shogun installation secure:
 2. **Use strong ntfy topics**:
    ```bash
    # Generate a random topic
-   echo "shogun-$(openssl rand -hex 8)"
+   echo "darkninja-$(openssl rand -hex 8)"
    ```
 
 3. **Review scripts before running**:
    ```bash
    # Always check what a script does before running it
-   cat shutsujin_departure.sh
+   cat yokubari.sh
    ```
 
 4. **Limit tmux session access**:

@@ -1,5 +1,5 @@
 #!/bin/bash
-# 🏯 multi-agent-shogun 出陣スクリプト（毎日の起動用）
+# 🏯 multi-agent-shogun ネオサイタマ・デプロイメント・スクリプト（毎日の起動用）
 # Daily Deployment Script for Multi-Agent Orchestration System
 #
 # 使用方法:
@@ -13,6 +13,11 @@ set -e
 # スクリプトのディレクトリを取得
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+
+# macOS (Darwin): GNU coreutils via Homebrew gnubin
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
+fi
 
 # 言語設定を読み取り（デフォルト: ja）
 LANG_SETTING="ja"
@@ -34,17 +39,41 @@ else
     CLI_ADAPTER_LOADED=false
 fi
 
-# 色付きログ関数（戦国風）
+# 暗黒メガコーポ名リスト（グレーターヤクザの所属企業をランダム選出）
+MEGACORPS=(
+    "オムラ・インダストリ"
+    "ヨロシサン製薬"
+    "ヨロシ・バイオサイバネティカ社"
+    "スゴイテック社"
+    "オナタカミ社"
+    "ドンブリ・ポン社"
+    "マグロアンドドラゴン社"
+    "アサノサン・パワーズ社"
+    "オムラ・メディテック社"
+    "オモテ社"
+    "コヨミ・エンタープライズ社"
+    "サイサムラINC"
+    "メガロ・キモチ社"
+    "ヤサシイ・サイバーウェア社"
+    "カタナ・オブ・リバプール社"
+    "メガトリイ社"
+    "ポンポン・エンタープライズ社"
+    "モーモーバイオジェネティクス社"
+    "チャノマ・コンフォーツ社"
+)
+GRYAKUZA_CORP="${MEGACORPS[$((RANDOM % ${#MEGACORPS[@]}))]}"
+
+# 色付きログ関数（忍殺風）
 log_info() {
-    echo -e "\033[1;33m【報】\033[0m $1"
+    echo -e "\033[1;33m【IRC】\033[0m $1"
 }
 
 log_success() {
-    echo -e "\033[1;32m【成】\033[0m $1"
+    echo -e "\033[1;32m【実際完了】\033[0m $1"
 }
 
 log_war() {
-    echo -e "\033[1;31m【戦】\033[0m $1"
+    echo -e "\033[1;31m【カラテ】\033[0m $1"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -106,7 +135,7 @@ while [[ $# -gt 0 ]]; do
             OPEN_TERMINAL=true
             shift
             ;;
-        --shogun-no-thinking)
+        --darkninja-no-thinking)
             SHOGUN_NO_THINKING=true
             shift
             ;;
@@ -119,65 +148,65 @@ while [[ $# -gt 0 ]]; do
                 SHELL_OVERRIDE="$2"
                 shift 2
             else
-                echo "エラー: -shell オプションには bash または zsh を指定してください"
+                echo "グワーッ！ -shell オプションには bash または zsh を指定せよ"
                 exit 1
             fi
             ;;
         -h|--help)
             echo ""
-            echo "🏯 multi-agent-shogun 出陣スクリプト"
+            echo "◆ multi-agent-shogun ネオサイタマ・デプロイメント・スクリプト ◆"
             echo ""
             echo "使用方法: ./shutsujin_departure.sh [オプション]"
             echo ""
             echo "オプション:"
             echo "  -c, --clean         キューとダッシュボードをリセットして起動（クリーンスタート）"
             echo "                      未指定時は前回の状態を維持して起動"
-            echo "  -k, --kessen        決戦の陣（全足軽をOpusで起動）"
-            echo "                      未指定時は平時の陣（足軽1-7=Sonnet, 軍師=Opus）"
+            echo "  -k, --kessen        ケッセンの陣（全ヤクザをOpusで起動）"
+            echo "                      未指定時はヘイジの陣（ヤクザ1-7=Sonnet, ソウカイヤ=Opus）"
             echo "  -s, --setup-only    tmuxセッションのセットアップのみ（Claude起動なし）"
             echo "  -t, --terminal      Windows Terminal で新しいタブを開く"
             echo "  -shell, --shell SH  シェルを指定（bash または zsh）"
             echo "                      未指定時は config/settings.yaml の設定を使用"
-            echo "  -S, --silent        サイレントモード（足軽の戦国echo表示を無効化・API節約）"
-            echo "                      未指定時はshoutモード（タスク完了時に戦国風echo表示）"
+            echo "  -S, --silent        サイレントモード（ヤクザの忍殺echo表示を無効化・API節約）"
+            echo "                      未指定時はshoutモード（タスク完了時に忍殺語echo表示）"
             echo "  -h, --help          このヘルプを表示"
             echo ""
             echo "例:"
-            echo "  ./shutsujin_departure.sh              # 前回の状態を維持して出陣"
+            echo "  ./shutsujin_departure.sh              # 前回の状態を維持してデプロイ"
             echo "  ./shutsujin_departure.sh -c           # クリーンスタート（キューリセット）"
             echo "  ./shutsujin_departure.sh -s           # セットアップのみ（手動でClaude起動）"
             echo "  ./shutsujin_departure.sh -t           # 全エージェント起動 + ターミナルタブ展開"
             echo "  ./shutsujin_departure.sh -shell bash  # bash用プロンプトで起動"
-            echo "  ./shutsujin_departure.sh -k           # 決戦の陣（全足軽Opus）"
-            echo "  ./shutsujin_departure.sh -c -k         # クリーンスタート＋決戦の陣"
+            echo "  ./shutsujin_departure.sh -k           # ケッセンの陣（全クローンヤクザOpus）"
+            echo "  ./shutsujin_departure.sh -c -k         # クリーンスタート＋ケッセンの陣"
             echo "  ./shutsujin_departure.sh -shell zsh   # zsh用プロンプトで起動"
-            echo "  ./shutsujin_departure.sh --shogun-no-thinking  # 将軍のthinkingを無効化（中継特化）"
+            echo "  ./shutsujin_departure.sh --darkninja-no-thinking  # ラオモトのthinkingを無効化（中継特化）"
             echo "  ./shutsujin_departure.sh -S           # サイレントモード（echo表示なし）"
             echo ""
             echo "モデル構成:"
-            echo "  将軍:      Opus（デフォルト。--shogun-no-thinkingで無効化）"
-            echo "  家老:      Sonnet（高速タスク管理）"
-            echo "  軍師:      Opus（戦略立案・設計判断）"
-            echo "  足軽1-7:   Sonnet（実働部隊）"
+            echo "  ラオモト:      Opus（デフォルト。--darkninja-no-thinkingで無効化）"
+            echo "  グレーターヤクザ:      Sonnet（高速タスク管理）"
+            echo "  ソウカイヤ:      Opus（戦略立案・設計判断）"
+            echo "  ヤクザ1-7:   Sonnet（ジッコウ部隊）"
             echo ""
             echo "陣形:"
-            echo "  平時の陣（デフォルト）: 足軽1-7=Sonnet, 軍師=Opus"
-            echo "  決戦の陣（--kessen）:   全足軽=Opus, 軍師=Opus"
+            echo "  ヘイジの陣（デフォルト）: ヤクザ1-7=Sonnet, ソウカイヤ=Opus"
+            echo "  ケッセンの陣（--kessen）:   全ヤクザ=Opus, ソウカイヤ=Opus"
             echo ""
             echo "表示モード:"
-            echo "  shout（デフォルト）:  タスク完了時に戦国風echo表示"
+            echo "  shout（デフォルト）:  タスク完了時に忍殺語echo表示"
             echo "  silent（--silent）:   echo表示なし（API節約）"
             echo ""
             echo "エイリアス:"
             echo "  csst  → cd /mnt/c/tools/multi-agent-shogun && ./shutsujin_departure.sh"
-            echo "  css   → tmux attach-session -t shogun"
+            echo "  css   → tmux attach-session -t darkninja"
             echo "  csm   → tmux attach-session -t multiagent"
             echo ""
             exit 0
             ;;
         *)
-            echo "不明なオプション: $1"
-            echo "./shutsujin_departure.sh -h でヘルプを表示"
+            echo "アイエエエ！不明なオプション: $1"
+            echo "./shutsujin_departure.sh -h でヘルプを表示せよ"
             exit 1
             ;;
     esac
@@ -188,7 +217,7 @@ if [ -n "$SHELL_OVERRIDE" ]; then
     if [[ "$SHELL_OVERRIDE" == "bash" || "$SHELL_OVERRIDE" == "zsh" ]]; then
         SHELL_SETTING="$SHELL_OVERRIDE"
     else
-        echo "エラー: -shell オプションには bash または zsh を指定してください（指定値: $SHELL_OVERRIDE）"
+        echo "グワーッ！ -shell には bash か zsh を指定せよ（指定値: $SHELL_OVERRIDE）。ケジメ案件！"
         exit 1
     fi
 fi
@@ -207,46 +236,50 @@ show_battle_cry() {
     # タイトルバナー（色付き）
     echo ""
     echo -e "\033[1;31m╔══════════════════════════════════════════════════════════════════════════════════╗\033[0m"
-    echo -e "\033[1;31m║\033[0m \033[1;33m███████╗██╗  ██╗██╗   ██╗████████╗███████╗██╗   ██╗     ██╗██╗███╗   ██╗\033[0m \033[1;31m║\033[0m"
-    echo -e "\033[1;31m║\033[0m \033[1;33m██╔════╝██║  ██║██║   ██║╚══██╔══╝██╔════╝██║   ██║     ██║██║████╗  ██║\033[0m \033[1;31m║\033[0m"
-    echo -e "\033[1;31m║\033[0m \033[1;33m███████╗███████║██║   ██║   ██║   ███████╗██║   ██║     ██║██║██╔██╗ ██║\033[0m \033[1;31m║\033[0m"
-    echo -e "\033[1;31m║\033[0m \033[1;33m╚════██║██╔══██║██║   ██║   ██║   ╚════██║██║   ██║██   ██║██║██║╚██╗██║\033[0m \033[1;31m║\033[0m"
-    echo -e "\033[1;31m║\033[0m \033[1;33m███████║██║  ██║╚██████╔╝   ██║   ███████║╚██████╔╝╚█████╔╝██║██║ ╚████║\033[0m \033[1;31m║\033[0m"
-    echo -e "\033[1;31m║\033[0m \033[1;33m╚══════╝╚═╝  ╚═╝ ╚═════╝    ╚═╝   ╚══════╝ ╚═════╝  ╚════╝ ╚═╝╚═╝  ╚═══╝\033[0m \033[1;31m║\033[0m"
+    echo -e "\033[1;31m║\033[0m \033[1;33m███╗   ██╗     ██╗███████╗██╗  ██╗   ██╗██████╗                          \033[0m \033[1;31m║\033[0m"
+    echo -e "\033[1;31m║\033[0m \033[1;33m████╗  ██║     ██║██╔════╝██║  ╚██╗ ██╔╝██╔══██╗                         \033[0m \033[1;31m║\033[0m"
+    echo -e "\033[1;31m║\033[0m \033[1;33m██╔██╗ ██║     ██║███████╗██║   ╚████╔╝ ██████╔╝                         \033[0m \033[1;31m║\033[0m"
+    echo -e "\033[1;31m║\033[0m \033[1;33m██║╚██╗██║██   ██║╚════██║██║    ╚██╔╝  ██╔══██╗                         \033[0m \033[1;31m║\033[0m"
+    echo -e "\033[1;31m║\033[0m \033[1;33m██║ ╚████║╚█████╔╝███████║███████╗██║   ██║  ██║                         \033[0m \033[1;31m║\033[0m"
+    echo -e "\033[1;31m║\033[0m \033[1;33m╚═╝  ╚═══╝ ╚════╝ ╚══════╝╚══════╝╚═╝   ╚═╝  ╚═╝                         \033[0m \033[1;31m║\033[0m"
     echo -e "\033[1;31m╠══════════════════════════════════════════════════════════════════════════════════╣\033[0m"
-    echo -e "\033[1;31m║\033[0m       \033[1;37m出陣じゃーーー！！！\033[0m    \033[1;36m⚔\033[0m    \033[1;35m天下布武！\033[0m                          \033[1;31m║\033[0m"
+    echo -e "\033[1;31m║\033[0m       \033[1;37mドーモ。ニンジャスレイヤーです。\033[0m    \033[1;36m⚔\033[0m    \033[1;35mイヤーッ！\033[0m                          \033[1;31m║\033[0m"
     echo -e "\033[1;31m╚══════════════════════════════════════════════════════════════════════════════════╝\033[0m"
     echo ""
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # 足軽隊列（オリジナル）
+    # クローンヤクザ隊列（ヤクザAA）
     # ═══════════════════════════════════════════════════════════════════════════
     echo -e "\033[1;34m  ╔═════════════════════════════════════════════════════════════════════════════╗\033[0m"
-    echo -e "\033[1;34m  ║\033[0m                \033[1;37m【 足 軽 隊 列 ・ 七 名 + 軍 師 配 備 】\033[0m                  \033[1;34m║\033[0m"
+    echo -e "\033[1;34m  ║\033[0m                \033[1;37m【 クローンヤクザ隊列 ・ 七名 + 幹部 配備 】\033[0m                  \033[1;34m║\033[0m"
     echo -e "\033[1;34m  ╚═════════════════════════════════════════════════════════════════════════════╝\033[0m"
-
-    cat << 'ASHIGARU_EOF'
-
-       /\      /\      /\      /\      /\      /\      /\      /\
-      /||\    /||\    /||\    /||\    /||\    /||\    /||\    /||\
-     /_||\   /_||\   /_||\   /_||\   /_||\   /_||\   /_||\   /_||\
-       ||      ||      ||      ||      ||      ||      ||      ||
-      /||\    /||\    /||\    /||\    /||\    /||\    /||\    /||\
-      /  \    /  \    /  \    /  \    /  \    /  \    /  \    /  \
-     [足1]   [足2]   [足3]   [足4]   [足5]   [足6]   [足7]   [軍師]
-
-ASHIGARU_EOF
-
-    echo -e "                    \033[1;36m「「「 はっ！！ 出陣いたす！！ 」」」\033[0m"
+    echo ""
+    echo "⣿⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⢛⣛⣛⣛⣛⣛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⣿"
+    echo "⣿⠀⠀⠀⠀⠀⠀⣠⠴⠊⠉⠁⠈⠀⠀⢀⡡⣿⣿⣶⣤⡀⠀⠀⠀⠀⠀⠀⠀⣿"
+    echo "⣿⠀⠀⠀⠀⠰⡮⡀⠀⠀⠀⢀⣀⠔⠊⢁⡠⠟⢿⣿⣿⣿⠆⠀⠀⠀⠀⠀⠀⣿"
+    echo "⣿⠀⠀⠀⠀⠀⢳⢬⣴⣶⠞⠋⣃⠔⠚⠉⠀⠀⢸⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀⣿"
+    echo "⣿⠀⠀⠀⠀⠀⠘⡇⠑⢿⡤⠎⠁⠀⠀⣠⢠⢀⣼⣿⡿⢿⡇⠀⠀⠀⠀⠀⠀⣿"
+    echo "⣿⠀⠀⠀⠀⠀⢀⡇⢄⠠⠀⢠⠎⢀⢄⣀⣼⣶⣿⣿⣝⢁⡇⠀⠀⠀⠀⠀⠀⣿"
+    echo "⣿⠀⠀⠀⠀⠀⠘⡉⣷⣷⣷⡵⠲⣿⣿⣿⣿⡏⠀⡡⢮⣼⡅⠀⠀⠀⠀⠀⠀⣿"
+    echo "⣿⠀⠀⠀⠀⠀⠀⠡⣿⣿⣿⠟⢂⢿⣿⡿⡟⠡⢲⠁⣯⡈⠳⣀⠀⠀⠀⠀⠀⣿"
+    echo "⣿⠀⠀⠀⠀⠀⠀⠀⠹⡟⠣⡠⡴⠛⠡⠀⢸⠁⠂⠀⣿⢀⡔⠈⢧⡀⠀⠀⠀⣿"
+    echo "⣿⠀⠀⠀⠀⠀⠀⠀⢀⡵⡐⢩⡧⣄⡐⠂⡨⢃⠀⡾⡤⠊⠀⠀⠈⢻⣖⠤⡀⣿"
+    echo "⣿⠀⠀⠀⠀⢀⣠⠖⣱⡷⢿⠆⠀⠀⠀⡩⠖⢁⡼⠊⠀⠀⠀⠀⠀⣾⣿⣷⣆⣿"
+    echo "⣿⠀⡀⠠⣒⡵⣡⣾⡟⠀⢎⠫⡻⡋⣉⠠⠚⠁⠀⠀⠀⠀⠀⠀⣸⣿⣿⣿⣿⣿"
+    echo "⣿⣭⣶⣿⡟⣾⣿⡏⠀⢀⣴⣇⢠⢎⠅⣤⡀⠀⠀⠀⠀⢀⠠⡾⣿⣿⣿⣿⣿⣿"
+    echo "⣿⣿⣿⣟⣾⢿⣿⠀⣠⣺⣿⣿⣿⣿⣿⣿⣿⢦⡀⠔⠈⠁⡔⣰⣿⣿⣿⣿⣿⣿"
+    echo "⣿⣿⣿⣿⣵⣿⣿⣼⣥⣤⣿⣿⣿⣿⣿⣯⣥⣬⣭⣦⣤⣾⣿⣿⣿⣿⣿⣿⣿⣿"
+    echo ""
+    echo -e "                    \033[1;36m「「「 ザッケンナコラー！！ 」」」\033[0m"
     echo ""
 
     # ═══════════════════════════════════════════════════════════════════════════
     # システム情報
     # ═══════════════════════════════════════════════════════════════════════════
     echo -e "\033[1;33m  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\033[0m"
-    echo -e "\033[1;33m  ┃\033[0m  \033[1;37m🏯 multi-agent-shogun\033[0m  〜 \033[1;36m戦国マルチエージェント統率システム\033[0m 〜           \033[1;33m┃\033[0m"
+    echo -e "\033[1;33m  ┃\033[0m  \033[1;37m🏯 multi-agent-shogun\033[0m  〜 \033[1;36mネオサイタマ・マルチエージェント統率システム\033[0m 〜           \033[1;33m┃\033[0m"
     echo -e "\033[1;33m  ┃\033[0m                                                                           \033[1;33m┃\033[0m"
-    echo -e "\033[1;33m  ┃\033[0m  \033[1;35m将軍\033[0m: 統括  \033[1;31m家老\033[0m: 管理  \033[1;33m軍師\033[0m: 戦略(Opus)  \033[1;34m足軽\033[0m: 実働×7  \033[1;33m┃\033[0m"
+    echo -e "\033[1;33m  ┃\033[0m  \033[1;35mラオモト\033[0m: 統括  \033[1;31mグレーターヤクザ\033[0m: カンリ  \033[1;33mソウカイヤ\033[0m: 戦略(Opus)  \033[1;34mヤクザ\033[0m: ジッコウ×7  \033[1;33m┃\033[0m"
     echo -e "\033[1;33m  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\033[0m"
     echo ""
 }
@@ -254,15 +287,15 @@ ASHIGARU_EOF
 # バナー表示実行
 show_battle_cry
 
-echo -e "  \033[1;33m天下布武！陣立てを開始いたす\033[0m (Setting up the battlefield)"
+echo -e "  \033[1;33mドーモ。陣立てを開始する。イヤーッ！\033[0m (Setting up the battlefield)"
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 1: 既存セッションクリーンアップ
 # ═══════════════════════════════════════════════════════════════════════════════
-log_info "🧹 既存の陣を撤収中..."
-tmux kill-session -t multiagent 2>/dev/null && log_info "  └─ multiagent陣、撤収完了" || log_info "  └─ multiagent陣は存在せず"
-tmux kill-session -t shogun 2>/dev/null && log_info "  └─ shogun本陣、撤収完了" || log_info "  └─ shogun本陣は存在せず"
+log_info "🧹 既存セッションをサツバツ！と破壊する..."
+tmux kill-session -t multiagent 2>/dev/null && log_info "  └─ multiagent…サヨナラ！爆発四散！" || log_info "  └─ multiagent…存在セズ。ナムアミダブツ"
+tmux kill-session -t darkninja 2>/dev/null && log_info "  └─ darkninja…サヨナラ！爆発四散！" || log_info "  └─ darkninja…存在セズ。ナムアミダブツ"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 1.5: 前回記録のバックアップ（--clean時のみ、内容がある場合）
@@ -278,8 +311,8 @@ if [ "$CLEAN_MODE" = true ]; then
     fi
 
     # 既存の dashboard.md 判定の後に追加
-    if [ -f "./queue/shogun_to_karo.yaml" ]; then
-        if grep -q "id: cmd_" "./queue/shogun_to_karo.yaml" 2>/dev/null; then
+    if [ -f "./queue/darkninja_to_gryakuza.yaml" ]; then
+        if grep -q "id: cmd_" "./queue/darkninja_to_gryakuza.yaml" 2>/dev/null; then
             NEED_BACKUP=true
         fi
     fi
@@ -289,8 +322,8 @@ if [ "$CLEAN_MODE" = true ]; then
         cp "./dashboard.md" "$BACKUP_DIR/" 2>/dev/null || true
         cp -r "./queue/reports" "$BACKUP_DIR/" 2>/dev/null || true
         cp -r "./queue/tasks" "$BACKUP_DIR/" 2>/dev/null || true
-        cp "./queue/shogun_to_karo.yaml" "$BACKUP_DIR/" 2>/dev/null || true
-        log_info "📦 前回の記録をバックアップ: $BACKUP_DIR"
+        cp "./queue/darkninja_to_gryakuza.yaml" "$BACKUP_DIR/" 2>/dev/null || true
+        log_info "📦 前回のセンカ記録をバックアップ。インガオホー: $BACKUP_DIR"
     fi
 fi
 
@@ -301,22 +334,28 @@ fi
 # queue ディレクトリが存在しない場合は作成（初回起動時に必要）
 [ -d ./queue/reports ] || mkdir -p ./queue/reports
 [ -d ./queue/tasks ] || mkdir -p ./queue/tasks
-# inbox はLinux FSにシンボリックリンク（WSL2の/mnt/c/ではinotifywaitが動かないため）
-INBOX_LINUX_DIR="$HOME/.local/share/multi-agent-shogun/inbox"
-if [ ! -L ./queue/inbox ]; then
-    mkdir -p "$INBOX_LINUX_DIR"
-    [ -d ./queue/inbox ] && cp ./queue/inbox/*.yaml "$INBOX_LINUX_DIR/" 2>/dev/null && rm -rf ./queue/inbox
-    ln -sf "$INBOX_LINUX_DIR" ./queue/inbox
-    log_info "  └─ inbox → Linux FS ($INBOX_LINUX_DIR) にシンボリックリンク作成"
+# inbox ディレクトリ確保（OS別）
+# WSL2: /mnt/c/ では inotifywait が動かないため Linux FS にシンボリックリンク
+# macOS: ローカルFSなので直接ディレクトリでOK
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    mkdir -p ./queue/inbox
+else
+    INBOX_LINUX_DIR="$HOME/.local/share/multi-agent-shogun/inbox"
+    if [ ! -L ./queue/inbox ]; then
+        mkdir -p "$INBOX_LINUX_DIR"
+        [ -d ./queue/inbox ] && cp ./queue/inbox/*.yaml "$INBOX_LINUX_DIR/" 2>/dev/null && rm -rf ./queue/inbox
+        ln -sf "$INBOX_LINUX_DIR" ./queue/inbox
+        log_info "  └─ inbox → Linux FS ($INBOX_LINUX_DIR) にシンボリックリンク作成。ワザマエ"
+    fi
 fi
 
 if [ "$CLEAN_MODE" = true ]; then
-    log_info "📜 前回の軍議記録を破棄中..."
+    log_info "📜 前回のYAMLキューを破棄する…サヨナラ！"
 
-    # 足軽タスクファイルリセット
+    # ヤクザタスクファイルリセット
     for i in {1..7}; do
-        cat > ./queue/tasks/ashigaru${i}.yaml << EOF
-# 足軽${i}専用タスクファイル
+        cat > ./queue/tasks/yakuza${i}.yaml << EOF
+# ヤクザ${i}専用タスクファイル
 task:
   task_id: null
   parent_cmd: null
@@ -327,9 +366,9 @@ task:
 EOF
     done
 
-    # 軍師タスクファイルリセット
-    cat > ./queue/tasks/gunshi.yaml << EOF
-# 軍師専用タスクファイル
+    # ソウカイヤタスクファイルリセット
+    cat > ./queue/tasks/soukaiya.yaml << EOF
+# ソウカイヤ専用タスクファイル
 task:
   task_id: null
   parent_cmd: null
@@ -339,10 +378,10 @@ task:
   timestamp: ""
 EOF
 
-    # 足軽レポートファイルリセット
+    # ヤクザレポートファイルリセット
     for i in {1..7}; do
-        cat > ./queue/reports/ashigaru${i}_report.yaml << EOF
-worker_id: ashigaru${i}
+        cat > ./queue/reports/yakuza${i}_report.yaml << EOF
+worker_id: yakuza${i}
 task_id: null
 timestamp: ""
 status: idle
@@ -350,9 +389,9 @@ result: null
 EOF
     done
 
-    # 軍師レポートファイルリセット
-    cat > ./queue/reports/gunshi_report.yaml << EOF
-worker_id: gunshi
+    # ソウカイヤレポートファイルリセット
+    cat > ./queue/reports/soukaiya_report.yaml << EOF
+worker_id: soukaiya
 task_id: null
 timestamp: ""
 status: idle
@@ -363,36 +402,36 @@ EOF
     echo "inbox:" > ./queue/ntfy_inbox.yaml
 
     # agent inbox リセット
-    for agent in shogun karo ashigaru{1..7} gunshi; do
+    for agent in darkninja gryakuza yakuza{1..7} soukaiya; do
         echo "messages:" > "./queue/inbox/${agent}.yaml"
     done
 
-    log_success "✅ 陣払い完了"
+    log_success "✅ ゼンカイのデータ、全て爆発四散！クリーンスタート！ワザマエ！"
 else
-    log_info "📜 前回の陣容を維持して出陣..."
-    log_success "✅ キュー・報告ファイルはそのまま継続"
+    log_info "📜 ゼンカイのジョウタイを維持してデプロイする。カラテの蓄積はムダにしない"
+    log_success "✅ キュー・レポートYAML、ゼンカイのデータを引き継ぐ。ワザマエ！"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 3: ダッシュボード初期化（--clean時のみ）
 # ═══════════════════════════════════════════════════════════════════════════════
 if [ "$CLEAN_MODE" = true ]; then
-    log_info "📊 戦況報告板を初期化中..."
+    log_info "📊 センキョウ・ダッシュボードをイニシャライズ中...イヤーッ！"
     TIMESTAMP=$(date "+%Y-%m-%d %H:%M")
 
     if [ "$LANG_SETTING" = "ja" ]; then
         # 日本語のみ
         cat > ./dashboard.md << EOF
-# 📊 戦況報告
+# 📊 センキョウ・ダッシュボード
 最終更新: ${TIMESTAMP}
 
-## 🚨 要対応 - 殿のご判断をお待ちしております
+## 🚨 ヨウタイオウ - ラオモトのゴハンダンをお待ちしております
 なし
 
-## 🔄 進行中 - 只今、戦闘中でござる
+## 🔄 ジッコウ中 - 只今、サイバーパンクなサギョウ中
 なし
 
-## ✅ 本日の戦果
+## ✅ 本日のセンカ
 | 時刻 | 戦場 | 任務 | 結果 |
 |------|------|------|------|
 
@@ -411,16 +450,16 @@ EOF
     else
         # 日本語 + 翻訳併記
         cat > ./dashboard.md << EOF
-# 📊 戦況報告 (Battle Status Report)
+# 📊 センキョウ・ダッシュボード (Battle Status Report)
 最終更新 (Last Updated): ${TIMESTAMP}
 
-## 🚨 要対応 - 殿のご判断をお待ちしております (Action Required - Awaiting Lord's Decision)
+## 🚨 ヨウタイオウ - ラオモトのゴハンダンをお待ちしております (Action Required - Awaiting Lord's Decision)
 なし (None)
 
-## 🔄 進行中 - 只今、戦闘中でござる (In Progress - Currently in Battle)
+## 🔄 ジッコウ中 - 只今、サイバーパンクなサギョウ中 (In Progress - Currently in Battle)
 なし (None)
 
-## ✅ 本日の戦果 (Today's Achievements)
+## ✅ 本日のセンカ (Today's Achievements)
 | 時刻 (Time) | 戦場 (Battlefield) | 任務 (Mission) | 結果 (Result) |
 |------|------|------|------|
 
@@ -438,9 +477,9 @@ EOF
 EOF
     fi
 
-    log_success "  └─ ダッシュボード初期化完了 (言語: $LANG_SETTING, シェル: $SHELL_SETTING)"
+    log_success "  └─ ダッシュボード、イニシャライズ完了。ワザマエ！ (言語: $LANG_SETTING, シェル: $SHELL_SETTING)"
 else
-    log_info "📊 前回のダッシュボードを維持"
+    log_info "📊 ゼンカイのダッシュボードを維持。センカの記録はカラテの証"
 fi
 echo ""
 
@@ -450,11 +489,10 @@ echo ""
 if ! command -v tmux &> /dev/null; then
     echo ""
     echo "  ╔════════════════════════════════════════════════════════╗"
+    echo "  ║  アイエエエ！tmuxが存在しない！ナムアミダブツ！       ║"
     echo "  ║  [ERROR] tmux not found!                              ║"
-    echo "  ║  tmux が見つかりません                                 ║"
     echo "  ╠════════════════════════════════════════════════════════╣"
-    echo "  ║  Run first_setup.sh first:                            ║"
-    echo "  ║  まず first_setup.sh を実行してください:               ║"
+    echo "  ║  カラテが足りていない。まずfirst_setup.shを実行せよ:  ║"
     echo "  ║     ./first_setup.sh                                  ║"
     echo "  ╚════════════════════════════════════════════════════════╝"
     echo ""
@@ -462,14 +500,14 @@ if ! command -v tmux &> /dev/null; then
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 5: shogun セッション作成（1ペイン・window 0 を必ず確保）
+# STEP 5: darkninja セッション作成（1ペイン・window 0 を必ず確保）
 # ═══════════════════════════════════════════════════════════════════════════════
-log_war "👑 将軍の本陣を構築中..."
+log_war "👑 ラオモトのホンジンをコンストラクト中...イヤーッ！"
 
-# shogun セッションがなければ作る（-s 時もここで必ず shogun が存在するようにする）
+# darkninja セッションがなければ作る（-s 時もここで必ず darkninja が存在するようにする）
 # window 0 のみ作成し -n main で名前付け（第二 window にするとアタッチ時に空ペインが開くため 1 window に限定）
-if ! tmux has-session -t shogun 2>/dev/null; then
-    tmux new-session -d -s shogun -n main
+if ! tmux has-session -t darkninja 2>/dev/null; then
+    tmux new-session -d -s darkninja -n main
 fi
 
 # スマホ等の小画面クライアント対策: aggressive-resize + latest
@@ -477,35 +515,32 @@ fi
 tmux set-option -g window-size latest
 tmux set-option -g aggressive-resize on
 
-# 将軍ペインはウィンドウ名 "main" で指定（base-index 1 環境でも動く）
-SHOGUN_PROMPT=$(generate_prompt "将軍" "magenta" "$SHELL_SETTING")
-tmux send-keys -t shogun:main "cd \"$(pwd)\" && export PS1='${SHOGUN_PROMPT}' && clear" Enter
-tmux select-pane -t shogun:main -P 'bg=#002b36'  # 将軍の Solarized Dark
-tmux set-option -p -t shogun:main @agent_id "shogun"
+# ダークニンジャペインはウィンドウ名 "main" で指定（base-index 1 環境でも動く）
+SHOGUN_PROMPT=$(generate_prompt "ラオモト" "magenta" "$SHELL_SETTING")
+tmux send-keys -t darkninja:main "cd \"$(pwd)\" && export PS1='${SHOGUN_PROMPT}' && clear" Enter
+tmux select-pane -t darkninja:main -P 'bg=#001520'  # ダークニンジャの Dark Blue
+tmux set-option -p -t darkninja:main @agent_id "darkninja"
 
-log_success "  └─ 将軍の本陣、構築完了"
+log_success "  └─ ラオモトのホンジン、コンストラクト完了！ワザマエ！"
 echo ""
 
 # pane-base-index を取得（1 の環境ではペインは 1,2,... になる）
 PANE_BASE=$(tmux show-options -gv pane-base-index 2>/dev/null || echo 0)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 5.1: multiagent セッション作成（9ペイン：karo + ashigaru1-8）
+# STEP 5.1: multiagent セッション作成（9ペイン：gryakuza + yakuza1-8）
 # ═══════════════════════════════════════════════════════════════════════════════
-log_war "⚔️ 家老・足軽・軍師の陣を構築中（9名配備）..."
+log_war "⚔️ グレーターヤクザ・ヤクザ・ソウカイヤをジェネレート中…9名配備！"
 
 # 最初のペイン作成
 if ! tmux new-session -d -s multiagent -n "agents" 2>/dev/null; then
     echo ""
     echo "  ╔════════════════════════════════════════════════════════════╗"
-    echo "  ║  [ERROR] Failed to create tmux session 'multiagent'      ║"
-    echo "  ║  tmux セッション 'multiagent' の作成に失敗しました       ║"
+    echo "  ║  グワーッ！multiagentセッション生成に失敗！              ║"
+    echo "  ║  アイエエエ！既存セッションのゴーストが残留している！    ║"
     echo "  ╠════════════════════════════════════════════════════════════╣"
-    echo "  ║  An existing session may be running.                     ║"
-    echo "  ║  既存セッションが残っている可能性があります              ║"
-    echo "  ║                                                          ║"
-    echo "  ║  Check: tmux ls                                          ║"
-    echo "  ║  Kill:  tmux kill-session -t multiagent                  ║"
+    echo "  ║  ジョウキョウ確認:  tmux ls                              ║"
+    echo "  ║  爆発四散させる:   tmux kill-session -t multiagent       ║"
     echo "  ╚════════════════════════════════════════════════════════════╝"
     echo ""
     exit 1
@@ -514,7 +549,7 @@ fi
 # DISPLAY_MODE: shout (default) or silent (--silent flag)
 if [ "$SILENT_MODE" = true ]; then
     tmux set-environment -t multiagent DISPLAY_MODE "silent"
-    echo "  📢 表示モード: サイレント（echo表示なし）"
+    echo "  📢 ヒョウジモード: サイレント（ザッケンナコラーの叫びナシ。API節約重点）"
 else
     tmux set-environment -t multiagent DISPLAY_MODE "shout"
 fi
@@ -539,17 +574,17 @@ tmux split-window -v
 tmux split-window -v
 
 # ペインラベル設定（プロンプト用: モデル名なし）
-PANE_LABELS=("karo" "ashigaru1" "ashigaru2" "ashigaru3" "ashigaru4" "ashigaru5" "ashigaru6" "ashigaru7" "gunshi")
+PANE_LABELS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
 # ペインタイトル設定（tmuxタイトル用: モデル名付き）
 if [ "$KESSEN_MODE" = true ]; then
     PANE_TITLES=("Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus")
 else
     PANE_TITLES=("Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus")
 fi
-# 色設定（karo: 赤, ashigaru: 青, gunshi: 黄）
+# 色設定（gryakuza: 赤, yakuza: 青, soukaiya: 黄）
 PANE_COLORS=("red" "blue" "blue" "blue" "blue" "blue" "blue" "blue" "yellow")
 
-AGENT_IDS=("karo" "ashigaru1" "ashigaru2" "ashigaru3" "ashigaru4" "ashigaru5" "ashigaru6" "ashigaru7" "gunshi")
+AGENT_IDS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
 
 # モデル名設定（pane-border-format で常時表示するため）
 # デフォルト（Claude用）
@@ -603,16 +638,20 @@ for i in {0..8}; do
     tmux send-keys -t "multiagent:agents.${p}" "cd \"$(pwd)\" && export PS1='${PROMPT_STR}' && clear" Enter
 done
 
-# 家老・軍師ペインの背景色（足軽との視覚的区別）
+# グレーターヤクザ・ソウカイヤペインの背景色（ヤクザとの視覚的区別）
 # 注: グループセッションで背景色が引き継がれない問題があるため、コメントアウト（2026-02-14）
-# tmux select-pane -t "multiagent:agents.${PANE_BASE}" -P 'bg=#501515'          # 家老: 赤
-# tmux select-pane -t "multiagent:agents.$((PANE_BASE+8))" -P 'bg=#454510'      # 軍師: 金
+# tmux select-pane -t "multiagent:agents.${PANE_BASE}" -P 'bg=#501515'          # グレーターヤクザ: 赤
+# tmux select-pane -t "multiagent:agents.$((PANE_BASE+8))" -P 'bg=#454510'      # ソウカイヤ: 金
 
 # pane-border-format でモデル名を常時表示
 tmux set-option -t multiagent -w pane-border-status top
 tmux set-option -t multiagent -w pane-border-format '#{?pane_active,#[reverse],}#[bold]#{@agent_id}#[default] (#{@model_name}) #{@current_task}'
 
-log_success "  └─ 家老・足軽・軍師の陣、構築完了"
+# ウィンドウを最大クライアントサイズまで拡張し、ペインを均等配分
+tmux resize-window -A -t multiagent:agents
+tmux select-layout -t multiagent:agents tiled
+
+log_success "  └─ グレーターヤクザ・ヤクザ・ソウカイヤのジン、コンストラクト完了！ワザマエ！"
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -627,129 +666,129 @@ if [ "$SETUP_ONLY" = false ]; then
         fi
     else
         if ! command -v claude &> /dev/null; then
-            log_info "⚠️  claude コマンドが見つかりません"
-            echo "  first_setup.sh を再実行してください:"
+            log_info "アイエエエ！claudeコマンドが存在しない！カラテが足りていない！"
+            echo "  first_setup.shを実行してカラテを補充せよ:"
             echo "    ./first_setup.sh"
             exit 1
         fi
     fi
 
-    log_war "👑 全軍に Claude Code を召喚中..."
+    log_war "👑 全エージェントにClaude Codeをインストール中...イヤーッ！"
 
-    # 将軍: CLI Adapter経由でコマンド構築
-    _shogun_cli_type="claude"
-    _shogun_cmd="claude --model opus --dangerously-skip-permissions"
+    # ダークニンジャ: CLI Adapter経由でコマンド構築
+    _darkninja_cli_type="claude"
+    _darkninja_cmd="claude --model opus --dangerously-skip-permissions"
     if [ "$CLI_ADAPTER_LOADED" = true ]; then
-        _shogun_cli_type=$(get_cli_type "shogun")
-        _shogun_cmd=$(build_cli_command "shogun")
+        _darkninja_cli_type=$(get_cli_type "darkninja")
+        _darkninja_cmd=$(build_cli_command "darkninja")
     fi
-    tmux set-option -p -t "shogun:main" @agent_cli "$_shogun_cli_type"
-    if [ "$SHOGUN_NO_THINKING" = true ] && [ "$_shogun_cli_type" = "claude" ]; then
-        tmux send-keys -t shogun:main "MAX_THINKING_TOKENS=0 $_shogun_cmd"
-        tmux send-keys -t shogun:main Enter
-        log_info "  └─ 将軍（${_shogun_cli_type} / thinking無効）、召喚完了"
+    tmux set-option -p -t "darkninja:main" @agent_cli "$_darkninja_cli_type"
+    if [ "$SHOGUN_NO_THINKING" = true ] && [ "$_darkninja_cli_type" = "claude" ]; then
+        tmux send-keys -t darkninja:main "MAX_THINKING_TOKENS=0 $_darkninja_cmd"
+        tmux send-keys -t darkninja:main Enter
+        log_info "  └─ ラオモト（${_darkninja_cli_type} / thinking無効）…ニンジャソウル覚醒！"
     else
-        tmux send-keys -t shogun:main "$_shogun_cmd"
-        tmux send-keys -t shogun:main Enter
-        log_info "  └─ 将軍（${_shogun_cli_type}）、召喚完了"
+        tmux send-keys -t darkninja:main "$_darkninja_cmd"
+        tmux send-keys -t darkninja:main Enter
+        log_info "  └─ ラオモト（${_darkninja_cli_type}）…ニンジャソウル覚醒！"
     fi
 
     # 少し待機（安定のため）
     sleep 1
 
-    # 家老（pane 0）: CLI Adapter経由でコマンド構築（デフォルト: Sonnet）
+    # グレーターヤクザ（pane 0）: CLI Adapter経由でコマンド構築（デフォルト: Sonnet）
     p=$((PANE_BASE + 0))
-    _karo_cli_type="claude"
-    _karo_cmd="claude --model sonnet --dangerously-skip-permissions"
+    _gryakuza_cli_type="claude"
+    _gryakuza_cmd="claude --model sonnet --dangerously-skip-permissions"
     if [ "$CLI_ADAPTER_LOADED" = true ]; then
-        _karo_cli_type=$(get_cli_type "karo")
-        _karo_cmd=$(build_cli_command "karo")
+        _gryakuza_cli_type=$(get_cli_type "gryakuza")
+        _gryakuza_cmd=$(build_cli_command "gryakuza")
     fi
     # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
-    _startup_prompt=$(get_startup_prompt "karo" 2>/dev/null)
+    _startup_prompt=$(get_startup_prompt "gryakuza" 2>/dev/null)
     if [[ -n "$_startup_prompt" ]]; then
-        _karo_cmd="$_karo_cmd \"$_startup_prompt\""
+        _gryakuza_cmd="$_gryakuza_cmd \"$_startup_prompt\""
     fi
-    tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_karo_cli_type"
-    tmux send-keys -t "multiagent:agents.${p}" "$_karo_cmd"
+    tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_gryakuza_cli_type"
+    tmux send-keys -t "multiagent:agents.${p}" "$_gryakuza_cmd"
     tmux send-keys -t "multiagent:agents.${p}" Enter
-    log_info "  └─ 家老（${_karo_cli_type}）、召喚完了"
+    log_info "  └─ ${GRYAKUZA_CORP}のグレーターヤクザ（${_gryakuza_cli_type}）…配備完了！"
 
     if [ "$KESSEN_MODE" = true ]; then
         # 決戦の陣: CLI Adapter経由（claudeはOpus強制）
         for i in {1..7}; do
             p=$((PANE_BASE + i))
-            _ashi_cli_type="claude"
-            _ashi_cmd="claude --model opus --dangerously-skip-permissions"
+            _yakuza_cli_type="claude"
+            _yakuza_cmd="claude --model opus --dangerously-skip-permissions"
             if [ "$CLI_ADAPTER_LOADED" = true ]; then
-                _ashi_cli_type=$(get_cli_type "ashigaru${i}")
-                if [ "$_ashi_cli_type" = "claude" ]; then
-                    _ashi_cmd="claude --model opus --dangerously-skip-permissions"
+                _yakuza_cli_type=$(get_cli_type "yakuza${i}")
+                if [ "$_yakuza_cli_type" = "claude" ]; then
+                    _yakuza_cmd="claude --model opus --dangerously-skip-permissions"
                 else
-                    _ashi_cmd=$(build_cli_command "ashigaru${i}")
+                    _yakuza_cmd=$(build_cli_command "yakuza${i}")
                 fi
             fi
             # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
-            _startup_prompt=$(get_startup_prompt "ashigaru${i}" 2>/dev/null)
+            _startup_prompt=$(get_startup_prompt "yakuza${i}" 2>/dev/null)
             if [[ -n "$_startup_prompt" ]]; then
-                _ashi_cmd="$_ashi_cmd \"$_startup_prompt\""
+                _yakuza_cmd="$_yakuza_cmd \"$_startup_prompt\""
             fi
-            tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_ashi_cli_type"
-            tmux send-keys -t "multiagent:agents.${p}" "$_ashi_cmd"
+            tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_yakuza_cli_type"
+            tmux send-keys -t "multiagent:agents.${p}" "$_yakuza_cmd"
             tmux send-keys -t "multiagent:agents.${p}" Enter
         done
-        log_info "  └─ 足軽1-7（決戦の陣）、召喚完了"
+        log_info "  └─ ヤクザ1-7（ケッセンの陣）…全員Opus！ニンジャソウル覚醒！サツバツ！"
     else
-        # 平時の陣: CLI Adapter経由（デフォルト: 全足軽=Sonnet）
+        # 平時の陣: CLI Adapter経由（デフォルト: 全ヤクザ=Sonnet）
         for i in {1..7}; do
             p=$((PANE_BASE + i))
-            _ashi_cli_type="claude"
-            _ashi_cmd="claude --model sonnet --dangerously-skip-permissions"
+            _yakuza_cli_type="claude"
+            _yakuza_cmd="claude --model sonnet --dangerously-skip-permissions"
             if [ "$CLI_ADAPTER_LOADED" = true ]; then
-                _ashi_cli_type=$(get_cli_type "ashigaru${i}")
-                _ashi_cmd=$(build_cli_command "ashigaru${i}")
+                _yakuza_cli_type=$(get_cli_type "yakuza${i}")
+                _yakuza_cmd=$(build_cli_command "yakuza${i}")
             fi
             # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
-            _startup_prompt=$(get_startup_prompt "ashigaru${i}" 2>/dev/null)
+            _startup_prompt=$(get_startup_prompt "yakuza${i}" 2>/dev/null)
             if [[ -n "$_startup_prompt" ]]; then
-                _ashi_cmd="$_ashi_cmd \"$_startup_prompt\""
+                _yakuza_cmd="$_yakuza_cmd \"$_startup_prompt\""
             fi
-            tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_ashi_cli_type"
-            tmux send-keys -t "multiagent:agents.${p}" "$_ashi_cmd"
+            tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_yakuza_cli_type"
+            tmux send-keys -t "multiagent:agents.${p}" "$_yakuza_cmd"
             tmux send-keys -t "multiagent:agents.${p}" Enter
         done
-        log_info "  └─ 足軽1-7（平時の陣）、召喚完了"
+        log_info "  └─ ヤクザ1-7（ヘイジの陣）…生成完了！"
     fi
 
-    # 軍師（pane 8）: Opus Thinking — 戦略立案・設計判断専任
+    # ソウカイヤ（pane 8）: Opus Thinking — 戦略立案・設計判断専任
     p=$((PANE_BASE + 8))
-    _gunshi_cli_type="claude"
-    _gunshi_cmd="claude --model opus --dangerously-skip-permissions"
+    _soukaiya_cli_type="claude"
+    _soukaiya_cmd="claude --model opus --dangerously-skip-permissions"
     if [ "$CLI_ADAPTER_LOADED" = true ]; then
-        _gunshi_cli_type=$(get_cli_type "gunshi")
-        _gunshi_cmd=$(build_cli_command "gunshi")
+        _soukaiya_cli_type=$(get_cli_type "soukaiya")
+        _soukaiya_cmd=$(build_cli_command "soukaiya")
     fi
     # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
-    _startup_prompt=$(get_startup_prompt "gunshi" 2>/dev/null)
+    _startup_prompt=$(get_startup_prompt "soukaiya" 2>/dev/null)
     if [[ -n "$_startup_prompt" ]]; then
-        _gunshi_cmd="$_gunshi_cmd \"$_startup_prompt\""
+        _soukaiya_cmd="$_soukaiya_cmd \"$_startup_prompt\""
     fi
-    tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_gunshi_cli_type"
-    tmux send-keys -t "multiagent:agents.${p}" "$_gunshi_cmd"
+    tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_soukaiya_cli_type"
+    tmux send-keys -t "multiagent:agents.${p}" "$_soukaiya_cmd"
     tmux send-keys -t "multiagent:agents.${p}" Enter
-    log_info "  └─ 軍師（${_gunshi_cli_type} / Opus Thinking）、召喚完了"
+    log_info "  └─ ソウカイヤ（${_soukaiya_cli_type} / Opus Thinking）…ニンジャソウル覚醒！ドーモ"
 
     if [ "$KESSEN_MODE" = true ]; then
-        log_success "✅ 決戦の陣で出陣！全軍Opus！"
+        log_success "✅ ケッセンの陣でデプロイ！全軍Opus！カラテが溢れている！！"
     else
-        log_success "✅ 平時の陣で出陣（家老=Sonnet, 足軽=Sonnet, 軍師=Opus）"
+        log_success "✅ ヘイジの陣でデプロイ完了！（グレーターヤクザ=Sonnet, Y=Sonnet, ソウカイヤ=Opus）ワザマエ！"
     fi
     echo ""
 
     # ═══════════════════════════════════════════════════════════════════════════
     # STEP 6.5: 各エージェントに指示書を読み込ませる
     # ═══════════════════════════════════════════════════════════════════════════
-    log_war "📜 各エージェントに指示書を読み込ませ中..."
+    log_war "📜 各ニンジャにオキテ（シジショ）を読み込ませ中…コトダマ空間展開！"
     echo ""
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -812,17 +851,17 @@ if [ "$SETUP_ONLY" = false ]; then
 NINJA_EOF
 
     echo ""
-    echo -e "                                    \033[1;35m「 天下布武！勝利を掴め！ 」\033[0m"
+    echo -e "                                    \033[1;35m「 ドーモ。ニンジャスレイヤーです。 」\033[0m"
     echo ""
     echo -e "                               \033[0;36m[ASCII Art: syntax-samurai/ryu - CC0 1.0 Public Domain]\033[0m"
     echo ""
 
-    echo "  Claude Code の起動を待機中（最大30秒）..."
+    echo "  ラオモトのClaude Code起動を待機中（最大30秒）..."
 
-    # 将軍の起動を確認（最大30秒待機）
+    # ダークニンジャの起動を確認（最大30秒待機）
     for i in {1..30}; do
-        if tmux capture-pane -t shogun:main -p | grep -q "bypass permissions"; then
-            echo "  └─ 将軍の Claude Code 起動確認完了（${i}秒）"
+        if tmux capture-pane -t darkninja:main -p | grep -q "bypass permissions"; then
+            echo "  └─ ラオモト起動確認！（${i}秒）ニンジャソウル覚醒！ワザマエ！"
             break
         fi
         sleep 1
@@ -831,54 +870,55 @@ NINJA_EOF
     # ═══════════════════════════════════════════════════════════════════
     # STEP 6.6: inbox_watcher起動（全エージェント）
     # ═══════════════════════════════════════════════════════════════════
-    log_info "📬 メールボックス監視を起動中..."
+    log_info "📬 IRCチャンネル監視プロセスをスタート…ニューロンに接続！"
 
     # inbox ディレクトリ初期化（シンボリックリンク先のLinux FSに作成）
     mkdir -p "$SCRIPT_DIR/logs"
-    for agent in shogun karo ashigaru{1..7} gunshi; do
+    for agent in darkninja gryakuza yakuza{1..7} soukaiya; do
         [ -f "$SCRIPT_DIR/queue/inbox/${agent}.yaml" ] || echo "messages:" > "$SCRIPT_DIR/queue/inbox/${agent}.yaml"
     done
 
     # 既存のwatcherと孤児inotifywaitをkill
     pkill -f "inbox_watcher.sh" 2>/dev/null || true
     pkill -f "inotifywait.*queue/inbox" 2>/dev/null || true
+    pkill -f "fswatch.*queue/inbox" 2>/dev/null || true
     sleep 1
 
-    # 将軍のwatcher（ntfy受信の自動起床に必要）
+    # ダークニンジャのwatcher（ntfy受信の自動起床に必要）
     # 安全モード: phase2/phase3エスカレーションは無効、timeout周期処理も無効（event-drivenのみ）
-    _shogun_watcher_cli=$(tmux show-options -p -t "shogun:main" -v @agent_cli 2>/dev/null || echo "claude")
+    _darkninja_watcher_cli=$(tmux show-options -p -t "darkninja:main" -v @agent_cli 2>/dev/null || echo "claude")
     nohup env ASW_DISABLE_ESCALATION=1 ASW_PROCESS_TIMEOUT=0 ASW_DISABLE_NORMAL_NUDGE=0 \
-        bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" shogun "shogun:main" "$_shogun_watcher_cli" \
-        >> "$SCRIPT_DIR/logs/inbox_watcher_shogun.log" 2>&1 &
+        bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" darkninja "darkninja:main" "$_darkninja_watcher_cli" \
+        >> "$SCRIPT_DIR/logs/inbox_watcher_darkninja.log" 2>&1 &
     disown
 
-    # 家老のwatcher
-    _karo_watcher_cli=$(tmux show-options -p -t "multiagent:agents.${PANE_BASE}" -v @agent_cli 2>/dev/null || echo "claude")
-    nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" karo "multiagent:agents.${PANE_BASE}" "$_karo_watcher_cli" \
-        >> "$SCRIPT_DIR/logs/inbox_watcher_karo.log" 2>&1 &
+    # グレーターヤクザのwatcher
+    _gryakuza_watcher_cli=$(tmux show-options -p -t "multiagent:agents.${PANE_BASE}" -v @agent_cli 2>/dev/null || echo "claude")
+    nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" gryakuza "multiagent:agents.${PANE_BASE}" "$_gryakuza_watcher_cli" \
+        >> "$SCRIPT_DIR/logs/inbox_watcher_gryakuza.log" 2>&1 &
     disown
 
-    # 足軽のwatcher
+    # ヤクザのwatcher
     for i in {1..7}; do
         p=$((PANE_BASE + i))
-        _ashi_watcher_cli=$(tmux show-options -p -t "multiagent:agents.${p}" -v @agent_cli 2>/dev/null || echo "claude")
-        nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" "ashigaru${i}" "multiagent:agents.${p}" "$_ashi_watcher_cli" \
-            >> "$SCRIPT_DIR/logs/inbox_watcher_ashigaru${i}.log" 2>&1 &
+        _yakuza_watcher_cli=$(tmux show-options -p -t "multiagent:agents.${p}" -v @agent_cli 2>/dev/null || echo "claude")
+        nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" "yakuza${i}" "multiagent:agents.${p}" "$_yakuza_watcher_cli" \
+            >> "$SCRIPT_DIR/logs/inbox_watcher_yakuza${i}.log" 2>&1 &
         disown
     done
 
-    # 軍師のwatcher
+    # ソウカイヤのwatcher
     p=$((PANE_BASE + 8))
-    _gunshi_watcher_cli=$(tmux show-options -p -t "multiagent:agents.${p}" -v @agent_cli 2>/dev/null || echo "claude")
-    nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" "gunshi" "multiagent:agents.${p}" "$_gunshi_watcher_cli" \
-        >> "$SCRIPT_DIR/logs/inbox_watcher_gunshi.log" 2>&1 &
+    _soukaiya_watcher_cli=$(tmux show-options -p -t "multiagent:agents.${p}" -v @agent_cli 2>/dev/null || echo "claude")
+    nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" "soukaiya" "multiagent:agents.${p}" "$_soukaiya_watcher_cli" \
+        >> "$SCRIPT_DIR/logs/inbox_watcher_soukaiya.log" 2>&1 &
     disown
 
-    log_success "  └─ 10エージェント分のinbox_watcher起動完了（将軍+家老+足軽7+軍師）"
+    log_success "  └─ 10エージェント分のIRC監視起動完了！全チャンネル接続！ワザマエ！"
 
     # STEP 6.7 は廃止 — CLAUDE.md Session Start (step 1: tmux agent_id) で各自が自律的に
     # 自分のinstructions/*.mdを読み込む。検証済み (2026-02-08)。
-    log_info "📜 指示書読み込みは各エージェントが自律実行（CLAUDE.md Session Start）"
+    log_info "📜 オキテの読み込みは各ニンジャが自律実行する。カラテは己で磨け"
     echo ""
 fi
 
@@ -936,7 +976,7 @@ with open(INBOX, 'w') as f:
 print(f'{len(old)}件退避 {len(recent)}件保持')
 " 2>/dev/null) || true
     if [ -n "$_archive_result" ]; then
-        log_info "📱 ntfy_inbox整理: $_archive_result → ntfy_inbox_archive.yaml"
+        log_info "📱 ntfy_inbox整理完了: $_archive_result → アーカイブ送り。インガオホー"
     fi
 fi
 
@@ -949,60 +989,60 @@ if [ -n "$NTFY_TOPIC" ]; then
     [ ! -f ./queue/ntfy_inbox.yaml ] && echo "inbox:" > ./queue/ntfy_inbox.yaml
     nohup bash "$SCRIPT_DIR/scripts/ntfy_listener.sh" &>/dev/null &
     disown
-    log_info "📱 ntfy入力リスナー起動 (topic: $NTFY_TOPIC)"
+    log_info "📱 ntfyリスナー起動…ラオモトのスマホからのコトダマを受信する (topic: $NTFY_TOPIC)"
 else
-    log_info "📱 ntfy未設定のためリスナーはスキップ"
+    log_info "📱 ntfy未設定。ラオモトのスマホ回線は未接続。ナムアミダブツ"
 fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 7: 環境確認・完了メッセージ
 # ═══════════════════════════════════════════════════════════════════════════════
-log_info "🔍 陣容を確認中..."
+log_info "🔍 ジンヨウを最終確認中…アイサツの前のマナーだ"
 echo ""
 echo "  ┌──────────────────────────────────────────────────────────┐"
-echo "  │  📺 Tmux陣容 (Sessions)                                  │"
+echo "  │  📺 Tmuxジンヨウ (Active Sessions)                        │"
 echo "  └──────────────────────────────────────────────────────────┘"
 tmux list-sessions | sed 's/^/     /'
 echo ""
 echo "  ┌──────────────────────────────────────────────────────────┐"
-echo "  │  📋 布陣図 (Formation)                                   │"
+echo "  │  📋 フジンズ (Battle Formation)                           │"
 echo "  └──────────────────────────────────────────────────────────┘"
 echo ""
-echo "     【shogunセッション】将軍の本陣"
-echo "     ┌─────────────────────────────┐"
-echo "     │  Pane 0: 将軍 (SHOGUN)      │  ← 総大将・プロジェクト統括"
-echo "     └─────────────────────────────┘"
+echo "     【darkninjaセッション】ラオモトのホンジン"
+echo "     ┌─────────────────────────────────┐"
+echo "     │  Pane 0: ラオモト (DARKNINJA)    │  ← メガコーポCEO・プロジェクト統括"
+echo "     └─────────────────────────────────┘"
 echo ""
-echo "     【multiagentセッション】家老・足軽・軍師の陣（3x3 = 9ペイン）"
-echo "     ┌─────────┬─────────┬─────────┐"
-echo "     │  karo   │ashigaru3│ashigaru6│"
-echo "     │  (家老) │ (足軽3) │ (足軽6) │"
-echo "     ├─────────┼─────────┼─────────┤"
-echo "     │ashigaru1│ashigaru4│ashigaru7│"
-echo "     │ (足軽1) │ (足軽4) │ (足軽7) │"
-echo "     ├─────────┼─────────┼─────────┤"
-echo "     │ashigaru2│ashigaru5│ gunshi  │"
-echo "     │ (足軽2) │ (足軽5) │ (軍師)  │"
-echo "     └─────────┴─────────┴─────────┘"
+echo "     【multiagentセッション】グレーターヤクザ・ヤクザ・ソウカイヤのジン（3x3 = 9ペイン）"
+echo "     ┌──────────┬─────────┬─────────┐"
+echo "     │ gryakuza │ yakuza3 │ yakuza6 │"
+echo "     │(GrYakuza)│  (Y3)   │  (Y6)   │"
+echo "     ├──────────┼─────────┼─────────┤"
+echo "     │ yakuza1  │ yakuza4 │ yakuza7 │"
+echo "     │   (Y1)   │  (Y4)   │  (Y7)   │"
+echo "     ├──────────┼─────────┼─────────┤"
+echo "     │ yakuza2  │ yakuza5 │soukaiya │"
+echo "     │   (Y2)   │  (Y5)   │(Soukaiya)│"
+echo "     └──────────┴─────────┴─────────┘"
 echo ""
 
 echo ""
 echo "  ╔══════════════════════════════════════════════════════════╗"
-echo "  ║  🏯 出陣準備完了！天下布武！                              ║"
+echo "  ║  ◆ ドーモ。ネオサイタマ・デプロイメント完了。イヤーッ！ ◆            ║"
 echo "  ╚══════════════════════════════════════════════════════════╝"
 echo ""
 
 if [ "$SETUP_ONLY" = true ]; then
-    echo "  ⚠️  セットアップのみモード: Claude Codeは未起動です"
+    echo "  ⚠️  セットアップ・オンリー: Claude Codeは未起動。手動でショウカンせよ"
     echo ""
-    echo "  手動でClaude Codeを起動するには:"
+    echo "  手動でショウカンするには:"
     echo "  ┌──────────────────────────────────────────────────────────┐"
-    echo "  │  # 将軍を召喚                                            │"
-    echo "  │  tmux send-keys -t shogun:main \\                         │"
+    echo "  │  # ラオモトをショウカン                                              │"
+    echo "  │  tmux send-keys -t darkninja:main \\                      │"
     echo "  │    'claude --dangerously-skip-permissions' Enter         │"
     echo "  │                                                          │"
-    echo "  │  # 家老・足軽を一斉召喚                                  │"
+    echo "  │  # グレーターヤクザ・ヤクザを一斉ショウカン                                  │"
     echo "  │  for p in \$(seq $PANE_BASE $((PANE_BASE+8))); do                                 │"
     echo "  │      tmux send-keys -t multiagent:agents.\$p \\            │"
     echo "  │      'claude --dangerously-skip-permissions' Enter       │"
@@ -1011,20 +1051,20 @@ if [ "$SETUP_ONLY" = true ]; then
     echo ""
 fi
 
-echo "  次のステップ:"
+echo "  ◆ ツギノ・アクション:"
 echo "  ┌──────────────────────────────────────────────────────────┐"
-echo "  │  将軍の本陣にアタッチして命令を開始:                      │"
-echo "  │     tmux attach-session -t shogun   (または: css)        │"
+echo "  │  ラオモトのホンジンにアタッチしてメイレイを開始:                    │"
+echo "  │     tmux attach-session -t darkninja   (または: css)     │"
 echo "  │                                                          │"
-echo "  │  家老・足軽の陣を確認する:                                │"
+echo "  │  グレーターヤクザ・ヤクザのジンを確認する:                            │"
 echo "  │     tmux attach-session -t multiagent   (または: csm)    │"
 echo "  │                                                          │"
-echo "  │  ※ 各エージェントは指示書を読み込み済み。                 │"
-echo "  │    すぐに命令を開始できます。                             │"
+echo "  │  ※ 各ニンジャはオキテを読み込み済み。                    │"
+echo "  │    ラオモトのメイレイを待っている。イヤーッ！             │"
 echo "  └──────────────────────────────────────────────────────────┘"
 echo ""
 echo "  ════════════════════════════════════════════════════════════"
-echo "   天下布武！勝利を掴め！ (Tenka Fubu! Seize victory!)"
+echo "   ドーモ。ニンジャスレイヤーです。 (Domo. I am Ninja Slayer.)"
 echo "  ════════════════════════════════════════════════════════════"
 echo ""
 
@@ -1032,14 +1072,14 @@ echo ""
 # STEP 8: Windows Terminal でタブを開く（-t オプション時のみ）
 # ═══════════════════════════════════════════════════════════════════════════════
 if [ "$OPEN_TERMINAL" = true ]; then
-    log_info "📺 Windows Terminal でタブを展開中..."
+    log_info "📺 Windows Terminalでタブを展開中…ニューロンにジャックイン！"
 
     # Windows Terminal が利用可能か確認
     if command -v wt.exe &> /dev/null; then
-        wt.exe -w 0 new-tab wsl.exe -e bash -c "tmux attach-session -t shogun" \; new-tab wsl.exe -e bash -c "tmux attach-session -t multiagent"
-        log_success "  └─ ターミナルタブ展開完了"
+        wt.exe -w 0 new-tab wsl.exe -e bash -c "tmux attach-session -t darkninja" \; new-tab wsl.exe -e bash -c "tmux attach-session -t multiagent"
+        log_success "  └─ ターミナルタブ展開完了！ワザマエ！"
     else
-        log_info "  └─ wt.exe が見つかりません。手動でアタッチしてください。"
+        log_info "  └─ アイエエエ！wt.exeが見つからない。手動でジャックインせよ"
     fi
     echo ""
 fi

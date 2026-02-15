@@ -2,13 +2,13 @@
 # ═══════════════════════════════════════════════════════════════
 # E2E-006: Parallel Tasks Test
 # ═══════════════════════════════════════════════════════════════
-# Validates that multiple ashigaru can process tasks simultaneously:
-#   1. Two tasks assigned to ashigaru1 and ashigaru2
+# Validates that multiple yakuza can process tasks simultaneously:
+#   1. Two tasks assigned to yakuza1 and yakuza2
 #   2. Both receive inbox nudges
 #   3. Both complete independently
 #   4. Both reports are written
 #
-# Uses 3-pane setup (karo + ashigaru1 + ashigaru2).
+# Uses 3-pane setup (gryakuza + yakuza1 + yakuza2).
 # ═══════════════════════════════════════════════════════════════
 
 # bats file_tags=e2e
@@ -42,45 +42,45 @@ setup() {
 }
 
 # ═══════════════════════════════════════════════════════════════
-# E2E-006-A: Two ashigaru process tasks in parallel
+# E2E-006-A: Two yakuza process tasks in parallel
 # ═══════════════════════════════════════════════════════════════
 
-@test "E2E-006-A: ashigaru1 and ashigaru2 complete tasks in parallel" {
-    # 1. Place tasks for both ashigaru
-    cp "$PROJECT_ROOT/tests/e2e/fixtures/task_ashigaru1_basic.yaml" \
-       "$E2E_QUEUE/queue/tasks/ashigaru1.yaml"
-    cp "$PROJECT_ROOT/tests/e2e/fixtures/task_ashigaru2_basic.yaml" \
-       "$E2E_QUEUE/queue/tasks/ashigaru2.yaml"
+@test "E2E-006-A: yakuza1 and yakuza2 complete tasks in parallel" {
+    # 1. Place tasks for both yakuza
+    cp "$PROJECT_ROOT/tests/e2e/fixtures/task_yakuza1_basic.yaml" \
+       "$E2E_QUEUE/queue/tasks/yakuza1.yaml"
+    cp "$PROJECT_ROOT/tests/e2e/fixtures/task_yakuza2_basic.yaml" \
+       "$E2E_QUEUE/queue/tasks/yakuza2.yaml"
 
     # 2. Send task_assigned to both inboxes
-    bash "$E2E_QUEUE/scripts/inbox_write.sh" "ashigaru1" \
-        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "karo"
-    bash "$E2E_QUEUE/scripts/inbox_write.sh" "ashigaru2" \
-        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "karo"
+    bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza1" \
+        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza"
+    bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza2" \
+        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza"
 
     # 3. Nudge both simultaneously
-    local ashigaru1_pane ashigaru2_pane
-    ashigaru1_pane=$(pane_target 1)
-    ashigaru2_pane=$(pane_target 2)
+    local yakuza1_pane yakuza2_pane
+    yakuza1_pane=$(pane_target 1)
+    yakuza2_pane=$(pane_target 2)
 
-    send_to_pane "$ashigaru1_pane" "inbox1"
-    send_to_pane "$ashigaru2_pane" "inbox1"
+    send_to_pane "$yakuza1_pane" "inbox1"
+    send_to_pane "$yakuza2_pane" "inbox1"
 
     # 4. Both should complete
-    run wait_for_yaml_value "$E2E_QUEUE/queue/tasks/ashigaru1.yaml" "task.status" "done" 30
+    run wait_for_yaml_value "$E2E_QUEUE/queue/tasks/yakuza1.yaml" "task.status" "done" 30
     assert_success
-    run wait_for_yaml_value "$E2E_QUEUE/queue/tasks/ashigaru2.yaml" "task.status" "done" 30
+    run wait_for_yaml_value "$E2E_QUEUE/queue/tasks/yakuza2.yaml" "task.status" "done" 30
     assert_success
 
     # 5. Both reports should exist
-    run wait_for_file "$E2E_QUEUE/queue/reports/ashigaru1_report.yaml" 10
+    run wait_for_file "$E2E_QUEUE/queue/reports/yakuza1_report.yaml" 10
     assert_success
-    run wait_for_file "$E2E_QUEUE/queue/reports/ashigaru2_report.yaml" 10
+    run wait_for_file "$E2E_QUEUE/queue/reports/yakuza2_report.yaml" 10
     assert_success
 
     # 6. Reports should have correct agent IDs
-    assert_yaml_field "$E2E_QUEUE/queue/reports/ashigaru1_report.yaml" "worker_id" "ashigaru1"
-    assert_yaml_field "$E2E_QUEUE/queue/reports/ashigaru2_report.yaml" "worker_id" "ashigaru2"
+    assert_yaml_field "$E2E_QUEUE/queue/reports/yakuza1_report.yaml" "worker_id" "yakuza1"
+    assert_yaml_field "$E2E_QUEUE/queue/reports/yakuza2_report.yaml" "worker_id" "yakuza2"
 }
 
 # ═══════════════════════════════════════════════════════════════
@@ -89,40 +89,40 @@ setup() {
 
 @test "E2E-006-B: parallel tasks maintain inbox isolation" {
     # 1. Place tasks and send notifications
-    cp "$PROJECT_ROOT/tests/e2e/fixtures/task_ashigaru1_basic.yaml" \
-       "$E2E_QUEUE/queue/tasks/ashigaru1.yaml"
-    cp "$PROJECT_ROOT/tests/e2e/fixtures/task_ashigaru2_basic.yaml" \
-       "$E2E_QUEUE/queue/tasks/ashigaru2.yaml"
+    cp "$PROJECT_ROOT/tests/e2e/fixtures/task_yakuza1_basic.yaml" \
+       "$E2E_QUEUE/queue/tasks/yakuza1.yaml"
+    cp "$PROJECT_ROOT/tests/e2e/fixtures/task_yakuza2_basic.yaml" \
+       "$E2E_QUEUE/queue/tasks/yakuza2.yaml"
 
-    bash "$E2E_QUEUE/scripts/inbox_write.sh" "ashigaru1" \
-        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "karo"
-    bash "$E2E_QUEUE/scripts/inbox_write.sh" "ashigaru2" \
-        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "karo"
+    bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza1" \
+        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza"
+    bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza2" \
+        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza"
 
-    local ashigaru1_pane ashigaru2_pane
-    ashigaru1_pane=$(pane_target 1)
-    ashigaru2_pane=$(pane_target 2)
+    local yakuza1_pane yakuza2_pane
+    yakuza1_pane=$(pane_target 1)
+    yakuza2_pane=$(pane_target 2)
 
-    send_to_pane "$ashigaru1_pane" "inbox1"
-    send_to_pane "$ashigaru2_pane" "inbox1"
+    send_to_pane "$yakuza1_pane" "inbox1"
+    send_to_pane "$yakuza2_pane" "inbox1"
 
     # 2. Wait for both to complete
-    run wait_for_yaml_value "$E2E_QUEUE/queue/tasks/ashigaru1.yaml" "task.status" "done" 30
+    run wait_for_yaml_value "$E2E_QUEUE/queue/tasks/yakuza1.yaml" "task.status" "done" 30
     assert_success
-    run wait_for_yaml_value "$E2E_QUEUE/queue/tasks/ashigaru2.yaml" "task.status" "done" 30
+    run wait_for_yaml_value "$E2E_QUEUE/queue/tasks/yakuza2.yaml" "task.status" "done" 30
     assert_success
 
-    # 3. Each inbox should have its own messages (task_assigned from karo + no cross-contamination)
-    # ashigaru1's inbox should NOT have ashigaru2's messages
+    # 3. Each inbox should have its own messages (task_assigned from gryakuza + no cross-contamination)
+    # yakuza1's inbox should NOT have yakuza2's messages
     run python3 -c "
 import yaml
-with open('$E2E_QUEUE/queue/inbox/ashigaru1.yaml') as f:
+with open('$E2E_QUEUE/queue/inbox/yakuza1.yaml') as f:
     data = yaml.safe_load(f) or {}
 msgs = data.get('messages', [])
-# All messages in ashigaru1's inbox should be addressed to ashigaru1 context
-# (no ashigaru2 task_assigned should appear here)
+# All messages in yakuza1's inbox should be addressed to yakuza1 context
+# (no yakuza2 task_assigned should appear here)
 for m in msgs:
-    if m.get('type') == 'task_assigned' and 'ashigaru2' in str(m.get('content', '')):
+    if m.get('type') == 'task_assigned' and 'yakuza2' in str(m.get('content', '')):
         print('CROSS-CONTAMINATION DETECTED')
         exit(1)
 "

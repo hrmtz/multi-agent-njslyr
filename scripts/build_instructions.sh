@@ -77,28 +77,28 @@ EOFYAML
 }
 
 # Build Claude Code instruction files
-build_instruction_file "claude" "shogun" "shogun.md"
-build_instruction_file "claude" "karo" "karo.md"
-build_instruction_file "claude" "ashigaru" "ashigaru.md"
-build_instruction_file "claude" "gunshi" "gunshi.md"
+build_instruction_file "claude" "darkninja" "darkninja.md"
+build_instruction_file "claude" "gryakuza" "gryakuza.md"
+build_instruction_file "claude" "yakuza" "yakuza.md"
+build_instruction_file "claude" "soukaiya" "soukaiya.md"
 
 # Build Codex instruction files
-build_instruction_file "codex" "shogun" "codex-shogun.md"
-build_instruction_file "codex" "karo" "codex-karo.md"
-build_instruction_file "codex" "ashigaru" "codex-ashigaru.md"
-build_instruction_file "codex" "gunshi" "codex-gunshi.md"
+build_instruction_file "codex" "darkninja" "codex-darkninja.md"
+build_instruction_file "codex" "gryakuza" "codex-gryakuza.md"
+build_instruction_file "codex" "yakuza" "codex-yakuza.md"
+build_instruction_file "codex" "soukaiya" "codex-soukaiya.md"
 
 # Build Copilot instruction files
-build_instruction_file "copilot" "shogun" "copilot-shogun.md"
-build_instruction_file "copilot" "karo" "copilot-karo.md"
-build_instruction_file "copilot" "ashigaru" "copilot-ashigaru.md"
-build_instruction_file "copilot" "gunshi" "copilot-gunshi.md"
+build_instruction_file "copilot" "darkninja" "copilot-darkninja.md"
+build_instruction_file "copilot" "gryakuza" "copilot-gryakuza.md"
+build_instruction_file "copilot" "yakuza" "copilot-yakuza.md"
+build_instruction_file "copilot" "soukaiya" "copilot-soukaiya.md"
 
 # Build Kimi K2 instruction files
-build_instruction_file "kimi" "shogun" "kimi-shogun.md"
-build_instruction_file "kimi" "karo" "kimi-karo.md"
-build_instruction_file "kimi" "ashigaru" "kimi-ashigaru.md"
-build_instruction_file "kimi" "gunshi" "kimi-gunshi.md"
+build_instruction_file "kimi" "darkninja" "kimi-darkninja.md"
+build_instruction_file "kimi" "gryakuza" "kimi-gryakuza.md"
+build_instruction_file "kimi" "yakuza" "kimi-yakuza.md"
+build_instruction_file "kimi" "soukaiya" "kimi-soukaiya.md"
 
 # ============================================================
 # AGENTS.md generation (Codex auto-load file)
@@ -120,10 +120,10 @@ generate_agents_md() {
     sed \
         -e 's|CLAUDE\.md|AGENTS.md|g' \
         -e 's|CLAUDE\.local\.md|AGENTS.override.md|g' \
-        -e 's|instructions/shogun\.md|instructions/generated/codex-shogun.md|g' \
-        -e 's|instructions/karo\.md|instructions/generated/codex-karo.md|g' \
-        -e 's|instructions/ashigaru\.md|instructions/generated/codex-ashigaru.md|g' \
-        -e 's|instructions/gunshi\.md|instructions/generated/codex-gunshi.md|g' \
+        -e 's|instructions/darkninja\.md|instructions/generated/codex-darkninja.md|g' \
+        -e 's|instructions/gryakuza\.md|instructions/generated/codex-gryakuza.md|g' \
+        -e 's|instructions/yakuza\.md|instructions/generated/codex-yakuza.md|g' \
+        -e 's|instructions/soukaiya\.md|instructions/generated/codex-soukaiya.md|g' \
         -e 's|~/.claude/|~/.codex/|g' \
         -e 's|\.claude\.json|.codex/config.toml|g' \
         -e 's|\.mcp\.json|config.toml (mcp_servers section)|g' \
@@ -156,10 +156,10 @@ generate_copilot_instructions() {
     sed \
         -e 's|CLAUDE\.md|copilot-instructions.md|g' \
         -e 's|CLAUDE\.local\.md|copilot-instructions.local.md|g' \
-        -e 's|instructions/shogun\.md|instructions/generated/copilot-shogun.md|g' \
-        -e 's|instructions/karo\.md|instructions/generated/copilot-karo.md|g' \
-        -e 's|instructions/ashigaru\.md|instructions/generated/copilot-ashigaru.md|g' \
-        -e 's|instructions/gunshi\.md|instructions/generated/copilot-gunshi.md|g' \
+        -e 's|instructions/darkninja\.md|instructions/generated/copilot-darkninja.md|g' \
+        -e 's|instructions/gryakuza\.md|instructions/generated/copilot-gryakuza.md|g' \
+        -e 's|instructions/yakuza\.md|instructions/generated/copilot-yakuza.md|g' \
+        -e 's|instructions/soukaiya\.md|instructions/generated/copilot-soukaiya.md|g' \
         -e 's|~/.claude/|~/.copilot/|g' \
         -e 's|\.claude\.json|.copilot/config.json|g' \
         -e 's|\.mcp\.json|.copilot/mcp-config.json|g' \
@@ -194,10 +194,10 @@ generate_kimi_instructions() {
     sed \
         -e 's|CLAUDE\.md|agents/default/system.md|g' \
         -e 's|CLAUDE\.local\.md|agents/default/system.local.md|g' \
-        -e 's|instructions/shogun\.md|instructions/generated/kimi-shogun.md|g' \
-        -e 's|instructions/karo\.md|instructions/generated/kimi-karo.md|g' \
-        -e 's|instructions/ashigaru\.md|instructions/generated/kimi-ashigaru.md|g' \
-        -e 's|instructions/gunshi\.md|instructions/generated/kimi-gunshi.md|g' \
+        -e 's|instructions/darkninja\.md|instructions/generated/kimi-darkninja.md|g' \
+        -e 's|instructions/gryakuza\.md|instructions/generated/kimi-gryakuza.md|g' \
+        -e 's|instructions/yakuza\.md|instructions/generated/kimi-yakuza.md|g' \
+        -e 's|instructions/soukaiya\.md|instructions/generated/kimi-soukaiya.md|g' \
         -e 's|~/.claude/|~/.kimi/|g' \
         -e 's|\.claude\.json|.kimi/config.json|g' \
         -e 's|\.mcp\.json|.kimi/mcp.json|g' \

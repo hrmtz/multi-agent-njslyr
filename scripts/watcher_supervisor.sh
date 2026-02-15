@@ -1,6 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
+# macOS (Darwin): GNU coreutils via Homebrew gnubin
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
+fi
+
 # Keep inbox watchers alive in a persistent tmux-hosted shell.
 # This script is designed to run forever.
 
@@ -41,15 +46,15 @@ start_watcher_if_missing() {
 }
 
 while true; do
-    start_watcher_if_missing "shogun" "shogun:main.0" "logs/inbox_watcher_shogun.log"
-    start_watcher_if_missing "karo" "multiagent:agents.0" "logs/inbox_watcher_karo.log"
-    start_watcher_if_missing "ashigaru1" "multiagent:agents.1" "logs/inbox_watcher_ashigaru1.log"
-    start_watcher_if_missing "ashigaru2" "multiagent:agents.2" "logs/inbox_watcher_ashigaru2.log"
-    start_watcher_if_missing "ashigaru3" "multiagent:agents.3" "logs/inbox_watcher_ashigaru3.log"
-    start_watcher_if_missing "ashigaru4" "multiagent:agents.4" "logs/inbox_watcher_ashigaru4.log"
-    start_watcher_if_missing "ashigaru5" "multiagent:agents.5" "logs/inbox_watcher_ashigaru5.log"
-    start_watcher_if_missing "ashigaru6" "multiagent:agents.6" "logs/inbox_watcher_ashigaru6.log"
-    start_watcher_if_missing "ashigaru7" "multiagent:agents.7" "logs/inbox_watcher_ashigaru7.log"
-    start_watcher_if_missing "gunshi" "multiagent:agents.8" "logs/inbox_watcher_gunshi.log"
+    start_watcher_if_missing "darkninja" "darkninja:main.0" "logs/inbox_watcher_darkninja.log"
+    start_watcher_if_missing "gryakuza" "multiagent:agents.0" "logs/inbox_watcher_gryakuza.log"
+    start_watcher_if_missing "yakuza1" "multiagent:agents.1" "logs/inbox_watcher_yakuza1.log"
+    start_watcher_if_missing "yakuza2" "multiagent:agents.2" "logs/inbox_watcher_yakuza2.log"
+    start_watcher_if_missing "yakuza3" "multiagent:agents.3" "logs/inbox_watcher_yakuza3.log"
+    start_watcher_if_missing "yakuza4" "multiagent:agents.4" "logs/inbox_watcher_yakuza4.log"
+    start_watcher_if_missing "yakuza5" "multiagent:agents.5" "logs/inbox_watcher_yakuza5.log"
+    start_watcher_if_missing "yakuza6" "multiagent:agents.6" "logs/inbox_watcher_yakuza6.log"
+    start_watcher_if_missing "yakuza7" "multiagent:agents.7" "logs/inbox_watcher_yakuza7.log"
+    start_watcher_if_missing "soukaiya" "multiagent:agents.8" "logs/inbox_watcher_soukaiya.log"
     sleep 5
 done
