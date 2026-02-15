@@ -1,16 +1,16 @@
 <div align="center">
 
-# multi-agent-shogun
+# multi-agent-njslyr
 
-**Command your AI army like a feudal warlord.**
+**Command your AI army like a Neo-Saitama syndicate boss.**
 
-Run 10 AI coding agents in parallel — **Claude Code, OpenAI Codex, GitHub Copilot, Kimi Code** — orchestrated through a samurai-inspired hierarchy with zero coordination overhead.
+Run 10 AI coding agents in parallel — **Claude Code, OpenAI Codex, GitHub Copilot, Kimi Code** — orchestrated through a Soukai Syndicate hierarchy with zero coordination overhead.
 
 **Talk Coding, not Vibe Coding. Speak to your phone, AI executes.**
 
-[![GitHub Stars](https://img.shields.io/github/stars/yohey-w/multi-agent-shogun?style=social)](https://github.com/yohey-w/multi-agent-shogun)
+[![GitHub Stars](https://img.shields.io/github/stars/hrmtz/multi-agent-njslyr?style=social)](https://github.com/hrmtz/multi-agent-njslyr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![v3.4 Bloom→Agent Routing](https://img.shields.io/badge/v3.4-Bloom→Agent_Routing-ff6600?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+PHRleHQgeD0iMCIgeT0iMTIiIGZvbnQtc2l6ZT0iMTIiPuKalTwvdGV4dD48L3N2Zz4=)](https://github.com/yohey-w/multi-agent-shogun)
+[![v3.4 Bloom→Agent Routing](https://img.shields.io/badge/v3.4-Bloom→Agent_Routing-ff6600?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+PHRleHQgeD0iMCIgeT0iMTIiIGZvbnQtc2l6ZT0iMTIiPuKalTwvdGV4dD48L3N2Zz4=)](https://github.com/hrmtz/multi-agent-njslyr)
 [![Shell](https://img.shields.io/badge/Shell%2FBash-100%25-green)]()
 
 [English](README.md) | [日本語](README_ja.md)
@@ -32,7 +32,7 @@ Run 10 AI coding agents in parallel — **Claude Code, OpenAI Codex, GitHub Copi
 
 ## What is this?
 
-**multi-agent-shogun** is a system that runs multiple AI coding CLI instances simultaneously, orchestrating them like a feudal Japanese army. Supports **Claude Code**, **OpenAI Codex**, **GitHub Copilot**, and **Kimi Code**.
+**multi-agent-njslyr** is a system that runs multiple AI coding CLI instances simultaneously, orchestrating them like a Neo-Saitama cyberpunk syndicate. Supports **Claude Code**, **OpenAI Codex**, **GitHub Copilot**, and **Kimi Code**.
 
 **Why use it?**
 - One command spawns 7 AI workers + 1 strategist executing in parallel (Yakuza + Soukaiya)
@@ -60,13 +60,13 @@ Run 10 AI coding agents in parallel — **Claude Code, OpenAI Codex, GitHub Copi
 
 ---
 
-## Why Shogun?
+## Why This System?
 
 Most multi-agent frameworks burn API tokens on coordination. This system doesn't.
 
-| | Claude Code `Task` tool | LangGraph | CrewAI | **multi-agent-shogun** |
+| | Claude Code `Task` tool | LangGraph | CrewAI | **multi-agent-njslyr** |
 |---|---|---|---|---|
-| **Architecture** | Subagents inside one process | Graph-based state machine | Role-based agents | Feudal hierarchy via tmux |
+| **Architecture** | Subagents inside one process | Graph-based state machine | Role-based agents | Syndicate hierarchy via tmux |
 | **Parallelism** | Sequential (one at a time) | Parallel nodes (v0.2+) | Limited | **8 independent agents** |
 | **Coordination cost** | API calls per Task | API + infra (Postgres/Redis) | API + CrewAI platform | **Zero** (YAML + tmux) |
 | **Observability** | Claude logs only | LangSmith integration | OpenTelemetry | **Live tmux panes** + dashboard |
@@ -164,9 +164,9 @@ Skills grow organically from real work — not from a predefined template librar
 
 📥 **Download the repository**
 
-[Download ZIP](https://github.com/yohey-w/multi-agent-shogun/archive/refs/heads/main.zip) and extract to `C:\tools\multi-agent-shogun`
+[Download ZIP](https://github.com/hrmtz/multi-agent-njslyr/archive/refs/heads/main.zip) and extract to `C:\tools\multi-agent-njslyr`
 
-*Or use git:* `git clone https://github.com/yohey-w/multi-agent-shogun.git C:\tools\multi-agent-shogun`
+*Or use git:* `git clone https://github.com/hrmtz/multi-agent-njslyr.git C:\tools\multi-agent-njslyr`
 
 </td>
 </tr>
@@ -195,7 +195,7 @@ Right-click → "Run as Administrator" (if WSL2 is not installed). Sets up WSL2 
 🐧 **Open Ubuntu and run** (first time only)
 
 ```bash
-cd /mnt/c/tools/multi-agent-shogun
+cd /mnt/c/tools/multi-agent-njslyr
 ./first_setup.sh
 ```
 
@@ -241,7 +241,7 @@ This saves credentials to `~/.claude/` — you won't need to do it again.
 Open an **Ubuntu terminal** (WSL) and run:
 
 ```bash
-cd /mnt/c/tools/multi-agent-shogun
+cd /mnt/c/tools/multi-agent-njslyr
 ./yokubari.sh
 ```
 
@@ -303,8 +303,8 @@ This detects dead connections within 45 seconds instead of waiting for TCP timeo
 
 ```bash
 # 1. Clone
-git clone https://github.com/yohey-w/multi-agent-shogun.git ~/multi-agent-shogun
-cd ~/multi-agent-shogun
+git clone https://github.com/hrmtz/multi-agent-njslyr.git ~/multi-agent-njslyr
+cd ~/multi-agent-njslyr
 
 # 2. Make scripts executable
 chmod +x *.sh
@@ -316,7 +316,7 @@ chmod +x *.sh
 ### Daily startup
 
 ```bash
-cd ~/multi-agent-shogun
+cd ~/multi-agent-njslyr
 ./yokubari.sh
 ```
 
@@ -456,7 +456,7 @@ Open `dashboard.md` in your editor for a real-time status view:
 You: "Research the top 5 MCP servers and create a comparison table"
 ```
 
-The Darkninja writes the task to `queue/shogun_to_karo.yaml` and wakes the Gryakuza. Control returns to you immediately.
+The Darkninja writes the task to `queue/darkninja_to_gryakuza.yaml` and wakes the Gryakuza. Control returns to you immediately.
 
 The Gryakuza breaks the task into subtasks:
 
@@ -597,7 +597,7 @@ Efficient knowledge sharing through a four-layer context system:
 |-------|----------|---------|
 | Layer 1: Memory MCP | `memory/darkninja_memory.jsonl` | Cross-project, cross-session long-term memory |
 | Layer 2: Project | `config/projects.yaml`, `projects/<id>.yaml`, `context/{project}.md` | Project-specific information and technical knowledge |
-| Layer 3: YAML Queue | `queue/shogun_to_karo.yaml`, `queue/tasks/`, `queue/reports/` | Task management — source of truth for instructions and reports |
+| Layer 3: YAML Queue | `queue/darkninja_to_gryakuza.yaml`, `queue/tasks/`, `queue/reports/` | Task management — source of truth for instructions and reports |
 | Layer 4: Session | CLAUDE.md, instructions/*.md | Working context (wiped by `/clear`) |
 
 This design enables:
@@ -869,8 +869,8 @@ Silent mode sets `DISPLAY_MODE=silent` as a tmux environment variable. The Gryak
 **Q: How is this different from other task apps?**
 A: You never open an app. Just speak. Zero friction. Most task apps fail because people stop opening them. SayTask removes that step entirely.
 
-**Q: Can I use SayTask without the full multi-agent-shogun system?**
-A: SayTask is a feature of multi-agent-shogun. The system also works as a standalone multi-agent development platform — you get both capabilities in one system.
+**Q: Can I use SayTask without the full multi-agent-njslyr system?**
+A: SayTask is a feature of multi-agent-njslyr. The system also works as a standalone multi-agent development platform — you get both capabilities in one system.
 
 **Q: What's the Frog 🐸?**
 A: Every morning, AI picks your hardest task — the one you'd rather avoid. Tackle it first (the "Eat the Frog" method) or ignore it. Your call.
@@ -1286,7 +1286,7 @@ tmux kill-session -t multiagent
 Running `first_setup.sh` automatically adds these aliases to `~/.bashrc`:
 
 ```bash
-alias csst='cd /mnt/c/tools/multi-agent-shogun && ./yokubari.sh'
+alias csst='cd /mnt/c/tools/multi-agent-njslyr && ./yokubari.sh'
 alias css='tmux attach-session -t darkninja'      # Connect to Darkninja
 alias csm='tmux attach-session -t multiagent'  # Connect to Gryakuza + Yakuza
 ```
@@ -1303,7 +1303,7 @@ To apply aliases: run `source ~/.bashrc` or restart your terminal (PowerShell: `
 <summary><b>Click to expand file structure</b></summary>
 
 ```
-multi-agent-shogun/
+multi-agent-njslyr/
 │
 │  ┌──────────────── Setup Scripts ────────────────────┐
 ├── install.bat               # Windows: First-time setup

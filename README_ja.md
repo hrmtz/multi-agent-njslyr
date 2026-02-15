@@ -1,6 +1,6 @@
 <div align="center">
 
-# multi-agent-shogun
+# multi-agent-njslyr
 
 **AIコーディング軍団統率システム — Multi-CLI対応**
 
@@ -8,9 +8,9 @@
 
 **Talk Coding — Vibe Codingではなく、スマホに話すだけでAIが実行**
 
-[![GitHub Stars](https://img.shields.io/github/stars/yohey-w/multi-agent-shogun?style=social)](https://github.com/yohey-w/multi-agent-shogun)
+[![GitHub Stars](https://img.shields.io/github/stars/hrmtz/multi-agent-njslyr?style=social)](https://github.com/hrmtz/multi-agent-njslyr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![v3.4 Bloom→Agent Routing](https://img.shields.io/badge/v3.4-Bloom→Agent_Routing-ff6600?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+PHRleHQgeD0iMCIgeT0iMTIiIGZvbnQtc2l6ZT0iMTIiPuKalTwvdGV4dD48L3N2Zz4=)](https://github.com/yohey-w/multi-agent-shogun)
+[![v3.4 Bloom→Agent Routing](https://img.shields.io/badge/v3.4-Bloom→Agent_Routing-ff6600?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+PHRleHQgeD0iMCIgeT0iMTIiIGZvbnQtc2l6ZT0iMTIiPuKalTwvdGV4dD48L3N2Zz4=)](https://github.com/hrmtz/multi-agent-njslyr)
 [![Shell](https://img.shields.io/badge/Shell%2FBash-100%25-green)]()
 
 [English](README.md) | [日本語](README_ja.md)
@@ -32,7 +32,7 @@
 
 ## これは何？
 
-**multi-agent-shogun** は、複数のAIコーディングCLIインスタンスを同時に実行し、戦国時代の軍制のように統率するシステムです。**Claude Code**、**OpenAI Codex**、**GitHub Copilot**、**Kimi Code** の4CLIに対応。
+**multi-agent-njslyr** は、複数のAIコーディングCLIインスタンスを同時に実行し、戦国時代の軍制のように統率するシステムです。**Claude Code**、**OpenAI Codex**、**GitHub Copilot**、**Kimi Code** の4CLIに対応。
 
 **なぜ使うのか？**
 - 1つの命令で、7体のAIワーカー+1体のソウカイヤ幹部が並列で実行
@@ -64,7 +64,7 @@
 
 多くのマルチエージェントフレームワークは、連携のためにAPIトークンを消費します。Darkninjaは違います。
 
-| | Claude Code `Task` ツール | LangGraph | CrewAI | **multi-agent-shogun** |
+| | Claude Code `Task` ツール | LangGraph | CrewAI | **multi-agent-njslyr** |
 |---|---|---|---|---|
 | **アーキテクチャ** | 1プロセス内のサブエージェント | グラフベースの状態機械 | ロールベースエージェント | tmux経由の階層構造 |
 | **並列性** | 逐次実行（1つずつ） | 並列ノード（v0.2+） | 限定的 | **8体の独立エージェント** |
@@ -164,9 +164,9 @@ dashboard.md に掲載 → ラオモトが承認 → .claude/commands/ にスキ
 
 📥 **リポジトリをダウンロード**
 
-[ZIPダウンロード](https://github.com/yohey-w/multi-agent-shogun/archive/refs/heads/main.zip) して `C:\tools\multi-agent-shogun` に展開
+[ZIPダウンロード](https://github.com/hrmtz/multi-agent-njslyr/archive/refs/heads/main.zip) して `C:\tools\multi-agent-njslyr` に展開
 
-*または git を使用:* `git clone https://github.com/yohey-w/multi-agent-shogun.git C:\tools\multi-agent-shogun`
+*または git を使用:* `git clone https://github.com/hrmtz/multi-agent-njslyr.git C:\tools\multi-agent-njslyr`
 
 </td>
 </tr>
@@ -195,7 +195,7 @@ dashboard.md に掲載 → ラオモトが承認 → .claude/commands/ にスキ
 🐧 **Ubuntu を開いて以下を実行**（初回のみ）
 
 ```bash
-cd /mnt/c/tools/multi-agent-shogun
+cd /mnt/c/tools/multi-agent-njslyr
 ./first_setup.sh
 ```
 
@@ -241,7 +241,7 @@ claude --dangerously-skip-permissions
 **Ubuntuターミナル**（WSL）を開いて実行：
 
 ```bash
-cd /mnt/c/tools/multi-agent-shogun
+cd /mnt/c/tools/multi-agent-njslyr
 ./yokubari.sh
 ```
 
@@ -294,8 +294,8 @@ cd /mnt/c/tools/multi-agent-shogun
 
 ```bash
 # 1. リポジトリをクローン
-git clone https://github.com/yohey-w/multi-agent-shogun.git ~/multi-agent-shogun
-cd ~/multi-agent-shogun
+git clone https://github.com/hrmtz/multi-agent-njslyr.git ~/multi-agent-njslyr
+cd ~/multi-agent-njslyr
 
 # 2. スクリプトに実行権限を付与
 chmod +x *.sh
@@ -307,7 +307,7 @@ chmod +x *.sh
 ### 毎日の起動
 
 ```bash
-cd ~/multi-agent-shogun
+cd ~/multi-agent-njslyr
 ./yokubari.sh
 ```
 
@@ -1257,7 +1257,7 @@ tmux kill-session -t multiagent
 `first_setup.sh` を実行すると、以下のエイリアスが `~/.bashrc` に自動追加されます：
 
 ```bash
-alias csst='cd /mnt/c/tools/multi-agent-shogun && ./yokubari.sh'
+alias csst='cd /mnt/c/tools/multi-agent-njslyr && ./yokubari.sh'
 alias css='tmux attach-session -t darkninja'      # ダークニンジャウィンドウの起動
 alias csm='tmux attach-session -t multiagent'  # グレーターヤクザ・クローンヤクザウィンドウの起動
 ```
@@ -1274,7 +1274,7 @@ alias csm='tmux attach-session -t multiagent'  # グレーターヤクザ・ク�
 <summary><b>クリックでファイル構成を展開</b></summary>
 
 ```
-multi-agent-shogun/
+multi-agent-njslyr/
 │
 │  ┌─────────────────── セットアップスクリプト ───────────────────┐
 ├── install.bat               # Windows: 初回セットアップ
