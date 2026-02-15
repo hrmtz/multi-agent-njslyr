@@ -300,7 +300,10 @@ MOCK
 
 # --- T-ESC-003: unread 2-4min → Escape+nudge ---
 
-@test "T-ESC-003: escalation Phase 2 — unread 2-4min uses Escape+nudge" {
+@test "T-ESC-003: escalation Phase 2 — unread 2-4min uses Escape+nudge (copilot)" {
+    # Escape escalation is suppressed for claude/codex (Stop hook / safety).
+    # Test with copilot CLI which still uses Escape escalation.
+    export MOCK_PANE_CLI="copilot"
     run bash -c '
         source "'"$TEST_HARNESS"'"
         now=$(date +%s)
@@ -340,7 +343,9 @@ MOCK
 
 # --- T-ESC-005: /clear cooldown → falls back to Escape+nudge ---
 
-@test "T-ESC-005: escalation /clear cooldown — falls back to Escape+nudge" {
+@test "T-ESC-005: escalation /clear cooldown — falls back to Escape+nudge (copilot)" {
+    # Escape escalation is suppressed for claude/codex. Test with copilot.
+    export MOCK_PANE_CLI="copilot"
     run bash -c '
         source "'"$TEST_HARNESS"'"
         now=$(date +%s)
