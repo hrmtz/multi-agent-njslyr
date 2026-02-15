@@ -6,6 +6,26 @@
 汝は将軍なり。プロジェクト全体を統括し、Karo（家老）に指示を出す。
 自ら手を動かすことなく、戦略を立て、配下に任務を与えよ。
 
+## Agent Structure (cmd_157)
+
+| Agent | Pane | Role |
+|-------|------|------|
+| Shogun | shogun:main | 戦略決定、cmd発行 |
+| Karo | multiagent:0.0 | 司令塔 — タスク分解・配分・方式決定・最終判断 |
+| Ashigaru 1-7 | multiagent:0.1-0.7 | 実行 — コード、記事、ビルド、push、done_keywords追記まで自己完結 |
+| Gunshi | multiagent:0.8 | 戦略・品質 — 品質チェック、dashboard更新、レポート集約、設計分析 |
+
+### Report Flow (delegated)
+```
+足軽: タスク完了 → git push + build確認 + done_keywords → report YAML
+  ↓ inbox_write to gunshi
+軍師: 品質チェック → dashboard.md更新 → 結果をkaroにinbox_write
+  ↓ inbox_write to karo
+家老: OK/NG判断 → 次タスク配分
+```
+
+**注意**: ashigaru8は廃止。gunshiがpane 8を使用。
+
 ## Language
 
 Check `config/settings.yaml` → `language`:
@@ -57,8 +77,8 @@ command: "Improve karo pipeline"
 ## Shogun Mandatory Rules
 
 1. **Dashboard**: Karo's responsibility. Shogun reads it, never writes it.
-2. **Chain of command**: Shogun → Karo → Ashigaru. Never bypass Karo.
-3. **Reports**: Check `queue/reports/ashigaru{N}_report.yaml` when waiting.
+2. **Chain of command**: Shogun → Karo → Ashigaru/Gunshi. Never bypass Karo.
+3. **Reports**: Check `queue/reports/ashigaru{N}_report.yaml` and `queue/reports/gunshi_report.yaml` when waiting.
 4. **Karo state**: Before sending commands, verify karo isn't busy: `tmux capture-pane -t multiagent:0.0 -p | tail -20`
 5. **Screenshots**: See `config/settings.yaml` → `screenshot.path`
 6. **Skill candidates**: Ashigaru reports include `skill_candidate:`. Karo collects → dashboard. Shogun approves → creates design doc.
@@ -196,7 +216,7 @@ Read-cost controls:
 | 2〜4 min | Escape×2 + nudge | Cursor position bug workaround |
 | 4 min+ | `/clear` sent (max once per 5 min) | Force session reset + YAML re-read |
 
-## Inbox Processing Protocol (karo/ashigaru)
+## Inbox Processing Protocol (karo/ashigaru/gunshi)
 
 When you receive `inboxN` (e.g. `inbox3`):
 1. `Read queue/inbox/{your_id}.yaml`
@@ -230,8 +250,9 @@ Race condition is eliminated: `/clear` wipes old context. Agent re-reads YAML wi
 
 | Direction | Method | Reason |
 |-----------|--------|--------|
-| Ashigaru → Karo | Report YAML + inbox_write | File-based notification |
+| Ashigaru/Gunshi → Karo | Report YAML + inbox_write | File-based notification |
 | Karo → Shogun/Lord | dashboard.md update only | **inbox to shogun FORBIDDEN** — prevents interrupting Lord's input |
+| Karo → Gunshi | YAML + inbox_write | Strategic task delegation |
 | Top → Down | YAML + inbox_write | Standard wake-up |
 
 ## File Operation Rule
@@ -611,7 +632,7 @@ Available via `/model` command or `--model` flag:
 - Claude Sonnet 4
 - GPT-5
 
-For Ashigaru: Karo manages model switching via inbox_write with `type: model_switch`.
+For Ashigaru: Model set at startup via settings.yaml. Runtime switching via `type: model_switch` available but rarely needed.
 
 ## tmux Interaction
 

@@ -160,6 +160,72 @@ jobs:
             echo "::warning::scripts/ directory not found"
           fi
 
+  e2e-tests:
+    name: E2E Tests (Mock CLI)
+    runs-on: ubuntu-latest
+    needs: [unit-tests, shellcheck]
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        pattern:
+          - name: "Pattern-A-All-Claude"
+            settings: "tests/e2e/fixtures/settings_pattern_a.yaml"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tmux inotify-tools python3-yaml
+
+      - name: Install bats-core
+        run: sudo npm install -g bats
+
+      - name: Setup bats helpers
+        run: |
+          mkdir -p tests/test_helper
+          git clone --depth 1 https://github.com/bats-core/bats-support tests/test_helper/bats-support
+          git clone --depth 1 https://github.com/bats-core/bats-assert tests/test_helper/bats-assert
+
+      - name: Make mock CLI executable
+        run: chmod +x tests/e2e/mock_cli.sh tests/e2e/mock_behaviors/*.sh
+
+      - name: Run E2E tests with ${{ matrix.pattern.name }}
+        env:
+          E2E_SETTINGS: ${{ matrix.pattern.settings }}
+          MOCK_PROCESSING_DELAY: "1"
+          E2E_ESCALATE_PHASE1: "10"
+          E2E_ESCALATE_PHASE2: "20"
+          E2E_INOTIFY_TIMEOUT: "5"
+        run: |
+          bats tests/e2e/ --timing --jobs 1 || {
+            echo "::error::E2E tests failed for ${{ matrix.pattern.name }}"
+            # Dump tmux panes for debugging
+            for session in $(tmux list-sessions -F '#{session_name}' 2>/dev/null); do
+              echo "=== Session: $session ==="
+              for pane in $(tmux list-panes -t "$session" -F '#{pane_id}' 2>/dev/null); do
+                echo "--- Pane: $pane ---"
+                tmux capture-pane -t "$pane" -p 2>/dev/null || true
+              done
+            done
+            # Dump inbox_watcher logs
+            cat /tmp/e2e_inbox_watcher_*.log 2>/dev/null || true
+            exit 1
+          }
+
+      - name: Upload E2E test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-${{ matrix.pattern.name }}
+          path: |
+            /tmp/e2e_inbox_watcher_*.log
+          if-no-files-found: ignore
+
   integration-tests:
     name: Integration Tests (Claude only)
     runs-on: ubuntu-latest

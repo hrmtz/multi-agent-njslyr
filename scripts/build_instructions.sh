@@ -80,21 +80,25 @@ EOFYAML
 build_instruction_file "claude" "shogun" "shogun.md"
 build_instruction_file "claude" "karo" "karo.md"
 build_instruction_file "claude" "ashigaru" "ashigaru.md"
+build_instruction_file "claude" "gunshi" "gunshi.md"
 
 # Build Codex instruction files
 build_instruction_file "codex" "shogun" "codex-shogun.md"
 build_instruction_file "codex" "karo" "codex-karo.md"
 build_instruction_file "codex" "ashigaru" "codex-ashigaru.md"
+build_instruction_file "codex" "gunshi" "codex-gunshi.md"
 
 # Build Copilot instruction files
 build_instruction_file "copilot" "shogun" "copilot-shogun.md"
 build_instruction_file "copilot" "karo" "copilot-karo.md"
 build_instruction_file "copilot" "ashigaru" "copilot-ashigaru.md"
+build_instruction_file "copilot" "gunshi" "copilot-gunshi.md"
 
 # Build Kimi K2 instruction files
 build_instruction_file "kimi" "shogun" "kimi-shogun.md"
 build_instruction_file "kimi" "karo" "kimi-karo.md"
 build_instruction_file "kimi" "ashigaru" "kimi-ashigaru.md"
+build_instruction_file "kimi" "gunshi" "kimi-gunshi.md"
 
 # ============================================================
 # AGENTS.md generation (Codex auto-load file)
@@ -119,6 +123,7 @@ generate_agents_md() {
         -e 's|instructions/shogun\.md|instructions/generated/codex-shogun.md|g' \
         -e 's|instructions/karo\.md|instructions/generated/codex-karo.md|g' \
         -e 's|instructions/ashigaru\.md|instructions/generated/codex-ashigaru.md|g' \
+        -e 's|instructions/gunshi\.md|instructions/generated/codex-gunshi.md|g' \
         -e 's|~/.claude/|~/.codex/|g' \
         -e 's|\.claude\.json|.codex/config.toml|g' \
         -e 's|\.mcp\.json|config.toml (mcp_servers section)|g' \
@@ -154,6 +159,7 @@ generate_copilot_instructions() {
         -e 's|instructions/shogun\.md|instructions/generated/copilot-shogun.md|g' \
         -e 's|instructions/karo\.md|instructions/generated/copilot-karo.md|g' \
         -e 's|instructions/ashigaru\.md|instructions/generated/copilot-ashigaru.md|g' \
+        -e 's|instructions/gunshi\.md|instructions/generated/copilot-gunshi.md|g' \
         -e 's|~/.claude/|~/.copilot/|g' \
         -e 's|\.claude\.json|.copilot/config.json|g' \
         -e 's|\.mcp\.json|.copilot/mcp-config.json|g' \
@@ -191,6 +197,7 @@ generate_kimi_instructions() {
         -e 's|instructions/shogun\.md|instructions/generated/kimi-shogun.md|g' \
         -e 's|instructions/karo\.md|instructions/generated/kimi-karo.md|g' \
         -e 's|instructions/ashigaru\.md|instructions/generated/kimi-ashigaru.md|g' \
+        -e 's|instructions/gunshi\.md|instructions/generated/kimi-gunshi.md|g' \
         -e 's|~/.claude/|~/.kimi/|g' \
         -e 's|\.claude\.json|.kimi/config.json|g' \
         -e 's|\.mcp\.json|.kimi/mcp.json|g' \

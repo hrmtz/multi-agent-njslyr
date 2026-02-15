@@ -625,7 +625,7 @@ Available via `/model` command or `--model` flag:
 - Claude Sonnet 4
 - GPT-5
 
-For Ashigaru: Karo manages model switching via inbox_write with `type: model_switch`.
+For Ashigaru: Model set at startup via settings.yaml. Runtime switching via `type: model_switch` available but rarely needed.
 
 ## tmux Interaction
 

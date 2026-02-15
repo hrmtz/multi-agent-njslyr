@@ -633,8 +633,8 @@ BASHRC_FILE="$HOME/.bashrc"
 # - 複数端末から接続しても画面サイズが干渉しない
 # - SSH切断・アプリ終了時に一時セッションが自動消滅
 # - 本体セッション (shogun/multiagent) は絶対に消えない
-CSS_FUNC='css() { local s="shogun-$$"; tmux new-session -d -t shogun -s "$s" && tmux set-option -t "$s" destroy-unattached on && tmux attach-session -t "$s"; }'
-CSM_FUNC='csm() { local s="multi-$$"; tmux new-session -d -t multiagent -s "$s" && tmux set-option -t "$s" destroy-unattached on && tmux attach-session -t "$s"; }'
+CSS_FUNC='css() { local s="shogun-$$"; local cols=$(tput cols 2>/dev/null || echo 80); tmux new-session -d -t shogun -s "$s" 2>/dev/null && tmux set-option -t "$s" destroy-unattached on 2>/dev/null; if [ "$cols" -lt 80 ]; then tmux new-window -t "$s" -n mobile 2>/dev/null; tmux attach-session -t "$s:mobile" 2>/dev/null || tmux attach-session -t shogun; else tmux attach-session -t "$s" 2>/dev/null || tmux attach-session -t shogun; fi; }'
+CSM_FUNC='csm() { local s="multi-$$"; local cols=$(tput cols 2>/dev/null || echo 80); tmux new-session -d -t multiagent -s "$s" 2>/dev/null && tmux set-option -t "$s" destroy-unattached on 2>/dev/null; if [ "$cols" -lt 80 ]; then tmux new-window -t "$s" -n mobile 2>/dev/null; tmux attach-session -t "$s:mobile" 2>/dev/null || tmux attach-session -t multiagent; else tmux attach-session -t "$s" 2>/dev/null || tmux attach-session -t multiagent; fi; }'
 
 ALIAS_ADDED=false
 

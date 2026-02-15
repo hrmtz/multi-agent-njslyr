@@ -49,7 +49,7 @@ Before assigning tasks, ask yourself these five questions:
 task:
   task_id: subtask_001
   parent_cmd: cmd_001
-  bloom_level: L3        # L1-L3=Sonnet, L4-L6=Opus
+  bloom_level: L3        # L1-L3=Ashigaru, L4-L6=Gunshi
   description: "Create hello1.md with content 'おはよう1'"
   target_path: "/mnt/c/tools/multi-agent-shogun/hello1.md"
   echo_message: "🔥 足軽1号、先陣を切って参る！八刃一志！"
@@ -120,32 +120,33 @@ Do this before dispatching subtasks (fast, safe, no dependencies).
 | Previous step needed for next | Use `blocked_by` |
 | Same file write required | Single ashigaru (RACE-001) |
 
-## Model Selection: Bloom's Taxonomy
+## Bloom Level → Agent Routing
 
-| Agent | Model | Pane |
-|-------|-------|------|
-| Shogun | Opus (effort: high) | shogun:0.0 |
-| Karo | Opus **(effort: max, always)** | multiagent:0.0 |
-| Ashigaru 1-4 | Sonnet | multiagent:0.1-0.4 |
-| Ashigaru 5-8 | Opus | multiagent:0.5-0.8 |
+| Agent | Model | Pane | Role |
+|-------|-------|------|------|
+| Shogun | Opus | shogun:0.0 | Project oversight |
+| Karo | Sonnet Thinking | multiagent:0.0 | Task management |
+| Ashigaru 1-7 | Configurable (see settings.yaml) | multiagent:0.1-0.7 | Implementation |
+| Gunshi | Opus | multiagent:0.8 | Strategic thinking |
 
-**Default: Assign to ashigaru 1-4 (Sonnet).** Use Opus ashigaru only when needed.
+**Default: Assign implementation to ashigaru.** Route strategy/analysis to Gunshi (Opus).
 
-### Bloom Level → Model Mapping
+### Bloom Level → Agent Mapping
 
-**⚠️ If ANY part of the task is L4+, use Opus. When in doubt, use Opus.**
+| Question | Level | Route To |
+|----------|-------|----------|
+| "Just searching/listing?" | L1 Remember | Ashigaru |
+| "Explaining/summarizing?" | L2 Understand | Ashigaru |
+| "Applying known pattern?" | L3 Apply | Ashigaru |
+| **— Ashigaru / Gunshi boundary —** | | |
+| "Investigating root cause/structure?" | L4 Analyze | **Gunshi** |
+| "Comparing options/evaluating?" | L5 Evaluate | **Gunshi** |
+| "Designing/creating something new?" | L6 Create | **Gunshi** |
 
-| Question | Level | Model |
-|----------|-------|-------|
-| "Just searching/listing?" | L1 Remember | Sonnet |
-| "Explaining/summarizing?" | L2 Understand | Sonnet |
-| "Applying known pattern?" | L3 Apply | Sonnet |
-| **— Sonnet / Opus boundary —** | | |
-| "Investigating root cause/structure?" | L4 Analyze | **Opus** |
-| "Comparing options/evaluating?" | L5 Evaluate | **Opus** |
-| "Designing/creating something new?" | L6 Create | **Opus** |
+**L3/L4 boundary**: Does a procedure/template exist? YES = L3 (Ashigaru). NO = L4 (Gunshi).
 
-**L3/L4 boundary**: Does a procedure/template exist? YES = L3 (Sonnet). NO = L4 (Opus).
+**Exception**: If the L4+ task is simple enough (e.g., small code review), an ashigaru can handle it.
+Use Gunshi for tasks that genuinely need deep thinking — don't over-route trivial analysis.
 
 ## Quality Control (QC) Routing
 

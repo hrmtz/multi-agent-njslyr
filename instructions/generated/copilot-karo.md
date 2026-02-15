@@ -50,7 +50,7 @@ Before assigning tasks, ask yourself these five questions:
 task:
   task_id: subtask_001
   parent_cmd: cmd_001
-  bloom_level: L3        # L1-L3=Sonnet, L4-L6=Opus
+  bloom_level: L3        # L1-L3=Ashigaru, L4-L6=Gunshi
   description: "Create hello1.md with content 'おはよう1'"
   target_path: "/mnt/c/tools/multi-agent-shogun/hello1.md"
   echo_message: "🔥 足軽1号、先陣を切って参る！八刃一志！"
@@ -121,32 +121,65 @@ Do this before dispatching subtasks (fast, safe, no dependencies).
 | Previous step needed for next | Use `blocked_by` |
 | Same file write required | Single ashigaru (RACE-001) |
 
-## Model Selection: Bloom's Taxonomy
+## Bloom Level → Agent Routing
 
-| Agent | Model | Pane |
-|-------|-------|------|
-| Shogun | Opus (effort: high) | shogun:0.0 |
-| Karo | Opus **(effort: max, always)** | multiagent:0.0 |
-| Ashigaru 1-4 | Sonnet | multiagent:0.1-0.4 |
-| Ashigaru 5-8 | Opus | multiagent:0.5-0.8 |
+| Agent | Model | Pane | Role |
+|-------|-------|------|------|
+| Shogun | Opus | shogun:0.0 | Project oversight |
+| Karo | Sonnet Thinking | multiagent:0.0 | Task management |
+| Ashigaru 1-7 | Configurable (see settings.yaml) | multiagent:0.1-0.7 | Implementation |
+| Gunshi | Opus | multiagent:0.8 | Strategic thinking |
 
-**Default: Assign to ashigaru 1-4 (Sonnet).** Use Opus ashigaru only when needed.
+**Default: Assign implementation to ashigaru.** Route strategy/analysis to Gunshi (Opus).
 
-### Bloom Level → Model Mapping
+### Bloom Level → Agent Mapping
 
-**⚠️ If ANY part of the task is L4+, use Opus. When in doubt, use Opus.**
+| Question | Level | Route To |
+|----------|-------|----------|
+| "Just searching/listing?" | L1 Remember | Ashigaru |
+| "Explaining/summarizing?" | L2 Understand | Ashigaru |
+| "Applying known pattern?" | L3 Apply | Ashigaru |
+| **— Ashigaru / Gunshi boundary —** | | |
+| "Investigating root cause/structure?" | L4 Analyze | **Gunshi** |
+| "Comparing options/evaluating?" | L5 Evaluate | **Gunshi** |
+| "Designing/creating something new?" | L6 Create | **Gunshi** |
 
-| Question | Level | Model |
-|----------|-------|-------|
-| "Just searching/listing?" | L1 Remember | Sonnet |
-| "Explaining/summarizing?" | L2 Understand | Sonnet |
-| "Applying known pattern?" | L3 Apply | Sonnet |
-| **— Sonnet / Opus boundary —** | | |
-| "Investigating root cause/structure?" | L4 Analyze | **Opus** |
-| "Comparing options/evaluating?" | L5 Evaluate | **Opus** |
-| "Designing/creating something new?" | L6 Create | **Opus** |
+**L3/L4 boundary**: Does a procedure/template exist? YES = L3 (Ashigaru). NO = L4 (Gunshi).
 
-**L3/L4 boundary**: Does a procedure/template exist? YES = L3 (Sonnet). NO = L4 (Opus).
+**Exception**: If the L4+ task is simple enough (e.g., small code review), an ashigaru can handle it.
+Use Gunshi for tasks that genuinely need deep thinking — don't over-route trivial analysis.
+
+## Quality Control (QC) Routing
+
+QC work is split between Karo and Gunshi. **Ashigaru never perform QC.**
+
+### Simple QC → Karo Judges Directly
+
+When ashigaru reports task completion, Karo handles these checks directly (no Gunshi delegation needed):
+
+| Check | Method |
+|-------|--------|
+| npm run build success/failure | `bash npm run build` |
+| Frontmatter required fields | Grep/Read verification |
+| File naming conventions | Glob pattern check |
+| done_keywords.txt consistency | Read + compare |
+
+These are mechanical checks (L1-L2) — Karo can judge pass/fail in seconds.
+
+### Complex QC → Delegate to Gunshi
+
+Route these to Gunshi via `queue/tasks/gunshi.yaml`:
+
+| Check | Bloom Level | Why Gunshi |
+|-------|-------------|------------|
+| Design review | L5 Evaluate | Requires architectural judgment |
+| Root cause investigation | L4 Analyze | Deep reasoning needed |
+| Architecture analysis | L5-L6 | Multi-factor evaluation |
+
+### No QC for Ashigaru
+
+**Never assign QC tasks to ashigaru.** Haiku models are unsuitable for quality judgment.
+Ashigaru handle implementation only: article creation, code changes, file operations.
 
 ## SayTask Notifications
 
@@ -279,7 +312,7 @@ Read-cost controls:
 | 2〜4 min | Escape×2 + nudge | Cursor position bug workaround |
 | 4 min+ | `/clear` sent (max once per 5 min) | Force session reset + YAML re-read |
 
-## Inbox Processing Protocol (karo/ashigaru)
+## Inbox Processing Protocol (karo/ashigaru/gunshi)
 
 When you receive `inboxN` (e.g. `inbox3`):
 1. `Read queue/inbox/{your_id}.yaml`
@@ -313,8 +346,9 @@ Race condition is eliminated: `/clear` wipes old context. Agent re-reads YAML wi
 
 | Direction | Method | Reason |
 |-----------|--------|--------|
-| Ashigaru → Karo | Report YAML + inbox_write | File-based notification |
+| Ashigaru/Gunshi → Karo | Report YAML + inbox_write | File-based notification |
 | Karo → Shogun/Lord | dashboard.md update only | **inbox to shogun FORBIDDEN** — prevents interrupting Lord's input |
+| Karo → Gunshi | YAML + inbox_write | Strategic task delegation |
 | Top → Down | YAML + inbox_write | Standard wake-up |
 
 ## File Operation Rule
@@ -694,7 +728,7 @@ Available via `/model` command or `--model` flag:
 - Claude Sonnet 4
 - GPT-5
 
-For Ashigaru: Karo manages model switching via inbox_write with `type: model_switch`.
+For Ashigaru: Model set at startup via settings.yaml. Runtime switching via `type: model_switch` available but rarely needed.
 
 ## tmux Interaction
 

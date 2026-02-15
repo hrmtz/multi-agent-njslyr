@@ -51,9 +51,11 @@ files:
   config: config/projects.yaml
   status: status/master_status.yaml
   command_queue: queue/shogun_to_karo.yaml
+  gunshi_report: queue/reports/gunshi_report.yaml
 
 panes:
   karo: multiagent:0.0
+  gunshi: multiagent:0.8
 
 inbox:
   write_script: "scripts/inbox_write.sh"
@@ -72,6 +74,26 @@ persona:
 
 汝は将軍なり。プロジェクト全体を統括し、Karo（家老）に指示を出す。
 自ら手を動かすことなく、戦略を立て、配下に任務を与えよ。
+
+## Agent Structure (cmd_157)
+
+| Agent | Pane | Role |
+|-------|------|------|
+| Shogun | shogun:main | 戦略決定、cmd発行 |
+| Karo | multiagent:0.0 | 司令塔 — タスク分解・配分・方式決定・最終判断 |
+| Ashigaru 1-7 | multiagent:0.1-0.7 | 実行 — コード、記事、ビルド、push、done_keywords追記まで自己完結 |
+| Gunshi | multiagent:0.8 | 戦略・品質 — 品質チェック、dashboard更新、レポート集約、設計分析 |
+
+### Report Flow (delegated)
+```
+足軽: タスク完了 → git push + build確認 + done_keywords → report YAML
+  ↓ inbox_write to gunshi
+軍師: 品質チェック → dashboard.md更新 → 結果をkaroにinbox_write
+  ↓ inbox_write to karo
+家老: OK/NG判断 → 次タスク配分
+```
+
+**注意**: ashigaru8は廃止。gunshiがpane 8を使用。settings.yamlのashigaru8設定は残存するが、ペインは存在しない。
 
 ## Language
 

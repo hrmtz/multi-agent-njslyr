@@ -32,6 +32,10 @@ workflow:
     action: receive_wakeup
     from: karo
     via: inbox
+  - step: 1.5
+    action: yaml_slim
+    command: 'bash scripts/slim_yaml.sh $(tmux display-message -t "$TMUX_PANE" -p "#{@agent_id}")'
+    note: "Compress task YAML before reading to conserve tokens"
   - step: 2
     action: read_yaml
     target: "queue/tasks/ashigaru{N}.yaml"
@@ -39,6 +43,10 @@ workflow:
   - step: 3
     action: update_status
     value: in_progress
+  - step: 3.5
+    action: set_current_task
+    command: 'tmux set-option -p @current_task "{task_id_short}"'
+    note: "Extract task_id short form (e.g., subtask_155b → 155b, max ~15 chars)"
   - step: 4
     action: execute_task
   - step: 5
@@ -47,17 +55,31 @@ workflow:
   - step: 6
     action: update_status
     value: done
+  - step: 6.5
+    action: clear_current_task
+    command: 'tmux set-option -p @current_task ""'
+    note: "Clear task label for next task"
   - step: 7
+    action: git_push
+    note: "If project has git repo, commit + push your changes. Only for article/documentation completion."
+  - step: 7.5
+    action: build_verify
+    note: "If project has build system (npm run build, etc.), run and verify success. Report failures in report YAML."
+  - step: 8
+    action: seo_keyword_record
+    note: "If SEO project, append completed keywords to done_keywords.txt"
+  - step: 9
     action: inbox_write
-    target: karo
+    target: gunshi
     method: "bash scripts/inbox_write.sh"
     mandatory: true
-  - step: 7.5
+    note: "Changed from karo to gunshi. Gunshi now handles quality check + dashboard."
+  - step: 9.5
     action: check_inbox
     target: "queue/inbox/ashigaru{N}.yaml"
     mandatory: true
     note: "Check for unread messages BEFORE going idle. Process any redo instructions."
-  - step: 8
+  - step: 10
     action: echo_shout
     condition: "DISPLAY_MODE=shout (check via tmux show-environment)"
     command: 'echo "{echo_message or self-generated battle cry}"'
@@ -81,7 +103,9 @@ panes:
 
 inbox:
   write_script: "scripts/inbox_write.sh"  # See CLAUDE.md for mailbox protocol
-  to_karo_allowed: true
+  to_gunshi_allowed: true
+  to_gunshi_on_completion: true  # Changed from karo to gunshi (quality check delegation)
+  to_karo_allowed: false
   to_shogun_allowed: false
   to_user_allowed: false
   mandatory_after_completion: true
@@ -152,13 +176,13 @@ date "+%Y-%m-%dT%H:%M:%S"
 
 ## Report Notification Protocol
 
-After writing report YAML, notify Karo:
+After writing report YAML, notify Gunshi (NOT Karo):
 
 ```bash
-bash scripts/inbox_write.sh karo "足軽{N}号、任務完了でござる。報告書を確認されよ。" report_received ashigaru{N}
+bash scripts/inbox_write.sh gunshi "足軽{N}号、任務完了でござる。品質チェックを仰ぎたし。" report_received ashigaru{N}
 ```
 
-That's it. No state checking, no retry, no delivery verification.
+Gunshi now handles quality check and dashboard aggregation. No state checking, no retry, no delivery verification.
 The inbox_write guarantees persistence. inbox_watcher handles delivery.
 
 ## Report Format

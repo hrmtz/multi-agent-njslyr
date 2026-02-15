@@ -26,7 +26,7 @@ Run 10 AI coding agents in parallel — **Claude Code, OpenAI Codex, GitHub Copi
   <img src="images/company-creed-all-panes.png" alt="Karo and Ashigaru panes reacting in parallel" width="520">
 </p>
 
-<p align="center"><i>One Karo (manager) coordinating 8 Ashigaru (workers) — real session, no mock data.</i></p>
+<p align="center"><i>One Karo (manager) coordinating 7 Ashigaru (workers) + 1 Gunshi (strategist) — real session, no mock data.</i></p>
 
 ---
 
@@ -35,7 +35,7 @@ Run 10 AI coding agents in parallel — **Claude Code, OpenAI Codex, GitHub Copi
 **multi-agent-shogun** is a system that runs multiple AI coding CLI instances simultaneously, orchestrating them like a feudal Japanese army. Supports **Claude Code**, **OpenAI Codex**, **GitHub Copilot**, and **Kimi Code**.
 
 **Why use it?**
-- One command spawns 8 AI workers executing in parallel
+- One command spawns 7 AI workers + 1 strategist executing in parallel
 - Zero wait time — give your next order while tasks run in the background
 - AI remembers your preferences across sessions (Memory MCP)
 - Real-time progress on a dashboard
@@ -400,12 +400,13 @@ Whichever option you chose, **10 AI agents** are automatically launched:
 | Agent | Role | Count |
 |-------|------|-------|
 | 🏯 Shogun | Supreme commander — receives your orders | 1 |
-| 📋 Karo | Manager — distributes tasks | 1 |
-| ⚔️ Ashigaru | Workers — execute tasks in parallel | 8 |
+| 📋 Karo | Manager — distributes tasks, quality checks | 1 |
+| ⚔️ Ashigaru | Workers — execute implementation tasks in parallel | 7 |
+| 🧠 Gunshi | Strategist — handles analysis, evaluation, and design | 1 |
 
 Two tmux sessions are created:
 - `shogun` — connect here to give commands
-- `multiagent` — workers running in the background
+- `multiagent` — Karo, Ashigaru, and Gunshi running in the background
 
 ---
 

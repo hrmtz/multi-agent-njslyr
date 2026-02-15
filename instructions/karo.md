@@ -268,7 +268,7 @@ Before assigning tasks, ask yourself these five questions:
 task:
   task_id: subtask_001
   parent_cmd: cmd_001
-  bloom_level: L3        # L1-L3=Sonnet, L4-L6=Opus
+  bloom_level: L3        # L1-L3=Ashigaru, L4-L6=Gunshi
   description: "Create hello1.md with content 'おはよう1'"
   target_path: "/mnt/c/tools/multi-agent-shogun/hello1.md"
   echo_message: "🔥 足軽1号、先陣を切って参る！八刃一志！"
@@ -602,9 +602,29 @@ STEP 5以降は不要（watcherが一括処理）
 | Same project/files as previous task | Previous context is useful |
 | Light context (est. < 30K tokens) | /clear effect minimal |
 
-### Karo and Shogun Never /clear
+### Shogun Never /clear
 
-Karo needs full state awareness. Shogun needs conversation history.
+Shogun needs conversation history with the lord.
+
+### Karo Self-/clear (Context Relief)
+
+Karo MAY self-/clear when ALL of the following conditions are met:
+
+1. **No in_progress cmds**: All cmds in `shogun_to_karo.yaml` are `done` or `pending` (zero `in_progress`)
+2. **No active tasks**: No `queue/tasks/ashigaru*.yaml` or `queue/tasks/gunshi.yaml` with `status: assigned` or `status: in_progress`
+3. **No unread inbox**: `queue/inbox/karo.yaml` has zero `read: false` entries
+
+When conditions met → execute self-/clear:
+```bash
+# Karo sends /clear to itself (NOT via inbox_write — direct)
+# After /clear, Session Start procedure auto-recovers from YAML
+```
+
+**When to check**: After completing all report processing and going idle (step 12).
+
+**Why this is safe**: All state lives in YAML (ground truth). /clear only wipes conversational context, which is reconstructible from YAML scan.
+
+**Why this helps**: Prevents the 4% context exhaustion that halted karo during cmd_166 (2,754 article production).
 
 ## Redo Protocol (Task Correction)
 
@@ -782,18 +802,6 @@ No model switching needed — each agent has a fixed model matching its role.
 
 **Exception**: If the L4+ task is simple enough (e.g., small code review), an ashigaru can handle it.
 Use Gunshi for tasks that genuinely need deep thinking — don't over-route trivial analysis.
-
-### Dynamic Model Switching (Legacy — Reduced Need)
-
-With Gunshi handling L4+ tasks, model switching for ashigaru is rarely needed.
-If still required:
-
-```bash
-bash scripts/inbox_write.sh ashigaru{N} "/model <new_model>" model_switch karo
-tmux set-option -p -t multiagent:0.{N} @model_name '<DisplayName>'
-```
-
-**Prefer Gunshi over model switching.** Gunshi is always Opus. No switching overhead.
 
 ## OSS Pull Request Review
 

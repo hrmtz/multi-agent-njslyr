@@ -705,8 +705,10 @@ process_unread() {
         FIRST_UNREAD_SEEN=0
         NEW_CONTEXT_SENT=0
         if ! agent_is_busy; then
-            # Shogun is human-controlled; never clear the input line automatically.
-            if [ "$AGENT_ID" != "shogun" ]; then
+            # Shogun: only clear input when pane is not active (Lord is away)
+            if [ "$AGENT_ID" = "shogun" ] && pane_is_active; then
+                : # Lord may be typing — skip C-u
+            else
                 timeout 2 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
             fi
         fi
@@ -860,8 +862,10 @@ for s in data.get('specials', []):
         # Clear stale nudge text from input field (Codex CLI prefills last input on idle).
         # Only send C-u when agent is idle — during Working it would be disruptive.
         if ! agent_is_busy; then
-            # Shogun is human-controlled; never clear the input line automatically.
-            if [ "$AGENT_ID" != "shogun" ]; then
+            # Shogun: only clear input when pane is not active (Lord is away)
+            if [ "$AGENT_ID" = "shogun" ] && pane_is_active; then
+                : # Lord may be typing — skip C-u
+            else
                 timeout 2 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
             fi
         fi
@@ -881,7 +885,7 @@ process_unread_once
 # ─── Main loop: event-driven via inotifywait ───
 # Timeout 30s: WSL2 /mnt/c/ can miss inotify events.
 # Shorter timeout = faster escalation retry for stuck agents.
-INOTIFY_TIMEOUT=30
+INOTIFY_TIMEOUT="${INOTIFY_TIMEOUT:-30}"
 
 while true; do
     # Block until file is modified OR timeout (safety net for WSL2)
