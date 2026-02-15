@@ -30,9 +30,12 @@
 
 ---
 
+> **これは [multi-agent-shogun](https://github.com/yohey-w/multi-agent-shogun) の[ニンジャスレイヤー](https://diehardtales.com/n/ndb78a66e0e79) MODです。**
+> オリジナルは戦国武将ヒエラルキー（将軍→家老→足軽）。本フォークは命名体系を **ソウカイ・シンジケート** に全面書き換え: ダークニンジャ→グレーターヤクザ→クローンヤクザ。インストラクション、スクリプト、テスト、ドキュメントすべて対応済み。アーキテクチャと機能は同一です。
+
 ## これは何？
 
-**multi-agent-njslyr** は、複数のAIコーディングCLIインスタンスを同時に実行し、戦国時代の軍制のように統率するシステムです。**Claude Code**、**OpenAI Codex**、**GitHub Copilot**、**Kimi Code** の4CLIに対応。
+**multi-agent-njslyr** は、複数のAIコーディングCLIインスタンスを同時に実行し、ソウカイ・シンジケートの組織構造で統率するシステムです。**Claude Code**、**OpenAI Codex**、**GitHub Copilot**、**Kimi Code** の4CLIに対応。
 
 **なぜ使うのか？**
 - 1つの命令で、7体のAIワーカー+1体のソウカイヤ幹部が並列で実行

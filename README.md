@@ -30,9 +30,12 @@ Run 10 AI coding agents in parallel — **Claude Code, OpenAI Codex, GitHub Copi
 
 ---
 
+> **This is a [Ninja Slayer](https://diehardtales.com/n/ndb78a66e0e79) mod of [multi-agent-shogun](https://github.com/yohey-w/multi-agent-shogun).**
+> The original system uses a feudal Japanese hierarchy (Shogun → Karo → Ashigaru). This fork re-skins the entire naming to the **Soukai Syndicate** from Ninja Slayer: Darkninja → Gryakuza → Yakuza. All instructions, scripts, tests, and documentation have been rewritten. The underlying architecture and functionality are identical.
+
 ## What is this?
 
-**multi-agent-njslyr** is a system that runs multiple AI coding CLI instances simultaneously, orchestrating them like a Neo-Saitama cyberpunk syndicate. Supports **Claude Code**, **OpenAI Codex**, **GitHub Copilot**, and **Kimi Code**.
+**multi-agent-njslyr** is a system that runs multiple AI coding CLI instances simultaneously, orchestrated as a Soukai Syndicate operation. Supports **Claude Code**, **OpenAI Codex**, **GitHub Copilot**, and **Kimi Code**.
 
 **Why use it?**
 - One command spawns 7 AI workers + 1 strategist executing in parallel (Yakuza + Soukaiya)
