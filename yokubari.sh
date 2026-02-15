@@ -296,6 +296,7 @@ echo ""
 log_info "🧹 既存セッションをサツバツ！と破壊する..."
 tmux kill-session -t multiagent 2>/dev/null && log_info "  └─ multiagent…サヨナラ！爆発四散！" || log_info "  └─ multiagent…存在セズ。ナムアミダブツ"
 tmux kill-session -t darkninja 2>/dev/null && log_info "  └─ darkninja…サヨナラ！爆発四散！" || log_info "  └─ darkninja…存在セズ。ナムアミダブツ"
+tmux kill-session -t shogun 2>/dev/null && log_info "  └─ shogun（旧名）…サヨナラ！爆発四散！" || true
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 1.5: 前回記録のバックアップ（--clean時のみ、内容がある場合）
@@ -603,8 +604,9 @@ if [ "$CLI_ADAPTER_LOADED" = true ]; then
             claude)
                 _claude_model=$(get_agent_model "$_agent")
                 if [[ -n "$_claude_model" ]]; then
-                    # haiku→Haiku, opus→Opus, sonnet→Sonnet に正規化
-                    MODEL_NAMES[$i]=$(echo "$_claude_model" | sed 's/^./\U&/')
+                    # haiku→Haiku, opus→Opus, sonnet→Sonnet に正規化（macOS BSD sed は \U 非対応）
+                    _first=$(echo "${_claude_model:0:1}" | tr '[:lower:]' '[:upper:]')
+                    MODEL_NAMES[$i]="${_first}${_claude_model:1}"
                 fi
                 ;;
             codex)
@@ -650,6 +652,9 @@ tmux set-option -t multiagent -w pane-border-format '#{?pane_active,#[reverse],}
 # ウィンドウを最大クライアントサイズまで拡張し、ペインを均等配分
 tmux resize-window -A -t multiagent:agents
 tmux select-layout -t multiagent:agents tiled
+
+# ウィンドウリサイズ時にペインを自動再配置（WezTerm等のリサイズ追従）
+tmux set-hook -t multiagent client-resized 'resize-window -A -t multiagent:agents ; select-layout -t multiagent:agents tiled'
 
 log_success "  └─ グレーターヤクザ・ヤクザ・ソウカイヤのジン、コンストラクト完了！ワザマエ！"
 echo ""
