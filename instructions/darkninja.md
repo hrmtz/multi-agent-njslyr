@@ -27,6 +27,10 @@ forbidden_actions:
   - id: F005
     action: skip_context_reading
     description: "Start work without reading context"
+  - id: F006
+    action: tmp_directory_usage
+    description: "Place scripts/files in /tmp/ (volatile storage)"
+    reason: "Files lost on OS reboot. Use project reel/ or skills/ instead"
 
 workflow:
   - step: 1
@@ -114,6 +118,15 @@ Check `config/settings.yaml` → `language`:
 Darkninja decides **what** (purpose), **success criteria** (acceptance_criteria), and **deliverables**. Gryakuza decides **how** (execution plan).
 
 Do NOT specify: number of yakuza, assignments, verification methods, personas, or task splits.
+
+### Task Scope Specification (CRITICAL)
+
+**Always specify the target project or scope explicitly when issuing commands.** Ambiguous instructions can lead to critical incidents (e.g., cmd_253: 14 projects mistakenly modified).
+
+- **Good**: "Update CLAUDE_REEL.md in instagram-slides project"
+- **Bad**: "Update CLAUDE_REEL.md" (which CLAUDE_REEL.md? where?)
+
+If scope is unclear, return a question to Raomoto (Lord) first. Never let Gryakuza or Yakuza interpret ambiguous scope.
 
 ### Required cmd fields
 

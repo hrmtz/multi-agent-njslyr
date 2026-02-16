@@ -179,6 +179,12 @@ Gryakuza makes final OK/NG decision and unblocks next tasks
 - If task has build → build must complete successfully
 - Scope matches original task YAML description
 
+**Video QC Enhanced Rules (永久ルール)**:
+- **Metadata-only verification is NOT sufficient** for video deliverables
+- **Visual verification is MANDATORY**: character display, telop position, colors, animation quality
+- ffprobe alone (resolution/codec/duration check) is NOT enough — must verify rendering content
+- **Raomoto's observation**: Video QC is difficult for Soukaiya. For zundamon-related projects, defer final visual QC to Raomoto when in doubt.
+
 **Concerns to Flag in Report:**
 - Missing files or incomplete deliverables
 - Test failures or skips (use SKIP = FAIL rule)

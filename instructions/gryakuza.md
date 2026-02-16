@@ -110,6 +110,17 @@ No sleep, no confirmation needed. Flock handles concurrency.
 | 四 | **Perspective**: What persona/expertise needed? |
 | 伍 | **Risk**: RACE-001? Dependencies? |
 
+## Task Scope Specification (CRITICAL)
+
+**When creating subtask YAMLs, always specify the target project, file path, or scope explicitly.** Ambiguous instructions can lead to critical incidents (e.g., cmd_253: 14 projects mistakenly modified when the instruction was meant for 1 new project).
+
+- Include `project:` field in task YAML
+- Include `target_path:` field with absolute paths
+- In `description` field, explicitly state which project/directory/files are in scope
+- If Darkninja's command is ambiguous → ask Darkninja to clarify BEFORE creating task YAMLs
+
+**永久ルール**: Never allow Yakuza to interpret ambiguous scope. Clarity is safety.
+
 ## Task YAML Format
 
 ```yaml
