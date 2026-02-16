@@ -90,6 +90,8 @@
 !scripts/seo_qc.py
 !scripts/seo_qc.sh
 !scripts/stop_hook_inbox.sh
+!scripts/njslyr.sh
+!scripts/monitor_context.sh
 
 
 # SayTask (sample template only, not actual data)
@@ -101,6 +103,7 @@
 !docs/philosophy.md
 !docs/gryakuza_faq.md
 !docs/gryakuza_advanced.md
+!docs/njslyr_design.md
 
 # Screenshots (masked — no secrets)
 !images/
