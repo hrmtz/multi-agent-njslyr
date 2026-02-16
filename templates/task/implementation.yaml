@@ -1,0 +1,25 @@
+task:
+  task_id: "{{task_id}}"
+  parent_cmd: "{{parent_cmd}}"
+  bloom_level: "{{bloom_level}}"
+  description: |
+    **{{title}}**
+
+    **背景**:
+    {{background}}
+
+    **タスク内容**:
+    {{content}}
+
+    **作業手順**:
+    {{steps}}
+
+    **Acceptance Criteria**:
+    {{acceptance_criteria}}
+
+    **Notes**:
+    {{notes}}
+
+  target_path: "{{target_path}}"
+  status: assigned
+  timestamp: "{{timestamp}}"

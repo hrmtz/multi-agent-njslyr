@@ -1,0 +1,23 @@
+task:
+  task_id: "{{task_id}}"
+  parent_cmd: "{{parent_cmd}}"
+  bloom_level: "{{bloom_level}}"
+  description: |
+    **Quality Check: {{target_task_id}} — {{title}}**
+
+    **検証対象**: {{verification_target}}
+
+    **報告YAML**: {{report_yaml_path}}
+
+    **検証項目**:
+    {{verification_items}}
+
+    **Acceptance Criteria**:
+    {{acceptance_criteria}}
+
+    **Notes**:
+    {{notes}}
+
+  target_path: "{{target_path}}"
+  status: assigned
+  timestamp: "{{timestamp}}"

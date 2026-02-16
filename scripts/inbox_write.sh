@@ -1,7 +1,8 @@
 #!/bin/bash
 # inbox_write.sh — メールボックスへのメッセージ書き込み（排他ロック付き）
-# Usage: bash scripts/inbox_write.sh <target_agent> <content> [type] [from]
-# Example: bash scripts/inbox_write.sh gryakuza "ヤクザ5号、任務完了" report_received yakuza5
+# Usage: bash scripts/inbox_write.sh <target_agent> <content> [type] [from] [task_yaml_path] [priority]
+# Example: bash scripts/inbox_write.sh gryakuza "ヤクザ5号、任務完了" report_received yakuza5 "" P1
+# Example (task_assigned): bash scripts/inbox_write.sh yakuza3 "タスクYAML読んで作業開始" task_assigned gryakuza queue/tasks/yakuza3_subtask_237c.yaml P2
 
 set -e
 
@@ -10,15 +11,53 @@ TARGET="$1"
 CONTENT="$2"
 TYPE="${3:-wake_up}"
 FROM="${4:-unknown}"
+TASK_YAML_PATH="${5:-}"
+PRIORITY_ARG="${6:-}"
+
+# Type-based default priority mapping (if priority not explicitly provided)
+if [ -z "$PRIORITY_ARG" ]; then
+    case "$TYPE" in
+        cmd_new)
+            PRIORITY="P0"  # Raomoto directive = highest priority
+            ;;
+        report_received)
+            # Check for BLOCKING keyword in content
+            if echo "$CONTENT" | grep -qi "BLOCKING"; then
+                PRIORITY="P0"  # BLOCKING issue = emergency
+            else
+                PRIORITY="P1"  # Normal QC result = high priority
+            fi
+            ;;
+        task_assigned|clear_command|model_switch)
+            PRIORITY="P2"  # Normal operational tasks
+            ;;
+        *)
+            PRIORITY="P3"  # Info sharing, proposals, etc.
+            ;;
+    esac
+else
+    PRIORITY="$PRIORITY_ARG"
+fi
 
 INBOX="$SCRIPT_DIR/queue/inbox/${TARGET}.yaml"
 LOCKFILE="${INBOX}.lock"
 
 # Validate arguments
 if [ -z "$TARGET" ] || [ -z "$CONTENT" ]; then
-    echo "Usage: inbox_write.sh <target_agent> <content> [type] [from]" >&2
+    echo "Usage: inbox_write.sh <target_agent> <content> [type] [from] [task_yaml_path] [priority]" >&2
     exit 1
 fi
+
+# Validate priority
+case "$PRIORITY" in
+    P0|P1|P2|P3)
+        # Valid priority
+        ;;
+    *)
+        echo "ERROR: Invalid priority '$PRIORITY'. Must be P0, P1, P2, or P3." >&2
+        exit 1
+        ;;
+esac
 
 # Initialize inbox if not exists
 if [ ! -f "$INBOX" ]; then
@@ -30,9 +69,10 @@ fi
 MSG_ID="msg_$(date +%Y%m%d_%H%M%S)_$(head -c 4 /dev/urandom | xxd -p)"
 TIMESTAMP=$(date "+%Y-%m-%dT%H:%M:%S")
 
-# Atomic write with flock (3 retries)
+# Atomic write with flock (exponential backoff: max 5 retries)
+# Backoff delays: 0.1s, 0.2s, 0.4s, 0.8s (doubles each time)
 attempt=0
-max_attempts=3
+max_attempts=5
 
 while [ $attempt -lt $max_attempts ]; do
     if (
@@ -59,9 +99,13 @@ try:
         'from': '$FROM',
         'timestamp': '$TIMESTAMP',
         'type': '$TYPE',
+        'priority': '$PRIORITY',
         'content': '''$CONTENT''',
         'read': False
     }
+    # Add task_yaml_path if provided (for task_assigned messages)
+    if '$TASK_YAML_PATH':
+        new_msg['task_yaml_path'] = '$TASK_YAML_PATH'
     data['messages'].append(new_msg)
 
     # Overflow protection: keep max 50 messages
@@ -90,15 +134,19 @@ except Exception as e:
 
     ) 200>"$LOCKFILE"; then
         # Success
+        echo "[inbox_write] Message written to $INBOX (attempt $((attempt + 1)))" >&2
         exit 0
     else
         # Lock timeout or error
         attempt=$((attempt + 1))
         if [ $attempt -lt $max_attempts ]; then
-            echo "[inbox_write] Lock timeout for $INBOX (attempt $attempt/$max_attempts), retrying..." >&2
-            sleep 1
+            # Exponential backoff: 0.1s * 2^attempt
+            # attempt=0 → 0.1s, attempt=1 → 0.2s, attempt=2 → 0.4s, attempt=3 → 0.8s
+            backoff_delay=$(awk "BEGIN {print 0.1 * (2 ^ $attempt)}")
+            echo "[inbox_write] Lock timeout for $INBOX (attempt $((attempt + 1))/$max_attempts), retrying in ${backoff_delay}s..." >&2
+            sleep "$backoff_delay"
         else
-            echo "[inbox_write] Failed to acquire lock after $max_attempts attempts for $INBOX" >&2
+            echo "[inbox_write] FAILED to acquire lock after $max_attempts attempts for $INBOX" >&2
             exit 1
         fi
     fi

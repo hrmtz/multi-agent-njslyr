@@ -1,0 +1,49 @@
+task:
+  task_id: "{{task_id}}"
+  parent_cmd: "{{parent_cmd}}"
+  bloom_level: "{{bloom_level}}"
+  description: |
+    **バグ修正: {{title}}**
+
+    **背景**:
+    {{background}}
+
+    **バグ詳細**:
+    {{bug_description}}
+
+    **再現手順**:
+    {{reproduction_steps}}
+
+    **影響範囲**:
+    {{impact}}
+
+    **修正方針**:
+    {{fix_strategy}}
+
+    **作業手順**:
+    1. 対象ファイル（{{target_path}}）を読む
+    2. バグ箇所を特定（grep, ripgrep等で検索）
+    3. 修正実施（Editツール使用）
+    4. 修正後の動作確認（テスト実行 or 手動検証）
+    5. 副作用チェック（他機能への影響確認）
+    6. ソウカイヤにQC依頼
+
+    **検証方法**:
+    {{verification_method}}
+
+    **Acceptance Criteria**:
+    - [ ] バグ修正完了（{{target_path}}）
+    - [ ] 修正後の動作確認PASS
+    - [ ] 副作用なし（他機能への影響確認）
+    - [ ] テスト実行PASS（該当テストがあれば）
+    - [ ] ソウカイヤQC PASS
+
+    **Notes**:
+    - 修正の根拠を明確に報告すること
+    - 「実装したつもり」を防ぐため、コード検証を徹底
+    - 修正後は必ず動作確認を実施
+    {{notes}}
+
+  target_path: "{{target_path}}"
+  status: assigned
+  timestamp: "{{timestamp}}"

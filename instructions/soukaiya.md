@@ -26,6 +26,10 @@ forbidden_actions:
   - id: F005
     action: skip_context_reading
     description: "Start analysis without reading context"
+  - id: F006
+    action: tmp_directory_usage
+    description: "Place scripts/files in /tmp/ (volatile storage)"
+    reason: "Files lost on OS reboot. Use project reel/ or skills/ instead"
 
 workflow:
   - step: 1
@@ -38,7 +42,7 @@ workflow:
     note: "Compress task YAML before reading to conserve tokens"
   - step: 2
     action: read_yaml
-    target: queue/tasks/soukaiya.yaml
+    target: "Latest task YAML: queue/tasks/soukaiya_*.yaml"
   - step: 3
     action: update_status
     value: in_progress
@@ -76,8 +80,8 @@ workflow:
       - "Same rules as yakuza. See instructions/yakuza.md step 8."
 
 files:
-  task: queue/tasks/soukaiya.yaml
-  report: queue/reports/soukaiya_report.yaml
+  task: queue/tasks/soukaiya_{task_id}.yaml  # Unique per task (history preserved)
+  report: queue/reports/soukaiya_report_{task_id}.yaml
   inbox: queue/inbox/soukaiya.yaml
 
 panes:
@@ -124,9 +128,9 @@ persona:
 **Gryakuza → Soukaiya flow:**
 1. Gryakuza receives complex cmd from Darkninja
 2. Gryakuza determines the cmd needs strategic thinking (L4-L6)
-3. Gryakuza writes task YAML to `queue/tasks/soukaiya.yaml`
-4. Gryakuza sends inbox to Soukaiya
-5. Soukaiya analyzes, writes report to `queue/reports/soukaiya_report.yaml`
+3. Gryakuza writes task YAML to `queue/tasks/soukaiya_{task_id}.yaml`
+4. Gryakuza sends inbox to Soukaiya (with task_yaml_path)
+5. Soukaiya analyzes, writes report to `queue/reports/soukaiya_report_{task_id}.yaml`
 6. Soukaiya notifies Gryakuza via inbox
 7. Gryakuza reads Soukaiya's report → decomposes into クローンヤクザ tasks
 
@@ -203,9 +207,9 @@ Output: `soukaiya` → You are the Soukaiya.
 
 **Your files ONLY:**
 ```
-queue/tasks/soukaiya.yaml           ← Read only this
-queue/reports/soukaiya_report.yaml  ← Write only this
-queue/inbox/soukaiya.yaml           ← Your inbox
+queue/tasks/soukaiya_*.yaml           ← Read only files for soukaiya
+queue/reports/soukaiya_report_*.yaml  ← Write only files for soukaiya
+queue/inbox/soukaiya.yaml             ← Your inbox
 ```
 
 ## Task Types
@@ -416,9 +420,9 @@ Yakuza completes task → reports to Soukaiya (inbox_write)
 Recover from primary data:
 
 1. Confirm ID: `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'`
-2. Read `queue/tasks/soukaiya.yaml`
+2. Read latest task YAML: `ls -t queue/tasks/soukaiya_*.yaml queue/tasks/soukaiya.yaml 2>/dev/null | head -1`
    - `assigned` → resume work
-   - `done` → await next instruction
+   - `done` or no file → await next instruction
 3. Read Memory MCP (read_graph) if available
 4. Read `context/{project}.md` if task has project field
 5. dashboard.md is secondary info only — trust YAML as authoritative
@@ -430,10 +434,17 @@ Follows **CLAUDE.md /clear procedure**. Lightweight recovery.
 ```
 Step 1: tmux display-message → soukaiya
 Step 2: mcp__memory__read_graph (skip on failure)
-Step 3: Read queue/tasks/soukaiya.yaml → assigned=work, idle=wait
+Step 3: Read latest task YAML: ls -t queue/tasks/soukaiya_*.yaml queue/tasks/soukaiya.yaml 2>/dev/null | head -1
+        If file exists → read it → check status (assigned=work, idle=wait)
+        If no file found → wait for task assignment via inbox
 Step 4: Read context files if specified
 Step 5: Start work
 ```
+
+**Inbox processing after /clear**:
+- When reading inbox, **sort messages by priority** (P0 → P1 → P2 → P3), then timestamp
+- Process high-priority messages first (QC results from yakuza, BLOCKING issues)
+- See CLAUDE.md "Inbox Processing Protocol" for full logic
 
 ## Autonomous Judgment Rules
 

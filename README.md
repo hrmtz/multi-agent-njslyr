@@ -810,6 +810,26 @@ task:
 
 Silent mode sets `DISPLAY_MODE=silent` as a tmux environment variable. The Gryakuza checks this when writing task YAMLs and omits the `echo_message` field.
 
+### ⚔️ 10. njslyr (Agent Monitoring Daemon)
+
+Automatic agent health monitoring with three-stage escalation — keeps your AI army responsive without manual intervention.
+
+**What it does:**
+
+njslyr (`scripts/njslyr.sh`) is a watchdog daemon that monitors agent responsiveness and automatically escalates when agents fail to process their inbox messages:
+
+| Stage | Trigger | Action | Purpose |
+|-------|---------|--------|---------|
+| **Stage 1: Shuriken** | Agent ignores inbox for 2+ minutes | Send gentle nudge (`inbox3` via tmux send-keys) | Wake up distracted agent |
+| **Stage 2: Chop** | Still unresponsive after 4 minutes | Force `/clear` to reset session | Clear context overload |
+| **Stage 3: Slay** | Unresponsive after 6 minutes | `kill -9` + auto-restart + **red pane background** | Terminate and revive crashed agent |
+
+**Cost optimization:** njslyr only sends nudges to agents with **unread inbox messages** (`grep 'read: false'` detection — pure bash, zero API calls). Idle agents are left untouched.
+
+**How it runs:** `yokubari.sh` starts njslyr in the background. It executes every 15 minutes, scanning all agent inboxes and applying escalation stages as needed.
+
+**Ninja Slayer flavor:** Stage 3 displays a dramatic red-screen death sequence (`◆◆◆ Wasshoi!!!!`, `[KARATE]`, `アバーッ！`, `サヨナラ！`, `爆発四散！`) in the tmux pane before auto-restarting the agent.
+
 ---
 
 ## 🗣️ SayTask — Task Management for People Who Hate Task Management

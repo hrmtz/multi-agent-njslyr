@@ -57,7 +57,8 @@ if [ ! -f "$INBOX" ]; then
 fi
 
 # Count unread messages using grep (fast, no python dependency)
-UNREAD_COUNT=$(grep -c 'read: false' "$INBOX" 2>/dev/null || true)
+# Pattern: '^ *read: false$' to avoid false positives from message content
+UNREAD_COUNT=$(grep -c '^ *read: false$' "$INBOX" 2>/dev/null || true)
 
 if [ "${UNREAD_COUNT:-0}" -eq 0 ]; then
     exit 0

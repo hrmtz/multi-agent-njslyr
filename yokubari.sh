@@ -1,5 +1,5 @@
 #!/bin/bash
-# 🏯 multi-agent-shogun ネオサイタマ・デプロイメント・スクリプト（毎日の起動用）
+# multi-agent-shogun ネオサイタマ・デプロイメント・スクリプト（毎日の起動用）
 # Daily Deployment Script for Multi-Agent Orchestration System
 #
 # 使用方法:
@@ -180,11 +180,11 @@ while [[ $# -gt 0 ]]; do
             echo "  ./shutsujin_departure.sh -k           # ケッセンの陣（全クローンヤクザOpus）"
             echo "  ./shutsujin_departure.sh -c -k         # クリーンスタート＋ケッセンの陣"
             echo "  ./shutsujin_departure.sh -shell zsh   # zsh用プロンプトで起動"
-            echo "  ./shutsujin_departure.sh --darkninja-no-thinking  # ラオモトのthinkingを無効化（中継特化）"
+            echo "  ./shutsujin_departure.sh --darkninja-no-thinking  # ダークニンジャのthinkingを無効化（中継特化）"
             echo "  ./shutsujin_departure.sh -S           # サイレントモード（echo表示なし）"
             echo ""
             echo "モデル構成:"
-            echo "  ラオモト:      Opus（デフォルト。--darkninja-no-thinkingで無効化）"
+            echo "  ダークニンジャ:      Opus（デフォルト。--darkninja-no-thinkingで無効化）"
             echo "  グレーターヤクザ:      Sonnet（高速タスク管理）"
             echo "  ソウカイヤ:      Opus（戦略立案・設計判断）"
             echo "  ヤクザ1-7:   Sonnet（ジッコウ部隊）"
@@ -206,7 +206,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "アイエエエ！不明なオプション: $1"
-            echo "./shutsujin_departure.sh -h でヘルプを表示せよ"
+            echo "./yokubari.sh -h でヘルプを表示せよ"
             exit 1
             ;;
     esac
@@ -254,21 +254,21 @@ show_battle_cry() {
     echo -e "\033[1;34m  ║\033[0m                \033[1;37m【 クローンヤクザ隊列 ・ 七名 + 幹部 配備 】\033[0m                  \033[1;34m║\033[0m"
     echo -e "\033[1;34m  ╚═════════════════════════════════════════════════════════════════════════════╝\033[0m"
     echo ""
-    echo "⣿⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⢛⣛⣛⣛⣛⣛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⣿"
-    echo "⣿⠀⠀⠀⠀⠀⠀⣠⠴⠊⠉⠁⠈⠀⠀⢀⡡⣿⣿⣶⣤⡀⠀⠀⠀⠀⠀⠀⠀⣿"
-    echo "⣿⠀⠀⠀⠀⠰⡮⡀⠀⠀⠀⢀⣀⠔⠊⢁⡠⠟⢿⣿⣿⣿⠆⠀⠀⠀⠀⠀⠀⣿"
-    echo "⣿⠀⠀⠀⠀⠀⢳⢬⣴⣶⠞⠋⣃⠔⠚⠉⠀⠀⢸⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀⣿"
-    echo "⣿⠀⠀⠀⠀⠀⠘⡇⠑⢿⡤⠎⠁⠀⠀⣠⢠⢀⣼⣿⡿⢿⡇⠀⠀⠀⠀⠀⠀⣿"
-    echo "⣿⠀⠀⠀⠀⠀⢀⡇⢄⠠⠀⢠⠎⢀⢄⣀⣼⣶⣿⣿⣝⢁⡇⠀⠀⠀⠀⠀⠀⣿"
-    echo "⣿⠀⠀⠀⠀⠀⠘⡉⣷⣷⣷⡵⠲⣿⣿⣿⣿⡏⠀⡡⢮⣼⡅⠀⠀⠀⠀⠀⠀⣿"
-    echo "⣿⠀⠀⠀⠀⠀⠀⠡⣿⣿⣿⠟⢂⢿⣿⡿⡟⠡⢲⠁⣯⡈⠳⣀⠀⠀⠀⠀⠀⣿"
-    echo "⣿⠀⠀⠀⠀⠀⠀⠀⠹⡟⠣⡠⡴⠛⠡⠀⢸⠁⠂⠀⣿⢀⡔⠈⢧⡀⠀⠀⠀⣿"
-    echo "⣿⠀⠀⠀⠀⠀⠀⠀⢀⡵⡐⢩⡧⣄⡐⠂⡨⢃⠀⡾⡤⠊⠀⠀⠈⢻⣖⠤⡀⣿"
-    echo "⣿⠀⠀⠀⠀⢀⣠⠖⣱⡷⢿⠆⠀⠀⠀⡩⠖⢁⡼⠊⠀⠀⠀⠀⠀⣾⣿⣷⣆⣿"
-    echo "⣿⠀⡀⠠⣒⡵⣡⣾⡟⠀⢎⠫⡻⡋⣉⠠⠚⠁⠀⠀⠀⠀⠀⠀⣸⣿⣿⣿⣿⣿"
-    echo "⣿⣭⣶⣿⡟⣾⣿⡏⠀⢀⣴⣇⢠⢎⠅⣤⡀⠀⠀⠀⠀⢀⠠⡾⣿⣿⣿⣿⣿⣿"
-    echo "⣿⣿⣿⣟⣾⢿⣿⠀⣠⣺⣿⣿⣿⣿⣿⣿⣿⢦⡀⠔⠈⠁⡔⣰⣿⣿⣿⣿⣿⣿"
-    echo "⣿⣿⣿⣿⣵⣿⣿⣼⣥⣤⣿⣿⣿⣿⣿⣯⣥⣬⣭⣦⣤⣾⣿⣿⣿⣿⣿⣿⣿⣿"
+    echo "                    ⣿⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⢛⣛⣛⣛⣛⣛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⣿"
+    echo "                    ⣿⠀⠀⠀⠀⠀⠀⣠⠴⠊⠉⠁⠈⠀⠀⢀⡡⣿⣿⣶⣤⡀⠀⠀⠀⠀⠀⠀⠀⣿"
+    echo "                    ⣿⠀⠀⠀⠀⠰⡮⡀⠀⠀⠀⢀⣀⠔⠊⢁⡠⠟⢿⣿⣿⣿⠆⠀⠀⠀⠀⠀⠀⣿"
+    echo "                    ⣿⠀⠀⠀⠀⠀⢳⢬⣴⣶⠞⠋⣃⠔⠚⠉⠀⠀⢸⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀⣿"
+    echo "                    ⣿⠀⠀⠀⠀⠀⠘⡇⠑⢿⡤⠎⠁⠀⠀⣠⢠⢀⣼⣿⡿⢿⡇⠀⠀⠀⠀⠀⠀⣿"
+    echo "                    ⣿⠀⠀⠀⠀⠀⢀⡇⢄⠠⠀⢠⠎⢀⢄⣀⣼⣶⣿⣿⣝⢁⡇⠀⠀⠀⠀⠀⠀⣿"
+    echo "                    ⣿⠀⠀⠀⠀⠀⠘⡉⣷⣷⣷⡵⠲⣿⣿⣿⣿⡏⠀⡡⢮⣼⡅⠀⠀⠀⠀⠀⠀⣿"
+    echo "                    ⣿⠀⠀⠀⠀⠀⠀⠡⣿⣿⣿⠟⢂⢿⣿⡿⡟⠡⢲⠁⣯⡈⠳⣀⠀⠀⠀⠀⠀⣿"
+    echo "                    ⣿⠀⠀⠀⠀⠀⠀⠀⠹⡟⠣⡠⡴⠛⠡⠀⢸⠁⠂⠀⣿⢀⡔⠈⢧⡀⠀⠀⠀⣿"
+    echo "                    ⣿⠀⠀⠀⠀⠀⠀⠀⢀⡵⡐⢩⡧⣄⡐⠂⡨⢃⠀⡾⡤⠊⠀⠀⠈⢻⣖⠤⡀⣿"
+    echo "                    ⣿⠀⠀⠀⠀⢀⣠⠖⣱⡷⢿⠆⠀⠀⠀⡩⠖⢁⡼⠊⠀⠀⠀⠀⠀⣾⣿⣷⣆⣿"
+    echo "                    ⣿⠀⡀⠠⣒⡵⣡⣾⡟⠀⢎⠫⡻⡋⣉⠠⠚⠁⠀⠀⠀⠀⠀⠀⣸⣿⣿⣿⣿⣿"
+    echo "                    ⣿⣭⣶⣿⡟⣾⣿⡏⠀⢀⣴⣇⢠⢎⠅⣤⡀⠀⠀⠀⠀⢀⠠⡾⣿⣿⣿⣿⣿⣿"
+    echo "                    ⣿⣿⣿⣟⣾⢿⣿⠀⣠⣺⣿⣿⣿⣿⣿⣿⣿⢦⡀⠔⠈⠁⡔⣰⣿⣿⣿⣿⣿⣿"
+    echo "                    ⣿⣿⣿⣿⣵⣿⣿⣼⣥⣤⣿⣿⣿⣿⣿⣯⣥⣬⣭⣦⣤⣾⣿⣿⣿⣿⣿⣿⣿⣿"
     echo ""
     echo -e "                    \033[1;36m「「「 ザッケンナコラー！！ 」」」\033[0m"
     echo ""
@@ -277,9 +277,9 @@ show_battle_cry() {
     # システム情報
     # ═══════════════════════════════════════════════════════════════════════════
     echo -e "\033[1;33m  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\033[0m"
-    echo -e "\033[1;33m  ┃\033[0m  \033[1;37m🏯 multi-agent-shogun\033[0m  〜 \033[1;36mネオサイタマ・マルチエージェント統率システム\033[0m 〜           \033[1;33m┃\033[0m"
+    echo -e "\033[1;33m  ┃\033[0m  \033[1;37m multi-agent-njslyr\033[0m  〜 \033[1;36mネオサイタマ・マルチエージェント統率システム\033[0m 〜           \033[1;33m┃\033[0m"
     echo -e "\033[1;33m  ┃\033[0m                                                                           \033[1;33m┃\033[0m"
-    echo -e "\033[1;33m  ┃\033[0m  \033[1;35mラオモト\033[0m: 統括  \033[1;31mグレーターヤクザ\033[0m: カンリ  \033[1;33mソウカイヤ\033[0m: 戦略(Opus)  \033[1;34mヤクザ\033[0m: ジッコウ×7  \033[1;33m┃\033[0m"
+    echo -e "\033[1;33m  ┃\033[0m  \033[1;35mダークニンジャ\033[0m: 統括  \033[1;31mグレーターヤクザ\033[0m: カンリ  \033[1;33mソウカイヤ\033[0m: 戦略(Opus)  \033[1;34mヤクザ\033[0m: ジッコウ×7  \033[1;33m┃\033[0m"
     echo -e "\033[1;33m  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\033[0m"
     echo ""
 }
@@ -402,10 +402,10 @@ EOF
         echo "messages:" > "./queue/inbox/${agent}.yaml"
     done
 
-    log_success "✅ ゼンカイのデータ、全て爆発四散！クリーンスタート！ワザマエ！"
+    log_success "✅ 前回のデータ、全て爆発四散！クリーンスタート！ワザマエ！"
 else
-    log_info "📜 ゼンカイのジョウタイを維持してデプロイする。カラテの蓄積はムダにしない"
-    log_success "✅ キュー・レポートYAML、ゼンカイのデータを引き継ぐ。ワザマエ！"
+    log_info "📜 前回の状態を維持してデプロイする。カラテの蓄積はムダにしない"
+    log_success "✅ キュー・レポートYAML、前回のデータを引き継ぐ。ワザマエ！"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -673,110 +673,126 @@ if [ "$SETUP_ONLY" = false ]; then
         fi
     fi
 
-    log_war "👑 全エージェントにClaude Codeをインストール中...イヤーッ！"
+    log_war "👑 全エージェントにClaude Codeをインストール中...イヤーッ！（並列起動モード）"
 
-    # ダークニンジャ: CLI Adapter経由でコマンド構築
-    _darkninja_cli_type="claude"
-    _darkninja_cmd="claude --model opus --dangerously-skip-permissions"
-    if [ "$CLI_ADAPTER_LOADED" = true ]; then
-        _darkninja_cli_type=$(get_cli_type "darkninja")
-        _darkninja_cmd=$(build_cli_command "darkninja")
-    fi
-    tmux set-option -p -t "darkninja:main" @agent_cli "$_darkninja_cli_type"
-    if [ "$SHOGUN_NO_THINKING" = true ] && [ "$_darkninja_cli_type" = "claude" ]; then
-        tmux send-keys -t darkninja:main "MAX_THINKING_TOKENS=0 $_darkninja_cmd"
-        tmux send-keys -t darkninja:main Enter
-        log_info "  └─ ラオモト（${_darkninja_cli_type} / thinking無効）…ニンジャソウル覚醒！"
-    else
-        tmux send-keys -t darkninja:main "$_darkninja_cmd"
-        tmux send-keys -t darkninja:main Enter
-        log_info "  └─ ラオモト（${_darkninja_cli_type}）…ニンジャソウル覚醒！"
-    fi
+    # ═════════════════════════════════════════════════════════════
+    # 【Phase 1高速化】全エージェント並列起動
+    # 削減時間: 40-60秒 → 期待10秒以下
+    # ═════════════════════════════════════════════════════════════
 
-    # 少し待機（安定のため）
-    sleep 1
+    # ダークニンジャ: CLI Adapter経由でコマンド構築（バックグラウンド起動）
+    (
+        _darkninja_cli_type="claude"
+        _darkninja_cmd="claude --model opus --dangerously-skip-permissions"
+        if [ "$CLI_ADAPTER_LOADED" = true ]; then
+            _darkninja_cli_type=$(get_cli_type "darkninja")
+            _darkninja_cmd=$(build_cli_command "darkninja")
+        fi
+        tmux set-option -p -t "darkninja:main" @agent_cli "$_darkninja_cli_type"
+        if [ "$SHOGUN_NO_THINKING" = true ] && [ "$_darkninja_cli_type" = "claude" ]; then
+            tmux send-keys -t darkninja:main "MAX_THINKING_TOKENS=0 $_darkninja_cmd"
+            tmux send-keys -t darkninja:main Enter
+            log_info "  └─ ダークニンジャ（${_darkninja_cli_type} / thinking無効）…ニンジャソウル覚醒！"
+        else
+            tmux send-keys -t darkninja:main "$_darkninja_cmd"
+            tmux send-keys -t darkninja:main Enter
+            log_info "  └─ ダークニンジャ（${_darkninja_cli_type}）…ニンジャソウル覚醒！"
+        fi
+    ) &
 
-    # グレーターヤクザ（pane 0）: CLI Adapter経由でコマンド構築（デフォルト: Sonnet）
-    p=$((PANE_BASE + 0))
-    _gryakuza_cli_type="claude"
-    _gryakuza_cmd="claude --model sonnet --dangerously-skip-permissions"
-    if [ "$CLI_ADAPTER_LOADED" = true ]; then
-        _gryakuza_cli_type=$(get_cli_type "gryakuza")
-        _gryakuza_cmd=$(build_cli_command "gryakuza")
-    fi
-    # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
-    _startup_prompt=$(get_startup_prompt "gryakuza" 2>/dev/null)
-    if [[ -n "$_startup_prompt" ]]; then
-        _gryakuza_cmd="$_gryakuza_cmd \"$_startup_prompt\""
-    fi
-    tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_gryakuza_cli_type"
-    tmux send-keys -t "multiagent:agents.${p}" "$_gryakuza_cmd"
-    tmux send-keys -t "multiagent:agents.${p}" Enter
-    log_info "  └─ ${GRYAKUZA_CORP}のグレーターヤクザ（${_gryakuza_cli_type}）…配備完了！"
+    # グレーターヤクザ（pane 0）: CLI Adapter経由でコマンド構築（デフォルト: Sonnet、バックグラウンド起動）
+    (
+        p=$((PANE_BASE + 0))
+        _gryakuza_cli_type="claude"
+        _gryakuza_cmd="claude --model sonnet --dangerously-skip-permissions"
+        if [ "$CLI_ADAPTER_LOADED" = true ]; then
+            _gryakuza_cli_type=$(get_cli_type "gryakuza")
+            _gryakuza_cmd=$(build_cli_command "gryakuza")
+        fi
+        # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
+        _startup_prompt=$(get_startup_prompt "gryakuza" 2>/dev/null)
+        if [[ -n "$_startup_prompt" ]]; then
+            _gryakuza_cmd="$_gryakuza_cmd \"$_startup_prompt\""
+        fi
+        tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_gryakuza_cli_type"
+        tmux send-keys -t "multiagent:agents.${p}" "$_gryakuza_cmd"
+        tmux send-keys -t "multiagent:agents.${p}" Enter
+        log_info "  └─ ${GRYAKUZA_CORP}のグレーターヤクザ（${_gryakuza_cli_type}）…配備完了！"
+    ) &
 
     if [ "$KESSEN_MODE" = true ]; then
-        # 決戦の陣: CLI Adapter経由（claudeはOpus強制）
+        # 決戦の陣: CLI Adapter経由（claudeはOpus強制、並列起動）
         for i in {1..7}; do
-            p=$((PANE_BASE + i))
-            _yakuza_cli_type="claude"
-            _yakuza_cmd="claude --model opus --dangerously-skip-permissions"
-            if [ "$CLI_ADAPTER_LOADED" = true ]; then
-                _yakuza_cli_type=$(get_cli_type "yakuza${i}")
-                if [ "$_yakuza_cli_type" = "claude" ]; then
-                    _yakuza_cmd="claude --model opus --dangerously-skip-permissions"
-                else
-                    _yakuza_cmd=$(build_cli_command "yakuza${i}")
+            (
+                p=$((PANE_BASE + i))
+                _yakuza_cli_type="claude"
+                _yakuza_cmd="claude --model opus --dangerously-skip-permissions"
+                if [ "$CLI_ADAPTER_LOADED" = true ]; then
+                    _yakuza_cli_type=$(get_cli_type "yakuza${i}")
+                    if [ "$_yakuza_cli_type" = "claude" ]; then
+                        _yakuza_cmd="claude --model opus --dangerously-skip-permissions"
+                    else
+                        _yakuza_cmd=$(build_cli_command "yakuza${i}")
+                    fi
                 fi
-            fi
-            # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
-            _startup_prompt=$(get_startup_prompt "yakuza${i}" 2>/dev/null)
-            if [[ -n "$_startup_prompt" ]]; then
-                _yakuza_cmd="$_yakuza_cmd \"$_startup_prompt\""
-            fi
-            tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_yakuza_cli_type"
-            tmux send-keys -t "multiagent:agents.${p}" "$_yakuza_cmd"
-            tmux send-keys -t "multiagent:agents.${p}" Enter
+                # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
+                _startup_prompt=$(get_startup_prompt "yakuza${i}" 2>/dev/null)
+                if [[ -n "$_startup_prompt" ]]; then
+                    _yakuza_cmd="$_yakuza_cmd \"$_startup_prompt\""
+                fi
+                tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_yakuza_cli_type"
+                tmux send-keys -t "multiagent:agents.${p}" "$_yakuza_cmd"
+                tmux send-keys -t "multiagent:agents.${p}" Enter
+            ) &
         done
         log_info "  └─ ヤクザ1-7（ケッセンの陣）…全員Opus！ニンジャソウル覚醒！サツバツ！"
     else
-        # 平時の陣: CLI Adapter経由（デフォルト: 全ヤクザ=Sonnet）
+        # 平時の陣: CLI Adapter経由（デフォルト: 全ヤクザ=Sonnet、並列起動）
         for i in {1..7}; do
-            p=$((PANE_BASE + i))
-            _yakuza_cli_type="claude"
-            _yakuza_cmd="claude --model sonnet --dangerously-skip-permissions"
-            if [ "$CLI_ADAPTER_LOADED" = true ]; then
-                _yakuza_cli_type=$(get_cli_type "yakuza${i}")
-                _yakuza_cmd=$(build_cli_command "yakuza${i}")
-            fi
-            # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
-            _startup_prompt=$(get_startup_prompt "yakuza${i}" 2>/dev/null)
-            if [[ -n "$_startup_prompt" ]]; then
-                _yakuza_cmd="$_yakuza_cmd \"$_startup_prompt\""
-            fi
-            tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_yakuza_cli_type"
-            tmux send-keys -t "multiagent:agents.${p}" "$_yakuza_cmd"
-            tmux send-keys -t "multiagent:agents.${p}" Enter
+            (
+                p=$((PANE_BASE + i))
+                _yakuza_cli_type="claude"
+                _yakuza_cmd="claude --model sonnet --dangerously-skip-permissions"
+                if [ "$CLI_ADAPTER_LOADED" = true ]; then
+                    _yakuza_cli_type=$(get_cli_type "yakuza${i}")
+                    _yakuza_cmd=$(build_cli_command "yakuza${i}")
+                fi
+                # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
+                _startup_prompt=$(get_startup_prompt "yakuza${i}" 2>/dev/null)
+                if [[ -n "$_startup_prompt" ]]; then
+                    _yakuza_cmd="$_yakuza_cmd \"$_startup_prompt\""
+                fi
+                tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_yakuza_cli_type"
+                tmux send-keys -t "multiagent:agents.${p}" "$_yakuza_cmd"
+                tmux send-keys -t "multiagent:agents.${p}" Enter
+            ) &
         done
         log_info "  └─ ヤクザ1-7（ヘイジの陣）…生成完了！"
     fi
 
-    # ソウカイヤ（pane 8）: Opus Thinking — 戦略立案・設計判断専任
-    p=$((PANE_BASE + 8))
-    _soukaiya_cli_type="claude"
-    _soukaiya_cmd="claude --model opus --dangerously-skip-permissions"
-    if [ "$CLI_ADAPTER_LOADED" = true ]; then
-        _soukaiya_cli_type=$(get_cli_type "soukaiya")
-        _soukaiya_cmd=$(build_cli_command "soukaiya")
-    fi
-    # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
-    _startup_prompt=$(get_startup_prompt "soukaiya" 2>/dev/null)
-    if [[ -n "$_startup_prompt" ]]; then
-        _soukaiya_cmd="$_soukaiya_cmd \"$_startup_prompt\""
-    fi
-    tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_soukaiya_cli_type"
-    tmux send-keys -t "multiagent:agents.${p}" "$_soukaiya_cmd"
-    tmux send-keys -t "multiagent:agents.${p}" Enter
-    log_info "  └─ ソウカイヤ（${_soukaiya_cli_type} / Opus Thinking）…ニンジャソウル覚醒！ドーモ"
+    # ソウカイヤ（pane 8）: Opus Thinking — 戦略立案・設計判断専任（バックグラウンド起動）
+    (
+        p=$((PANE_BASE + 8))
+        _soukaiya_cli_type="claude"
+        _soukaiya_cmd="claude --model opus --dangerously-skip-permissions"
+        if [ "$CLI_ADAPTER_LOADED" = true ]; then
+            _soukaiya_cli_type=$(get_cli_type "soukaiya")
+            _soukaiya_cmd=$(build_cli_command "soukaiya")
+        fi
+        # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
+        _startup_prompt=$(get_startup_prompt "soukaiya" 2>/dev/null)
+        if [[ -n "$_startup_prompt" ]]; then
+            _soukaiya_cmd="$_soukaiya_cmd \"$_startup_prompt\""
+        fi
+        tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_soukaiya_cli_type"
+        tmux send-keys -t "multiagent:agents.${p}" "$_soukaiya_cmd"
+        tmux send-keys -t "multiagent:agents.${p}" Enter
+        log_info "  └─ ソウカイヤ（${_soukaiya_cli_type} / Opus Thinking）…ニンジャソウル覚醒！ドーモ"
+    ) &
+
+    # 全バックグラウンドジョブの完了を待機
+    wait
+    log_info "  └─ 全エージェント並列起動完了！カラテの速度で展開！"
 
     if [ "$KESSEN_MODE" = true ]; then
         log_success "✅ ケッセンの陣でデプロイ！全軍Opus！カラテが溢れている！！"
@@ -856,12 +872,12 @@ NINJA_EOF
     echo -e "                               \033[0;36m[ASCII Art: syntax-samurai/ryu - CC0 1.0 Public Domain]\033[0m"
     echo ""
 
-    echo "  ラオモトのClaude Code起動を待機中（最大30秒）..."
+    echo "  ラオモトのClaude Code起動を待機中（最大10秒）..."
 
-    # ダークニンジャの起動を確認（最大30秒待機）
-    for i in {1..30}; do
+    # ダークニンジャの起動を確認（最大10秒待機）【Phase 1高速化: 30秒→10秒】
+    for i in {1..10}; do
         if tmux capture-pane -t darkninja:main -p | grep -q "bypass permissions"; then
-            echo "  └─ ラオモト起動確認！（${i}秒）ニンジャソウル覚醒！ワザマエ！"
+            echo "  └─ 電脳IRC空間起動確認！（${i}秒）ニンジャソウル覚醒！ワザマエ！"
             break
         fi
         sleep 1
@@ -882,7 +898,7 @@ NINJA_EOF
     pkill -f "inbox_watcher.sh" 2>/dev/null || true
     pkill -f "inotifywait.*queue/inbox" 2>/dev/null || true
     pkill -f "fswatch.*queue/inbox" 2>/dev/null || true
-    sleep 1
+    sleep 0.3  # 【Phase 1高速化: 1秒→0.3秒】
 
     # ダークニンジャのwatcher（ntfy受信の自動起床に必要）
     # 安全モード: phase2/phase3エスカレーションは無効、timeout周期処理も無効（event-drivenのみ）
@@ -915,6 +931,17 @@ NINJA_EOF
     disown
 
     log_success "  └─ 10エージェント分のIRC監視起動完了！全チャンネル接続！ワザマエ！"
+
+    # ═══════════════════════════════════════════════════════════════════
+    # STEP 6.6.5: monitor_context.sh起動（コンテキスト監視・自動回復）
+    # ═══════════════════════════════════════════════════════════════════
+    log_info "📊 コンテキスト監視プロセスをスタート…ボディ・ガード起動！"
+
+    # launch_monitor.sh経由でバックグラウンドウィンドウに起動
+    bash "$SCRIPT_DIR/scripts/launch_monitor.sh" 2>&1 | tee -a "$SCRIPT_DIR/logs/monitor_context_launch.log"
+
+    log_success "  └─ コンテキスト監視起動完了！閾値: 30%警告/20%アラート/10%自動clear。ワザマエ！"
+    echo ""
 
     # STEP 6.7 は廃止 — CLAUDE.md Session Start (step 1: tmux agent_id) で各自が自律的に
     # 自分のinstructions/*.mdを読み込む。検証済み (2026-02-08)。
@@ -1038,7 +1065,7 @@ if [ "$SETUP_ONLY" = true ]; then
     echo ""
     echo "  手動でショウカンするには:"
     echo "  ┌──────────────────────────────────────────────────────────┐"
-    echo "  │  # ラオモトをショウカン                                              │"
+    echo "  │  # ダークニンジャをショウカン                                              │"
     echo "  │  tmux send-keys -t darkninja:main \\                      │"
     echo "  │    'claude --dangerously-skip-permissions' Enter         │"
     echo "  │                                                          │"

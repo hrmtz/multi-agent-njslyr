@@ -1,0 +1,45 @@
+task:
+  task_id: "{{task_id}}"
+  parent_cmd: "{{parent_cmd}}"
+  bloom_level: "{{bloom_level}}"
+  description: |
+    **自己研鑽: {{title}}**
+
+    **背景**:
+    タスク枯渇期間を活用し、スキル向上・知識習得を実施する。
+
+    **研鑽テーマ**:
+    {{training_theme}}
+
+    **学習目標**:
+    {{learning_goals}}
+
+    **作業内容**:
+    {{work_content}}
+
+    **作業手順**:
+    1. {{step1}}
+    2. {{step2}}
+    3. {{step3}}
+    4. 成果物作成（{{deliverable}}）
+    5. ソウカイヤにレビュー依頼（任意）
+
+    **成果物**:
+    {{deliverables}}
+
+    **Acceptance Criteria**:
+    - [ ] {{criteria1}}
+    - [ ] {{criteria2}}
+    - [ ] 成果物作成完了
+    - [ ] グレーターヤクザに報告完了
+
+    **Notes**:
+    - 低優先度タスク（P3）。緊急タスクが発生した場合は中断可
+    - タスク枯渇時のみ割り当て（「やることがないから待機」は禁止 - MEMORY.md）
+    - 成果物は実用的なものを優先（テスト、ドキュメント、スキル検証等）
+    {{notes}}
+
+  target_path: "{{target_path}}"
+  status: assigned
+  timestamp: "{{timestamp}}"
+  priority: P3

@@ -1,0 +1,42 @@
+task:
+  task_id: "{{task_id}}"
+  parent_cmd: "{{parent_cmd}}"
+  bloom_level: "{{bloom_level}}"
+  description: |
+    **ドキュメント更新: {{title}}**
+
+    **背景**:
+    {{background}}
+
+    **更新対象ドキュメント**:
+    {{target_document}}
+
+    **更新内容**:
+    {{update_content}}
+
+    **更新理由**:
+    {{update_reason}}
+
+    **作業手順**:
+    1. 対象ドキュメント（{{target_path}}）を読む
+    2. 更新箇所を特定
+    3. Editツールで更新（Writeは既存ファイル上書きのため避ける）
+    4. 更新後の整合性確認（リンク切れ、構文エラー等）
+    5. git diffで変更内容を確認
+    6. ソウカイヤにQC依頼（内容の正確性・完全性）
+
+    **Acceptance Criteria**:
+    - [ ] 指定箇所の更新完了
+    - [ ] ドキュメント構文エラーなし
+    - [ ] リンク切れなし
+    - [ ] 他セクションとの整合性確保
+    - [ ] ソウカイヤQC PASS
+
+    **Notes**:
+    - ドキュメント更新時は必ず既存内容をReadしてから実施
+    - 過剰な変更を避け、指示された箇所のみ更新
+    {{notes}}
+
+  target_path: "{{target_path}}"
+  status: assigned
+  timestamp: "{{timestamp}}"

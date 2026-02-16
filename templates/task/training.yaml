@@ -1,0 +1,30 @@
+task:
+  task_id: "{{task_id}}"
+  parent_cmd: "{{parent_cmd}}"
+  bloom_level: "{{bloom_level}}"
+  description: |
+    **自己研鑽: {{title}}**
+
+    **背景**:
+    タスク枯渇期間を活用し、スキル向上・知識習得を実施。
+
+    **学習目標**:
+    {{learning_goals}}
+
+    **作業内容**:
+    {{work_content}}
+
+    **Acceptance Criteria**:
+    {{acceptance_criteria}}
+
+    **Deliverables**:
+    {{deliverables}}
+
+    **Notes**:
+    - 低優先度タスク（P3）。緊急タスクが発生した場合は中断可
+    {{notes}}
+
+  target_path: "{{target_path}}"
+  status: assigned
+  timestamp: "{{timestamp}}"
+  priority: P3

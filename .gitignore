@@ -99,6 +99,8 @@
 # Docs
 !docs/
 !docs/philosophy.md
+!docs/gryakuza_faq.md
+!docs/gryakuza_advanced.md
 
 # Screenshots (masked — no secrets)
 !images/
@@ -144,3 +146,6 @@
 !.github/
 !.github/workflows/
 !.github/workflows/*.yml
+
+# Always exclude (overrides whitelist)
+.DS_Store

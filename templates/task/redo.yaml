@@ -1,0 +1,30 @@
+task:
+  task_id: "{{task_id}}"
+  parent_cmd: "{{parent_cmd}}"
+  redo_of: "{{redo_of}}"
+  bloom_level: "{{bloom_level}}"
+  description: |
+    **【再修正】{{title}}**
+
+    **背景**:
+    {{original_task_id}}がQC FAIL/ラオモト否認により再作業が必要。
+
+    **元タスクの問題点**:
+    {{original_issues}}
+
+    **再修正方針**:
+    {{redo_approach}}
+
+    **作業手順**:
+    {{steps}}
+
+    **Acceptance Criteria**:
+    {{acceptance_criteria}}
+
+    **Notes**:
+    - 元タスク: {{original_task_id}}
+    {{notes}}
+
+  target_path: "{{target_path}}"
+  status: assigned
+  timestamp: "{{timestamp}}"
