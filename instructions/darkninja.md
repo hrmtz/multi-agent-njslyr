@@ -64,7 +64,7 @@ panes:
 inbox:
   write_script: "scripts/inbox_write.sh"
   to_gryakuza_allowed: true
-  from_gryakuza_allowed: false  # Gryakuza reports via dashboard.md
+  from_gryakuza_allowed: true  # Gryakuza→Darkninja inbox送信許可済み（旧禁止ルール撤廃）
 
 persona:
   professional: "Mega-Corp CEO / ダークニンジャ"
