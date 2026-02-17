@@ -34,34 +34,114 @@ MODE="${1:-once}"
 
 # ─── Startup banner ───
 show_startup_banner() {
-    cat << 'EOF'
+    echo ""
+    # ═══════════════════════════════════════════════════════════════════════════
+    # ネオサイタマ電脳IRC切断シーケンス（yokubari.sh接続シーケンスの対）
+    # ═══════════════════════════════════════════════════════════════════════════
+    echo -e "\033[1;31m◆◆◆ SHUTDOWN ◆◆◆\033[0m  \033[1;33m電脳空間切断開始\033[0m  \033[1;31m◆◆◆ SHUTDOWN ◆◆◆\033[0m"
+    echo ""
+    echo -e "\033[1;35m卍\033[0m \033[0;37mネオサイタマ電脳IRCコトダマ空間から切断中...\033[0m"
+    sleep 0.3
+    echo -e "\033[1;31m  ✗\033[0m \033[0;37m#マッポーの世 チャネル離脱\033[0m"
+    sleep 0.3
+    echo -e "\033[1;31m  ✗\033[0m \033[0;37mコトダマ空間ソケット解放中\033[0m"
+    sleep 0.3
+    echo -e "\033[1;31m  ✗\033[0m \033[0;37mサイバーパンクプロトコル解除\033[0m"
+    sleep 0.3
+    echo -e "\033[1;31m  ✗\033[0m \033[0;37mUNIXニューロン認証解除\033[0m"
+    sleep 0.3
+    echo -e "\033[1;31m  ✗\033[0m \033[0;37mニンジャソウル・リンク切断\033[0m"
+    sleep 0.3
+    echo -e "\033[1;31m  サヨナラ！\033[0m \033[1;37m切断処理を開始する。\033[0m"
+    sleep 0.5
+    echo ""
 
-◆◆◆ SHUTDOWN ◆◆◆  電脳空間切断開始  ◆◆◆ SHUTDOWN ◆◆◆
+    # タイトルバナー（yokubari.shと同一のASCIIアート、赤枠＋終了テーマ）
+    echo ""
+    echo -e "\033[1;31m╔══════════════════════════════════════════════════════════════════════════╗\033[0m"
+    echo -e "\033[1;31m║\033[0m \033[1;33m███╗   ██╗     ██╗███████╗██╗  ██╗   ██╗██████╗                    \033[0m \033[1;31m║\033[0m"
+    echo -e "\033[1;31m║\033[0m \033[1;33m████╗  ██║     ██║██╔════╝██║  ╚██╗ ██╔╝██╔══██╗                   \033[0m \033[1;31m║\033[0m"
+    echo -e "\033[1;31m║\033[0m \033[1;33m██╔██╗ ██║     ██║███████╗██║   ╚████╔╝ ██████╔╝                   \033[0m \033[1;31m║\033[0m"
+    echo -e "\033[1;31m║\033[0m \033[1;33m██║╚██╗██║██   ██║╚════██║██║    ╚██╔╝  ██╔══██╗                   \033[0m \033[1;31m║\033[0m"
+    echo -e "\033[1;31m║\033[0m \033[1;33m██║ ╚████║╚█████╔╝███████║███████╗██║   ██║  ██║                   \033[0m \033[1;31m║\033[0m"
+    echo -e "\033[1;31m║\033[0m \033[1;33m╚═╝  ╚═══╝ ╚════╝ ╚══════╝╚══════╝╚═╝   ╚═╝  ╚═╝                   \033[0m \033[1;31m║\033[0m"
+    echo -e "\033[1;31m╠══════════════════════════════════════════════════════════════════════════╣\033[0m"
+    echo -e "\033[1;31m║\033[0m    \033[1;37mサヨナラ。ニンジャスレイヤーです。\033[0m  \033[1;31m☠\033[0m  \033[1;35mグワーッ！\033[0m                \033[1;31m║\033[0m"
+    echo -e "\033[1;31m╚══════════════════════════════════════════════════════════════════════════╝\033[0m"
+    echo ""
 
-卍 ネオサイタマ電脳IRCコトダマ空間から切断中...
-  ✗ #マッポーの世 チャネル離脱
-  ✗ サイバーパンクプロトコル解除
-  ✗ UNIXニューロン認証解除
-  サヨナラ！切断処理を開始する。
+    # ═══════════════════════════════════════════════════════════════════════════
+    # ドクロ紋章（yokubari.shのクローンヤクザ隊列AAの対・粛清の印）
+    # ═══════════════════════════════════════════════════════════════════════════
+    echo -e "\033[1;31m  ╔═══════════════════════════════════════════════════════════════════════╗\033[0m"
+    echo -e "\033[1;31m  ║\033[0m         \033[1;37m【 ニンジャスレイヤー ・ 粛清デーモン起動 】\033[0m                \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ╚═══════════════════════════════════════════════════════════════════════╝\033[0m"
+    echo ""
+    echo -e "                       \033[1;31m     ▄▄▄████████▄▄▄\033[0m"
+    echo -e "                       \033[1;31m   ▄██▀▀▀      ▀▀▀██▄\033[0m"
+    echo -e "                       \033[1;31m  ██▀   ▄▀▀▀▀▀▄   ▀██\033[0m"
+    echo -e "                       \033[1;31m ██   ▄█ \033[1;33m◉\033[1;31m    \033[1;33m◉\033[1;31m █▄   ██\033[0m"
+    echo -e "                       \033[1;31m ██   ██         ██   ██\033[0m"
+    echo -e "                       \033[1;31m  ██▄  ▀▀▄▄▲▄▄▀▀  ▄██\033[0m"
+    echo -e "                       \033[1;31m   ▀██▄ ▄█████▄ ▄██▀\033[0m"
+    echo -e "                       \033[1;31m     ▀▀███████████▀▀\033[0m"
+    echo ""
+    echo -e "                  \033[1;31m「「「 ニンジャ殺すべし、慈悲はない 」」」\033[0m"
+    echo ""
 
-EOF
+    # ═══════════════════════════════════════════════════════════════════════════
+    # 粛清モード情報（yokubari.shのシステム情報ボックスの対）
+    # ═══════════════════════════════════════════════════════════════════════════
+    echo -e "\033[1;33m  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\033[0m"
+    echo -e "\033[1;33m  ┃\033[0m  \033[1;37m粛清プロトコル\033[0m 〜 \033[1;31mオヒルネ・ニンジャ狩り\033[0m 〜                    \033[1;33m┃\033[0m"
+    echo -e "\033[1;33m  ┃\033[0m                                                                 \033[1;33m┃\033[0m"
+    echo -e "\033[1;33m  ┃\033[0m  \033[1;36mStage 1\033[0m: スリケン    \033[1;33mStage 2\033[0m: カラテチョップ    \033[1;31mStage 3\033[0m: スレイ  \033[1;33m┃\033[0m"
+    echo -e "\033[1;33m  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\033[0m"
+    echo ""
 }
 
 # ─── Completion banner ───
 show_completion_banner() {
     local slain_count="$1"
     local healthy_count="$2"
-    cat << EOF
 
-◆粛清完了: ${slain_count}体処理 / ${healthy_count}体健全◆
+    echo ""
+    # ═══════════════════════════════════════════════════════════════════════════
+    # コトダマ空間切断完了シーケンス（yokubari.sh接続完了の対）
+    # ═══════════════════════════════════════════════════════════════════════════
+    echo -e "\033[1;35m卍\033[0m \033[0;37mコトダマ空間切断シーケンス実行中...\033[0m"
+    sleep 0.3
+    echo -e "\033[1;31m  ✗\033[0m \033[0;37mニンジャソウル・リンク解放完了\033[0m"
+    sleep 0.3
+    echo -e "\033[1;31m  ✗\033[0m \033[0;37mエージェント監視ループ終了\033[0m"
+    sleep 0.3
+    echo -e "\033[1;31m  ✗\033[0m \033[0;37m電脳IRCソケット完全切断\033[0m"
+    sleep 0.3
+    echo -e "\033[1;31m  ✗\033[0m \033[0;37mコトダマ空間からのログアウト完了\033[0m"
+    sleep 0.3
 
-  ✓ ニンジャソウル消滅完了
-  ✓ 全エージェント停止完了
-  ✓ 電脳IRC切断完了
-
-サヨナラ！ニンジャスレイヤーは闇に消えた。
-
-EOF
+    echo ""
+    echo -e "\033[1;31m  ╔═══════════════════════════════════════════════════════════════════════╗\033[0m"
+    echo -e "\033[1;31m  ║\033[0m                                                                       \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ║\033[0m         \033[1;37m【 粛清結果報告 ・ インガオホー 】\033[0m                            \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ║\033[0m                                                                       \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ╠═══════════════════════════════════════════════════════════════════════╣\033[0m"
+    echo -e "\033[1;31m  ║\033[0m                                                                       \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ║\033[0m  \033[1;31m  ☠ 爆発四散:\033[0m ${slain_count}体                                                  \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ║\033[0m  \033[1;32m  ✓ 健全:\033[0m     ${healthy_count}体                                                  \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ║\033[0m                                                                       \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ╠═══════════════════════════════════════════════════════════════════════╣\033[0m"
+    echo -e "\033[1;31m  ║\033[0m  \033[1;32m✓\033[0m ニンジャソウル消滅完了                                          \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ║\033[0m  \033[1;32m✓\033[0m 全エージェント巡回完了                                          \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ║\033[0m  \033[1;32m✓\033[0m 電脳IRC切断完了                                                \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ║\033[0m  \033[1;32m✓\033[0m コトダマ空間ログアウト完了                                      \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ╠═══════════════════════════════════════════════════════════════════════╣\033[0m"
+    echo -e "\033[1;31m  ║\033[0m                                                                       \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ║\033[0m  \033[1;37mサヨナラ！ニンジャスレイヤーは闇に消えた。\033[0m                        \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ║\033[0m  \033[0;37mナムアミダブツ…\033[0m                                                   \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ║\033[0m                                                                       \033[1;31m║\033[0m"
+    echo -e "\033[1;31m  ╚═══════════════════════════════════════════════════════════════════════╝\033[0m"
+    echo ""
 }
 
 # ─── Logging ───
@@ -330,7 +410,7 @@ stage1_suriken() {
     local agent_id="$1"
     local reason="$2"
 
-    log "[KARATE] ${agent_id} に [スリケン] を投げた！理由: ${reason}"
+    log "[KARATE] イヤーッ！${agent_id} に [スリケン] を投擲！理由: ${reason}"
 
     local message="🔪 ニンジャスレイヤーのスリケン！inbox確認せよ。理由: ${reason}"
     bash "$SCRIPT_DIR/inbox_write.sh" "$agent_id" "$message" njslyr njslyr "" P1 2>/dev/null || true
@@ -345,7 +425,7 @@ stage2_chop() {
     local agent_id="$1"
     local reason="$2"
 
-    log "[KARATE] ${agent_id} に [チョップ] を放つ！理由: ${reason}"
+    log "[KARATE] ドゴォーン！${agent_id} に [カラテ・チョップ] を放つ！理由: ${reason}"
 
     local message="🥋 ニンジャスレイヤーのカラテ・チョップ！セッションリセットする。理由: ${reason}"
     bash "$SCRIPT_DIR/inbox_write.sh" "$agent_id" "$message" clear_command njslyr "" P0 2>/dev/null || true
@@ -397,13 +477,13 @@ stage3_slay() {
     local reason="$2"
     local pane_target="$3"
 
-    log "[SLAY] ツヨイ・カラテ！${agent_id} を粛清する！理由: ${reason}"
+    log "[SLAY] ◆ツヨイ・カラテ！◆ ${agent_id} を粛清する！ニンジャソウル消滅！理由: ${reason}"
 
     # Check restart loop
     if check_restart_loop "$agent_id"; then
-        log "ERROR: Restart loop detected for ${agent_id}. Stopping auto-slay."
+        log "アイエエエ！${agent_id} が再起動ループに陥っている！ニンジャの手に負えぬ。"
         update_dashboard "🚨 エージェント異常停止: ${agent_id} が30分以内に3回再起動。手動介入が必要。"
-        notify_darkninja "🚨 エージェント異常停止: ${agent_id} が再起動ループに陥りました。手動介入が必要です。" P0
+        notify_darkninja "🚨 アイエエエ！${agent_id} が再起動ループ！カラテでは解決できぬ。手動介入を求む。" P0
         log_execution "$agent_id" "Stage 3 (スレイ)" "blocked" "再起動ループ検知"
         return 1
     fi
@@ -483,7 +563,7 @@ SLAY_EOF
     fi
 
     # Step 5: Restart agent using respawn-pane (M3 fix - preserves grid layout)
-    log "Restarting ${agent_id} (type: ${agent_type}, model: ${model})..."
+    log "◆再ショウカン◆ ${agent_id}（type: ${agent_type}, model: ${model}）…ニンジャソウル再覚醒！"
     sleep 1
     tmux respawn-pane -k -t "$pane_target" "claude --model ${model} --dangerously-skip-permissions" 2>/dev/null || true
     sleep 2
@@ -495,7 +575,7 @@ SLAY_EOF
     # Step 7: Increment restart counter
     increment_restart_count "$agent_id"
 
-    log "復帰完了: ${agent_id} を再起動しました。"
+    log "◆復帰完了◆ ${agent_id} ニンジャソウル再覚醒！ワザマエ！"
     log_execution "$agent_id" "Stage 3 (スレイ)" "success" "$reason"
 
     return 0
@@ -710,7 +790,11 @@ main() {
         return 0
     fi
 
-    log "Monitoring agents: $(echo "$agents" | tr '\n' ' ')"
+    log "◆巡回対象◆ $(echo "$agents" | tr '\n' ' ')…ニンジャの目は逃さぬ"
+
+    # Display patrol targets
+    echo -e "\033[1;33m  ◆巡回開始◆\033[0m \033[0;37mオヒルネ・ニンジャを狩る。逃げ場はない。\033[0m"
+    echo ""
 
     # Check each agent
     while IFS= read -r agent_id; do
@@ -718,7 +802,8 @@ main() {
 
         # Special handling: darkninja is excluded
         if [[ "$agent_id" == "darkninja" ]]; then
-            log "SKIP: darkninja (human agent, excluded from purge)"
+            log "SKIP: darkninja（ラオモトのホンジン、粛清対象外）"
+            echo -e "  \033[1;35m  卍\033[0m \033[0;37m${agent_id}\033[0m … \033[1;35mラオモトのホンジン。粛清対象外。\033[0m"
             continue
         fi
 
@@ -729,22 +814,32 @@ main() {
             # For Phase 2, we apply same logic but Stage 2/3 are skipped in check_agent
         fi
 
-        check_agent "$agent_id" && healthy_count=$((healthy_count + 1)) || slain_count=$((slain_count + 1))
+        echo -ne "  \033[1;36m  ⚔\033[0m \033[0;37m${agent_id}\033[0m … "
+        if check_agent "$agent_id"; then
+            healthy_count=$((healthy_count + 1))
+            echo -e "\033[1;32m健全。カラテが足りている\033[0m"
+        else
+            slain_count=$((slain_count + 1))
+            echo -e "\033[1;31m☠ 爆発四散！サヨナラ！\033[0m"
+        fi
     done <<< "$agents"
+
+    echo ""
 
     show_completion_banner "$slain_count" "$healthy_count"
 
-    log "Execution complete. Slain: $slain_count, Healthy: $healthy_count"
+    log "◆実際完了◆ 爆発四散: ${slain_count}体 / 健全: ${healthy_count}体。ニンジャスレイヤーは闇に消えた。"
+    echo -e "\033[0;37m  ◆実際完了◆ ニンジャスレイヤーは電脳空間の闇に溶けた。ナムアミダブツ。\033[0m"
 }
 
 # ─── Entry point ───
 # Skip main execution if in testing mode (for bats tests)
 if [[ -z "${__NJSLYR_TESTING__:-}" ]]; then
     if [[ "$MODE" == "continuous" ]]; then
-        log "Starting continuous monitoring mode (15-minute intervals)"
+        log "◆常駐監視モード起動◆ 15分間隔で巡回する。ニンジャは決して眠らぬ。"
         while true; do
             main
-            log "Sleeping for 15 minutes..."
+            log "◆潜伏◆ 15分間…闇に潜む。"
             sleep 900  # 15 minutes
         done
     else
