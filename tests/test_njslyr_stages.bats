@@ -206,10 +206,10 @@ EOF
 
 @test "TC-S2: stage3_slay updates task YAML status to slayed_by_njslyr" {
     # 再起動カウンタなし（ループ検知されない）
-    rm -f "$TEST_METRICS_DIR/njslyr_restarts_test_agent.yaml"
+    rm -f "$TEST_METRICS_DIR/njslyr_restarts_yakuza3.yaml"
 
-    # タスクYAML作成
-    cat > "$TEST_TASKS_DIR/test_agent.yaml" << 'EOF'
+    # タスクYAML作成（yakuza3 = 有効なエージェントタイプ）
+    cat > "$TEST_TASKS_DIR/yakuza3.yaml" << 'EOF'
 task:
   task_id: "pre_slay_test_001"
   description: "テストタスク"
@@ -221,11 +221,11 @@ EOF
     export PATH="$MOCK_TMUX_DIR:$PATH"
 
     # stage3_slayを実行
-    run stage3_slay "test_agent" "test_slay_reason" "multiagent:1.3"
+    run stage3_slay "yakuza3" "test_slay_reason" "multiagent:1.3"
     [ "$status" -eq 0 ]
 
     # タスクYAMLのstatusが "slayed_by_njslyr" に更新されていることを確認
-    run grep 'status: slayed_by_njslyr' "$TEST_TASKS_DIR/test_agent.yaml"
+    run grep 'status: slayed_by_njslyr' "$TEST_TASKS_DIR/yakuza3.yaml"
     [ "$status" -eq 0 ]
 
     # 粛清ログが作成されていることを確認
@@ -236,7 +236,7 @@ EOF
     # 粛清ログの内容を検証
     local slay_log
     slay_log=$(ls -t "$TEST_LOG_DIR"/njslyr_slay_*.yaml | head -1)
-    grep -q 'agent_id: "test_agent"' "$slay_log"
+    grep -q 'agent_id: "yakuza3"' "$slay_log"
     grep -q 'task_id: "pre_slay_test_001"' "$slay_log"
     grep -q 'slay_reason: "test_slay_reason"' "$slay_log"
 }

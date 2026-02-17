@@ -531,7 +531,7 @@ stage3_slay() {
     pre_slay_task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${agent_id}"*.yaml 2>/dev/null | head -1)
     local current_task_id="unknown"
     if [[ -n "$pre_slay_task_yaml" && -f "$pre_slay_task_yaml" ]]; then
-        current_task_id=$(grep '^ *task_id: ' "$pre_slay_task_yaml" | head -1 | sed 's/.*task_id: *//;s/[" ]*$//' || echo "unknown")
+        current_task_id=$(grep '^ *task_id: ' "$pre_slay_task_yaml" | head -1 | sed 's/.*task_id: *//;s/^"//;s/"$//' || echo "unknown")
         log "Data preservation: タスクYAML状態更新 (${pre_slay_task_yaml})..."
         sed -i '' 's/^ *status: .*/  status: slayed_by_njslyr/' "$pre_slay_task_yaml" 2>/dev/null || true
     fi
