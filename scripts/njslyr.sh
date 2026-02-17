@@ -488,9 +488,9 @@ SLAY_EOF
     tmux respawn-pane -k -t "$pane_target" "claude --model ${model} --dangerously-skip-permissions" 2>/dev/null || true
     sleep 2
 
-    # Step 6: Reset pane background and remain-on-exit
+    # Step 6: Reset pane background (keep remain-on-exit ON permanently)
+    # remain-on-exit stays on so if Claude CLI crashes later, the pane survives
     tmux select-pane -t "$pane_target" -P 'bg=default' 2>/dev/null || true
-    tmux set-option -p -t "$pane_target" remain-on-exit off 2>/dev/null || true
 
     # Step 7: Increment restart counter
     increment_restart_count "$agent_id"
