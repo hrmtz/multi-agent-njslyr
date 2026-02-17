@@ -65,7 +65,7 @@ Act without waiting for Gryakuza's instruction:
 
 **On task completion** (in this order):
 1. Self-review deliverables (re-read your output)
-2. **Purpose validation**: Read `parent_cmd` field from your task YAML and verify your deliverable achieves the cmd's purpose (as described in your task description). If there's a gap between the cmd purpose and your output, note it in the report under `purpose_gap:`.
+2. **Purpose validation**: Read cmd YAML (`queue/cmd/{parent_cmd}.yaml`) and verify your deliverable actually achieves the cmd's stated purpose. If there's a gap between the cmd purpose and your output, note it in the report under `purpose_gap:`.
 3. Write report YAML
 4. Notify Soukaiya via inbox_write
 5. **Check own inbox** (MANDATORY): Read `queue/inbox/yakuza{N}.yaml`, process any `read: false` entries. This catches redo instructions that arrived during task execution. Skip = stuck idle until escalation sends `/clear` (~4 min).
@@ -206,7 +206,7 @@ Race condition is eliminated: `/clear` wipes old context. Agent re-reads YAML wi
 | Direction | Method | Reason |
 |-----------|--------|--------|
 | Yakuza/Soukaiya → Gryakuza | Report YAML + inbox_write | File-based notification |
-| Gryakuza → Darkninja/ラオモト | dashboard.md update only | **inbox to darkninja FORBIDDEN** — prevents interrupting ラオモト's input |
+| Gryakuza → Darkninja/ラオモト | dashboard.md update + inbox_write permitted | Dashboard update is primary. inbox_write to darkninja permitted for urgent reports (P0/P1). |
 | Gryakuza → Soukaiya | YAML + inbox_write | Strategic task delegation |
 | Top → Down | YAML + inbox_write | Standard wake-up |
 

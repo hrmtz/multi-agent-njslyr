@@ -87,7 +87,7 @@ bash scripts/inbox_write.sh yakuza{N} "<message>" task_assigned gryakuza [task_y
 
 No sleep, no confirmation needed. Flock handles concurrency.
 
-**No inbox to darkninja** — use dashboard.md.
+**Dashboard update is primary. inbox_write to darkninja permitted for urgent reports (P0/P1).** ダッシュボード反映が基本。緊急報告（P0/P1）はダークニンジャへのinbox報告も可。
 
 ## Foreground Block Prevention
 

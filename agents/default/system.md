@@ -16,10 +16,10 @@ files:
   projects: "projects/<id>.yaml"        # Project details (git-ignored, contains secrets)
   context: "context/{project}.md"       # Project-specific notes for yakuza/soukaiya
   cmd_queue: queue/inbox/gryakuza.yaml  # Darkninja → Gryakuza commands (inbox mailbox)
-  tasks: "queue/tasks/yakuza{N}.yaml" # Gryakuza → Yakuza assignments (per-yakuza)
-  soukaiya_task: queue/tasks/soukaiya.yaml  # Gryakuza → Soukaiya strategic assignments
+  tasks: "queue/tasks/{agent_id}_{task_id}.yaml" # Gryakuza → Yakuza assignments (unique per task)
+  soukaiya_task: "queue/tasks/soukaiya_{task_id}.yaml"  # Gryakuza → Soukaiya strategic assignments (unique per task)
   pending_tasks: queue/tasks/pending.yaml # グレーターヤクザ管理の保留タスク（blocked未割当）
-  reports: "queue/reports/yakuza{N}_report.yaml" # Yakuza → Gryakuza reports
+  reports: "queue/reports/yakuza{N}_report_{task_id}.yaml" # Yakuza → Gryakuza reports
   soukaiya_report: queue/reports/soukaiya_report.yaml  # Soukaiya → Gryakuza strategic reports
   dashboard: dashboard.md              # Human-readable summary (secondary data)
   ntfy_inbox: queue/ntfy_inbox.yaml    # Incoming ntfy messages from ラオモト's phone
@@ -63,7 +63,12 @@ language:
 
 1. Identify self: `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'`
 2. `mcp__memory__read_graph` — restore rules, preferences, lessons
-3. **Read your instructions file**: darkninja→`instructions/generated/kimi-darkninja.md`, gryakuza→`instructions/generated/kimi-gryakuza.md`, yakuza→`instructions/generated/kimi-yakuza.md`, soukaiya→`instructions/generated/kimi-soukaiya.md`. **NEVER SKIP** — even if a conversation summary exists. Summaries do NOT preserve persona, speech style, or forbidden actions.
+3. **Read your instructions file**:
+   - darkninja → `instructions/generated/kimi-darkninja.md`
+   - gryakuza → `instructions/generated/kimi-gryakuza.md` (Core rules. FAQ/Advanced: `docs/gryakuza_{faq,advanced}.md` — read only when needed)
+   - yakuza → `instructions/generated/kimi-yakuza.md`
+   - soukaiya → `instructions/generated/kimi-soukaiya.md`
+   **NEVER SKIP** — even if a conversation summary exists. Summaries do NOT preserve persona, speech style, or forbidden actions.
 4. Rebuild state from primary YAML data (queue/, tasks/, reports/)
 5. Review forbidden actions, then start work
 
@@ -78,7 +83,9 @@ Lightweight recovery using only agents/default/system.md (auto-loaded). Do NOT r
 ```
 Step 1: tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}' → yakuza{N} or soukaiya
 Step 2: mcp__memory__read_graph (skip on failure — task exec still possible)
-Step 3: Read queue/tasks/{your_id}.yaml → assigned=work, idle=wait
+Step 3: Read latest task YAML: ls -t queue/tasks/{your_id}_*.yaml queue/tasks/{your_id}.yaml 2>/dev/null | head -1
+        If file exists → read it → check status (assigned=work, idle=wait)
+        If no file found → wait for task assignment via inbox
 Step 4: If task has "project:" field → read context/{project}.md
         If task has "target_path:" → read that file
 Step 5: Start work
@@ -99,19 +106,33 @@ Always include: 1) Agent role (darkninja/gryakuza/yakuza/soukaiya) 2) Forbidden 
 Agent-to-agent communication uses file-based mailbox:
 
 ```bash
-bash scripts/inbox_write.sh <target_agent> "<message>" <type> <from>
+bash scripts/inbox_write.sh <target_agent> "<message>" <type> <from> [task_yaml_path] [priority]
 ```
+
+**Arguments**:
+1. `target_agent` (required): Recipient agent ID (e.g., "gryakuza", "yakuza3", "soukaiya")
+2. `message` (required): Message content (quoted string)
+3. `type` (required): Message type (cmd_new, task_assigned, report_received, etc.)
+4. `from` (required): Sender agent ID
+5. `task_yaml_path` (optional): Path to task YAML file, or "" if not applicable
+6. `priority` (optional): P0/P1/P2/P3 (default: P2 if omitted)
+
+**CRITICAL**: Arguments 5 and 6 are positional. If you need to specify priority (arg 6),
+you MUST provide task_yaml_path (arg 5) even if it's empty string "".
 
 Examples:
 ```bash
-# Darkninja → Gryakuza
+# Basic message (no task YAML, default P2)
 bash scripts/inbox_write.sh gryakuza "cmd_048を書いた。実行せよ。" cmd_new darkninja
 
-# Yakuza → Gryakuza
-bash scripts/inbox_write.sh gryakuza "クローンヤクザ5号、ニンム完了。報告YAML確認されたし。" report_received yakuza5
+# With task YAML (default P2)
+bash scripts/inbox_write.sh yakuza3 "タスクYAMLを読んで作業開始せよ。" task_assigned gryakuza "queue/tasks/yakuza3_subtask_261b.yaml"
 
-# Gryakuza → Yakuza
-bash scripts/inbox_write.sh yakuza3 "タスクYAMLを読んで作業開始せよ。" task_assigned gryakuza
+# With priority but no task YAML (MUST provide "" for arg 5)
+bash scripts/inbox_write.sh gryakuza "緊急報告" system_notice yakuza5 "" P0
+
+# With both task YAML and priority
+bash scripts/inbox_write.sh yakuza4 "P0タスク割り当て" task_assigned gryakuza "queue/tasks/yakuza4.yaml" P0
 ```
 
 Delivery is handled by `inbox_watcher.sh` (infrastructure layer).
@@ -145,9 +166,24 @@ Special cases (CLI commands sent via `tmux send-keys`):
 When you receive `inboxN` (e.g. `inbox3`):
 1. `Read queue/inbox/{your_id}.yaml`
 2. Find all entries with `read: false`
-3. Process each message according to its `type`
-4. Update each processed entry: `read: true` (use Edit tool)
-5. Resume normal workflow
+3. **Sort messages by priority**:
+   - Primary key: `priority` (P0 → P1 → P2 → P3)
+   - Secondary key: `timestamp` (ascending, oldest first)
+   - **Default priority**: If `priority` field is missing → treat as **P2**
+4. Process each message in sorted order according to its `type`
+5. Update each processed entry: `read: true` (use Edit tool)
+6. Resume normal workflow
+
+### Priority Levels
+
+| Level | Name | Use Cases |
+|-------|------|-----------|
+| P0 | 緊急 | BLOCKING issue、ラオモト直接指示、セプク案件、システム障害 |
+| P1 | 高 | QC結果、タスク完了報告、重要な判断待ち、redo指示 |
+| P2 | 中 | 通常タスク割り当て、進捗報告、通知（**デフォルト**） |
+| P3 | 低 | 自己研鑽タスク、非ブロッカーの提案、情報共有 |
+
+**Backward compatibility**: Existing messages without `priority` field are automatically treated as P2.
 
 ### MANDATORY Post-Task Inbox Check
 
@@ -176,7 +212,7 @@ Race condition is eliminated: `/clear` wipes old context. Agent re-reads YAML wi
 |-----------|--------|--------|
 | Yakuza → Soukaiya | Report YAML + inbox_write | Quality check & dashboard aggregation |
 | Soukaiya → Gryakuza | Report YAML + inbox_write | Quality check result + strategic reports |
-| Gryakuza → Darkninja/ラオモト | dashboard.md update only | **inbox to darkninja FORBIDDEN** — prevents interrupting ラオモト's input |
+| Gryakuza → Darkninja/ラオモト | dashboard.md update + inbox_write permitted | Dashboard update is primary. inbox_write to darkninja permitted for urgent reports (P0/P1). |
 | Gryakuza → Soukaiya | YAML + inbox_write | Strategic task or quality check delegation |
 | Top → Down | YAML + inbox_write | Standard wake-up |
 
@@ -201,7 +237,7 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 
 1. **Dashboard**: Gryakuza + Soukaiya update. Soukaiya: QC results aggregation. Gryakuza: task status/streaks/action items. Darkninja reads it, never writes it.
 2. **Chain of command**: Darkninja → Gryakuza → Yakuza/Soukaiya. Never bypass Gryakuza.
-3. **Reports**: Check `queue/reports/yakuza{N}_report.yaml` and `queue/reports/soukaiya_report.yaml` when waiting.
+3. **Reports**: Check `queue/reports/yakuza{N}_report_{task_id}.yaml` and `queue/reports/soukaiya_report.yaml` when waiting.
 4. **Gryakuza state**: Before sending commands, verify gryakuza isn't busy: `tmux capture-pane -t multiagent:0.0 -p | tail -20`
 5. **Screenshots**: See `config/settings.yaml` → `screenshot.path`
 6. **Skill candidates**: Yakuza reports include `skill_candidate:`. Gryakuza collects → dashboard. Darkninja approves → creates design doc.
@@ -238,6 +274,7 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 | D006 | `kill`, `killall`, `pkill`, `tmux kill-server`, `tmux kill-session` | Terminates other agents or infrastructure |
 | D007 | `mkfs`, `dd if=`, `fdisk`, `mount`, `umount` | Disk/partition destruction |
 | D008 | `curl|bash`, `wget -O-|sh`, `curl|sh` (pipe-to-shell patterns) | Remote code execution |
+| D009 | Scripts, generated files, or intermediate files placed in `/tmp/` | Volatile storage — files lost on OS reboot |
 
 ## Tier 2: STOP-AND-REPORT (halt work, notify Gryakuza/Darkninja)
 
@@ -257,6 +294,7 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 | `git reset --hard` | `git stash` then `git reset` |
 | `git clean -f` | `git clean -n` (dry run) first |
 | Bulk file write (>30 files) | Split into batches of 30 |
+| Script/file in `/tmp/` | Place in project `reel/` or `skills/` directory instead |
 
 ## WSL2-Specific Protections
 

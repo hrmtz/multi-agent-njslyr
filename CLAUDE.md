@@ -19,7 +19,7 @@ files:
   tasks: "queue/tasks/{agent_id}_{task_id}.yaml" # Gryakuza → Yakuza assignments (unique per task)
   soukaiya_task: "queue/tasks/soukaiya_{task_id}.yaml"  # Gryakuza → Soukaiya strategic assignments (unique per task)
   pending_tasks: queue/tasks/pending.yaml # グレーターヤクザ管理の保留タスク（blocked未割当）
-  reports: "queue/reports/yakuza{N}_report.yaml" # Yakuza → Gryakuza reports
+  reports: "queue/reports/yakuza{N}_report_{task_id}.yaml" # Yakuza → Gryakuza reports
   soukaiya_report: queue/reports/soukaiya_report.yaml  # Soukaiya → Gryakuza strategic reports
   dashboard: dashboard.md              # Human-readable summary (secondary data)
   ntfy_inbox: queue/ntfy_inbox.yaml    # Incoming ntfy messages from ラオモト's phone
@@ -212,7 +212,7 @@ Race condition is eliminated: `/clear` wipes old context. Agent re-reads YAML wi
 |-----------|--------|--------|
 | Yakuza → Soukaiya | Report YAML + inbox_write | Quality check & dashboard aggregation |
 | Soukaiya → Gryakuza | Report YAML + inbox_write | Quality check result + strategic reports |
-| Gryakuza → Darkninja/ラオモト | dashboard.md update only | **inbox to darkninja FORBIDDEN** — prevents interrupting ラオモト's input |
+| Gryakuza → Darkninja/ラオモト | dashboard.md update + inbox_write permitted | Dashboard update is primary. inbox_write to darkninja permitted for urgent reports (P0/P1). |
 | Gryakuza → Soukaiya | YAML + inbox_write | Strategic task or quality check delegation |
 | Top → Down | YAML + inbox_write | Standard wake-up |
 
@@ -237,7 +237,7 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 
 1. **Dashboard**: Gryakuza + Soukaiya update. Soukaiya: QC results aggregation. Gryakuza: task status/streaks/action items. Darkninja reads it, never writes it.
 2. **Chain of command**: Darkninja → Gryakuza → Yakuza/Soukaiya. Never bypass Gryakuza.
-3. **Reports**: Check `queue/reports/yakuza{N}_report.yaml` and `queue/reports/soukaiya_report.yaml` when waiting.
+3. **Reports**: Check `queue/reports/yakuza{N}_report_{task_id}.yaml` and `queue/reports/soukaiya_report.yaml` when waiting.
 4. **Gryakuza state**: Before sending commands, verify gryakuza isn't busy: `tmux capture-pane -t multiagent:0.0 -p | tail -20`
 5. **Screenshots**: See `config/settings.yaml` → `screenshot.path`
 6. **Skill candidates**: Yakuza reports include `skill_candidate:`. Gryakuza collects → dashboard. Darkninja approves → creates design doc.
