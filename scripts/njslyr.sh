@@ -35,14 +35,14 @@ MODE="${1:-once}"
 # ─── Startup banner ───
 show_startup_banner() {
     cat << 'EOF'
-◆◆◆ Wasshoi!!!! ◆◆◆
-ニンジャスレイヤーがエントリーした。
 
-    ／￣￣￣＼
-   ／ ● ● ● ＼
-  ｜ ▲ ▲ ▲ ▲｜  [赤黒いニンジャ装束]
-   ＼ ■ ■ ■／
-    ￣￣￣￣
+◆◆◆ SHUTDOWN ◆◆◆  電脳空間切断開始  ◆◆◆ SHUTDOWN ◆◆◆
+
+卍 ネオサイタマ電脳IRCコトダマ空間から切断中...
+  ✗ #マッポーの世 チャネル離脱
+  ✗ サイバーパンクプロトコル解除
+  ✗ UNIXニューロン認証解除
+  サヨナラ！切断処理を開始する。
 
 EOF
 }
@@ -54,7 +54,12 @@ show_completion_banner() {
     cat << EOF
 
 ◆粛清完了: ${slain_count}体処理 / ${healthy_count}体健全◆
-ニンジャスレイヤーは闇に消えた。
+
+  ✓ ニンジャソウル消滅完了
+  ✓ 全エージェント停止完了
+  ✓ 電脳IRC切断完了
+
+サヨナラ！ニンジャスレイヤーは闇に消えた。
 
 EOF
 }
@@ -134,6 +139,30 @@ notify_darkninja() {
     bash "$SCRIPT_DIR/inbox_write.sh" darkninja "$message" system_notice njslyr "" "$priority" 2>/dev/null || true
 }
 
+# ─── バリキドリンク投与・解除ヘルパー関数 ───
+# Usage:
+#   inject_barikidorink "multiagent:0.1"   # yakuza1にOpus投与
+#   detox_barikidorink "multiagent:0.1"    # yakuza1をSonnetに復帰
+inject_barikidorink() {
+    local pane=$1
+    tmux send-keys -t "$pane" "/model opus" Enter
+    sleep 0.5
+    tmux set-option -p -t "$pane" @model_name "Opus"
+    tmux select-pane -t "$pane" -P 'bg=#1a002e'
+    sleep 0.3
+    tmux send-keys -t "$pane" "/clear" Enter
+}
+
+detox_barikidorink() {
+    local pane=$1
+    tmux send-keys -t "$pane" "/model sonnet" Enter
+    sleep 0.5
+    tmux set-option -p -t "$pane" @model_name "Sonnet"
+    tmux select-pane -t "$pane" -P 'bg=default'
+    sleep 0.3
+    tmux send-keys -t "$pane" "/clear" Enter
+}
+
 # ─── Get all monitored agents ───
 get_monitored_agents() {
     # Dynamically detect agents from yokubari.sh process list
@@ -175,7 +204,7 @@ get_pane_target() {
     local agent_id="$1"
     # Find pane with matching @agent_id
     tmux list-panes -t multiagent -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
-        awk -v id="$agent_id" '$2 == id {print "multiagent:0." $1; exit}'
+        awk -v id="$agent_id" '$2 == id {print "multiagent:1." $1; exit}'
 }
 
 # ─── Agent busy detection (from inbox_watcher.sh pattern) ───
@@ -336,19 +365,19 @@ generate_death_cry() {
 
     # 辞世の句コレクション (5-7-5 or 爆発四散)
     local -a haiku=(
-        "     ║    散りてなお    赤き炎の    ヤクザ道 ║"
-        "     ║    春風に    コンテキスト散る    無常 ║"
-        "     ║    令月に    YAMLの海に    沈みけり   ║"
-        "     ║    冬の夜    ソケット冷えて    ニンジャ死す ║"
-        "     ║    品質は    レビューの彼方    QC散る  ║"
-        "     ║    朝露の    如くトークン    消えにけり ║"
+        "     ║    散りてなお    赤き炎の    ヤクザ道                                        ║"
+        "     ║    春風に    コンテキスト散る    無常                                        ║"
+        "     ║    令月に    YAMLの海に    沈みけり                                          ║"
+        "     ║    冬の夜    ソケット冷えて    ニンジャ死す                                  ║"
+        "     ║    品質は    レビューの彼方    QC散る                                        ║"
+        "     ║    朝露の    如くトークン    消えにけり                                      ║"
     )
 
     local -a bakuhatsu=(
-        "     ║    アイエエエエ！ナンデ！？          ║\n     ║    グワーッ！！爆発四散！！          ║"
-        "     ║    グワーッ！！                      ║\n     ║    「タスクが…まだ…」爆発四散！！   ║"
-        "     ║    アイエエエ！スレイ！スレイ！       ║\n     ║    「オヌシのカラテは弱い」          ║"
-        "     ║    グワーッ！！                      ║\n     ║    「ラオモト＝サン…スミマセン…」   ║"
+        "     ║    アイエエエエ！ナンデ！？                                                  ║\n     ║    グワーッ！！爆発四散！！                                                  ║"
+        "     ║    グワーッ！！                                                              ║\n     ║    「タスクが…まだ…」爆発四散！！                                            ║"
+        "     ║    アイエエエ！スレイ！スレイ！                                              ║\n     ║    「オヌシのカラテは弱い」                                                  ║"
+        "     ║    グワーッ！！                                                              ║\n     ║    「ラオモト＝サン…スミマセン…」                                            ║"
     )
 
     # 50/50 chance: haiku or 爆発四散
@@ -379,6 +408,47 @@ stage3_slay() {
         return 1
     fi
 
+    # ─── Pre-slay data preservation (cmd_277) ───
+
+    # Data preservation Step 1: 粛清予告（ダッシュボード記載）
+    log "Data preservation: 粛清予告をダッシュボードに記載..."
+    update_dashboard "◆${agent_id}を粛清予定。データ保存中..."
+
+    # Data preservation Step 2: /compact送信（コンテキスト保存）
+    log "Data preservation: /compact送信中..."
+    tmux send-keys -t "$pane_target" "/compact" Enter 2>/dev/null || true
+    sleep 5  # サマリー生成待機
+
+    # Data preservation Step 3: タスクYAML状態更新
+    local pre_slay_task_yaml
+    pre_slay_task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${agent_id}"*.yaml 2>/dev/null | head -1)
+    local current_task_id="unknown"
+    if [[ -n "$pre_slay_task_yaml" && -f "$pre_slay_task_yaml" ]]; then
+        current_task_id=$(grep '^ *task_id: ' "$pre_slay_task_yaml" | head -1 | sed 's/.*task_id: *//;s/[" ]*$//' || echo "unknown")
+        log "Data preservation: タスクYAML状態更新 (${pre_slay_task_yaml})..."
+        sed -i '' 's/^ *status: .*/  status: slayed_by_njslyr/' "$pre_slay_task_yaml" 2>/dev/null || true
+    fi
+
+    # Data preservation Step 4: 粛清ログ記録
+    local slay_timestamp
+    slay_timestamp=$(date '+%Y-%m-%dT%H:%M:%S')
+    local slay_log="$LOG_DIR/njslyr_slay_${slay_timestamp//:/-}.yaml"
+    log "Data preservation: 粛清ログ記録 (${slay_log})..."
+    mkdir -p "$LOG_DIR"
+    cat > "$slay_log" << SLAY_EOF
+agent_id: "${agent_id}"
+task_id: "${current_task_id}"
+slay_reason: "${reason}"
+timestamp: "${slay_timestamp}"
+task_yaml_path: "${pre_slay_task_yaml:-none}"
+SLAY_EOF
+
+    # ─── End pre-slay data preservation ───
+
+    # Step 0: Prevent pane from closing when process dies
+    # Without this, killing the process may close the pane and shrink the tmux window
+    tmux set-option -p -t "$pane_target" remain-on-exit on 2>/dev/null || true
+
     # Step 1: Turn pane background red
     log "Turning ${pane_target} background to RED..."
     tmux select-pane -t "$pane_target" -P 'bg=red' 2>/dev/null || true
@@ -387,7 +457,7 @@ stage3_slay() {
     local death_cry
     death_cry=$(generate_death_cry "$agent_id")
     log "断末魔: ${agent_id}"
-    tmux respawn-pane -k -t "$pane_target" "bash -c 'printf \"\033[2J\033[H\n\n\n\033[1;37;41m\n\n     ╔══════════════════════════════════════╗\n     ║    ＜＜＜ SLAY ＞＞＞               ║\n     ║                                      ║\n${death_cry}\n     ║                                      ║\n     ║    【 ${agent_id} — 爆発四散！ 】\n     ╚══════════════════════════════════════╝\n\n     サヨナラ！\033[0m\n\"; sleep 999999'" 2>/dev/null || true
+    tmux respawn-pane -k -t "$pane_target" "bash -c 'printf \"\033[2J\033[H\n\n\n\033[1;37;41m\n\n     ╔══════════════════════════════════════════════════════════════════════════╗\n     ║    ＜＜＜ SLAY ＞＞＞                                                   ║\n     ║                                                                          ║\n${death_cry}\n     ║                                                                          ║\n     ║    【 ${agent_id} — 爆発四散！ 】                                  ║\n     ╚══════════════════════════════════════════════════════════════════════════╝\n\n     ◆ニンジャソウル消滅◆ サヨナラ！\033[0m\n\"; sleep 999999'" 2>/dev/null || true
     sleep 3
 
     # Step 3: Determine agent type for restart command
@@ -418,10 +488,11 @@ stage3_slay() {
     tmux respawn-pane -k -t "$pane_target" "claude --model ${model} --dangerously-skip-permissions" 2>/dev/null || true
     sleep 2
 
-    # Step 6: Reset pane background to default
+    # Step 6: Reset pane background and remain-on-exit
     tmux select-pane -t "$pane_target" -P 'bg=default' 2>/dev/null || true
+    tmux set-option -p -t "$pane_target" remain-on-exit off 2>/dev/null || true
 
-    # Step 6: Increment restart counter
+    # Step 7: Increment restart counter
     increment_restart_count "$agent_id"
 
     log "復帰完了: ${agent_id} を再起動しました。"
