@@ -17,7 +17,8 @@ LOG_DIR="$PROJECT_ROOT/queue/logs"
 METRICS_DIR="$PROJECT_ROOT/queue/metrics"
 STATE_DIR="$PROJECT_ROOT/.state"
 
-mkdir -p "$LOG_DIR" "$METRICS_DIR" "$STATE_DIR"
+CACHE_DIR="$PROJECT_ROOT/queue/.cache"
+mkdir -p "$LOG_DIR" "$METRICS_DIR" "$STATE_DIR" "$CACHE_DIR"
 
 # ─── Thresholds (seconds) ───
 IDLE_TIMEOUT=300           # 5 minutes idle without task
@@ -211,7 +212,7 @@ update_dashboard() {
 
         if grep -q "^## 🚨ヨウタイオウ" "$DASHBOARD"; then
             local temp_file
-            temp_file=$(mktemp)
+            temp_file=$(TMPDIR="$CACHE_DIR" mktemp)
             awk -v msg="$message" '
                 /^## 🚨ヨウタイオウ/ {
                     print

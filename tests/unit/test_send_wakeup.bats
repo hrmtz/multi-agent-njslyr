@@ -100,6 +100,10 @@ tmux() {
         echo "\${MOCK_PANE_CLI:-}"
         return 0
     fi
+    if echo "\$*" | grep -q "list-panes"; then
+        echo "\$AGENT_ID \$PANE_TARGET"
+        return 0
+    fi
     if echo "\$*" | grep -q "display-message"; then
         echo "mock_pane"
         return 0
@@ -120,6 +124,7 @@ HARNESS
 
 teardown() {
     rm -rf "$TEST_TMPDIR"
+    rm -f /tmp/inbox_watcher_busy_cache_test_agent 2>/dev/null
 }
 
 # --- T-SW-001: self-watch active → skip nudge ---
@@ -160,8 +165,9 @@ MOCK
     [ "$status" -eq 0 ]
 
     # Text and Enter are sent as separate send-keys calls (Codex TUI compatibility)
-    grep -q "send-keys -t test:0.0 inbox3" "$MOCK_LOG"
-    grep -q "send-keys -t test:0.0 Enter" "$MOCK_LOG"
+    # Nudge format: スリケン！inbox3 (subtask_263a)
+    grep -q "send-keys.*test:0.0.*inbox3" "$MOCK_LOG"
+    grep -q "send-keys.*test:0.0.*Enter" "$MOCK_LOG"
 }
 
 # --- T-SW-004: send-keys failure → return 1 ---
@@ -713,4 +719,85 @@ PY
 
     ! grep -q "send-keys.*/model" "$MOCK_LOG"
     echo "$output" | grep -q "not supported on copilot"
+}
+
+# --- T-DRIFT-001: resolve_pane_target resolves via @agent_id ---
+
+@test "T-DRIFT-001: resolve_pane_target resolves pane via @agent_id lookup" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        resolve_pane_target
+        echo "PANE_TARGET=$PANE_TARGET"
+    '
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "PANE_TARGET=test:0.0"
+    grep -q "list-panes" "$MOCK_LOG"
+}
+
+# --- T-DRIFT-002: resolve_pane_target falls back when @agent_id not found ---
+
+@test "T-DRIFT-002: resolve_pane_target falls back to startup target when agent not found" {
+    # Override mock: list-panes returns no matching agent
+    export MOCK_LIST_PANES_OUTPUT=""
+
+    cat > "$TEST_TMPDIR/test_harness_drift.sh" << DRIFTHARNESS
+#!/bin/bash
+AGENT_ID="test_agent"
+PANE_TARGET="test:0.0"
+CLI_TYPE="claude"
+INBOX="$TEST_INBOX_DIR/test_agent.yaml"
+LOCKFILE="\${INBOX}.lock"
+SCRIPT_DIR="$PROJECT_ROOT"
+
+tmux() {
+    echo "tmux \$*" >> "$MOCK_LOG"
+    if echo "\$*" | grep -q "list-panes"; then
+        echo "other_agent %99"
+        return 0
+    fi
+    if echo "\$*" | grep -q "capture-pane"; then echo ""; return 0; fi
+    if echo "\$*" | grep -q "send-keys"; then return 0; fi
+    if echo "\$*" | grep -q "show-options"; then echo ""; return 0; fi
+    if echo "\$*" | grep -q "display-message"; then echo "mock"; return 0; fi
+    return 0
+}
+timeout() { shift; "\$@"; }
+pgrep() { exit 1; }
+sleep() { :; }
+export -f tmux timeout pgrep sleep
+
+export __INBOX_WATCHER_TESTING__=1
+source "$WATCHER_SCRIPT"
+DRIFTHARNESS
+    chmod +x "$TEST_TMPDIR/test_harness_drift.sh"
+
+    run bash -c '
+        source "'"$TEST_TMPDIR/test_harness_drift.sh"'"
+        _RESOLVE_CACHE_TS=0
+        resolve_pane_target
+        echo "PANE_TARGET=$PANE_TARGET"
+    '
+    [ "$status" -eq 0 ]
+    # Falls back to startup value
+    echo "$output" | grep -q "PANE_TARGET=test:0.0"
+}
+
+# --- T-DRIFT-003: resolve_pane_target uses cache within TTL ---
+
+@test "T-DRIFT-003: resolve_pane_target uses cache within 5s TTL" {
+    run bash -c '
+        source "'"$TEST_HARNESS"'"
+        # First call: cache miss, does lookup
+        resolve_pane_target
+        # Second call: cache hit, skips lookup
+        resolve_pane_target
+        echo "PANE_TARGET=$PANE_TARGET"
+    '
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "PANE_TARGET=test:0.0"
+
+    # list-panes should be called only once (second call uses cache)
+    local list_count
+    list_count=$(grep -c "list-panes" "$MOCK_LOG")
+    [ "$list_count" -eq 1 ]
 }

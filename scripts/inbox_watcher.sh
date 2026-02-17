@@ -42,6 +42,8 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
 
     INBOX="$SCRIPT_DIR/queue/inbox/${AGENT_ID}.yaml"
     LOCKFILE="${INBOX}.lock"
+    CACHE_DIR="$SCRIPT_DIR/queue/.cache"
+    mkdir -p "$CACHE_DIR"
 
     if [ -z "$AGENT_ID" ] || [ -z "$PANE_TARGET" ]; then
         echo "Usage: inbox_watcher.sh <agent_id> <pane_target> [cli_type]" >&2
@@ -412,6 +414,49 @@ PY
     ) 200>"$LOCKFILE" 2>/dev/null
 }
 
+# ─── Resolve pane target dynamically via @agent_id ───
+# Fixes pane index drift when panes are added/removed.
+# Falls back to startup PANE_TARGET if @agent_id lookup fails.
+# 5-second TTL cache to avoid repeated tmux list-panes calls.
+_RESOLVE_CACHE_TARGET=""
+_RESOLVE_CACHE_TS=0
+
+resolve_pane_target() {
+    local now
+    now=$(date +%s)
+
+    # Cache hit: reuse if within TTL (5 seconds)
+    if [ -n "$_RESOLVE_CACHE_TARGET" ] && [ $(( now - _RESOLVE_CACHE_TS )) -lt 5 ]; then
+        PANE_TARGET="$_RESOLVE_CACHE_TARGET"
+        return 0
+    fi
+
+    # Darkninja uses a separate session — skip dynamic resolution
+    if [ "$AGENT_ID" = "darkninja" ]; then
+        _RESOLVE_CACHE_TARGET="$PANE_TARGET"
+        _RESOLVE_CACHE_TS=$now
+        return 0
+    fi
+
+    # Dynamic lookup: find pane by @agent_id
+    local resolved
+    resolved=$(tmux list-panes -a -F '#{@agent_id} #{pane_id}' 2>/dev/null \
+        | awk -v id="$AGENT_ID" '$1 == id {print $2; exit}')
+
+    if [ -n "$resolved" ]; then
+        PANE_TARGET="$resolved"
+        _RESOLVE_CACHE_TARGET="$resolved"
+        _RESOLVE_CACHE_TS=$now
+        return 0
+    fi
+
+    # Fallback: keep startup PANE_TARGET (may be stale but better than nothing)
+    echo "[$(date)] [WARN] resolve_pane_target: @agent_id=$AGENT_ID not found, using fallback $PANE_TARGET" >&2
+    _RESOLVE_CACHE_TARGET="$PANE_TARGET"
+    _RESOLVE_CACHE_TS=$now
+    return 0
+}
+
 # ─── Send CLI command via pty direct write ───
 # For /clear and /model only. These are CLI commands, not conversation messages.
 # CLI_TYPE別分岐: claude→そのまま, codex→/clear対応・/modelスキップ,
@@ -419,6 +464,7 @@ PY
 # 実行時にtmux paneの @agent_cli を再確認し、ドリフト時はpane値を優先する。
 send_cli_command() {
     local cmd="$1"
+    resolve_pane_target
     local effective_cli
     effective_cli=$(get_effective_cli_type)
 
@@ -602,7 +648,8 @@ agent_has_self_watch() {
 # Returns 0 (true) if agent is busy, 1 if idle.
 # P2-施策2: Cache tmux capture-pane result (TTL 2s) to reduce API calls.
 agent_is_busy() {
-    local cache_file="/tmp/inbox_watcher_busy_cache_${AGENT_ID}"
+    resolve_pane_target
+    local cache_file="${CACHE_DIR}/inbox_watcher_busy_cache_${AGENT_ID}"
     local cache_ttl_sec=2
     local now
     now=$(date +%s)
@@ -682,6 +729,7 @@ pane_is_active() {
 #   3. tmux send-keys (短いスリケンのみ、timeout 5s)
 send_wakeup() {
     local unread_count="$1"
+    resolve_pane_target
     local nudge="スリケン！inbox${unread_count}"
 
     if [ "${FINAL_ESCALATION_ONLY:-0}" = "1" ]; then
@@ -757,6 +805,7 @@ send_wakeup() {
 # Addresses the "echo last tool call" cursor position bug and stale input.
 send_wakeup_with_escape() {
     local unread_count="$1"
+    resolve_pane_target
     local nudge="スリケン！inbox${unread_count}"
     local effective_cli
     effective_cli=$(get_effective_cli_type)

@@ -20,7 +20,8 @@ CRITICAL_THRESHOLD=10
 # Cooldown to prevent spam (5 minutes = 300 seconds)
 COOLDOWN=300
 STATE_DIR="$PROJECT_ROOT/.state"
-mkdir -p "$STATE_DIR"
+CACHE_DIR="$PROJECT_ROOT/queue/.cache"
+mkdir -p "$STATE_DIR" "$CACHE_DIR"
 
 LAST_WARN_FILE="$STATE_DIR/last_warn"
 LAST_ALERT_FILE="$STATE_DIR/last_alert"
@@ -114,7 +115,7 @@ update_dashboard_alert() {
     if grep -q "^## 🚨ヨウタイオウ" "$DASHBOARD"; then
         # Append to existing section (insert after section header)
         local temp_file
-        temp_file=$(mktemp)
+        temp_file=$(TMPDIR="$CACHE_DIR" mktemp)
         awk -v alert="$alert_msg" '
             /^## 🚨ヨウタイオウ/ {
                 print
