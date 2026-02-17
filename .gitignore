@@ -92,6 +92,7 @@
 !scripts/stop_hook_inbox.sh
 !scripts/njslyr.sh
 !scripts/monitor_context.sh
+!scripts/test_inbox_write.sh
 
 
 # SayTask (sample template only, not actual data)
