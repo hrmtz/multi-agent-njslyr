@@ -61,7 +61,8 @@
 
 ```bash
 # inbox未読チェック（bashコマンド、API不要）
-if ! grep -q 'read: false' queue/inbox/{agent_id}.yaml; then
+# アンカー付きパターン: YAMLフィールドとして "  read: false" のみ検知（誤検知防止）
+if ! grep -q '^ *read: false$' queue/inbox/{agent_id}.yaml; then
     # 未読なし → (3) thinking長時間 を除き、粛清対象外
     skip_agent
 fi
@@ -98,15 +99,21 @@ inbox_watcher.shの既存エスカレーション機構をベースとする。
 
 #### Stage 3: kill+再起動（スレイ）
 
-- **方式**:
-  1. 対象paneを真っ赤に染める: `tmux select-pane -t {pane_target} -P 'bg=red'`
-  2. `[SLAY] ツヨイ・カラテ！` を表示（tmux display-message）
-  3. 断末魔演出: 「サヨナラ！」「爆発四散！」
-  4. `tmux kill-pane` で該当エージェントのpaneを終了
-  5. 再起動スクリプト（`yokubari.sh` の再起動ロジック流用）で新プロセス起動
-  6. タスクYAMLの `status: assigned` を維持（再起動後に自動再開）
-  7. 再起動完了後、pane背景をデフォルトに戻す: `tmux select-pane -t {pane_target} -P 'bg=default'`
-  8. 「復帰完了」を表示
+- **方式**（実装済み最新版）:
+  1. **再起動ループチェック**: 30分以内に3回再起動済みなら中止してダークニンジャに通知
+  2. **Pre-slay data preservation（cmd_277追加）**:
+     - 粛清予告をダッシュボードに記載
+     - `/compact` 送信（コンテキスト保存、5秒待機）
+     - タスクYAML status を `slayed_by_njslyr` に更新
+     - 粛清ログを `queue/metrics/njslyr_slay_{timestamp}.yaml` に記録
+  3. **remain-on-exit on 設定（ケジメ案件対策）**: `tmux set-option -p -t {pane_target} remain-on-exit on`
+     - プロセス終了時にpaneが消滅しないよう保護。tmuxグリッド崩壊防止
+  4. 対象paneを真っ赤に染める: `tmux select-pane -t {pane_target} -P 'bg=red'`
+  5. **断末魔演出 `generate_death_cry()`**: 辞世の句（5-7-5俳句）または爆発四散を50%で選択表示
+     - `tmux respawn-pane -k` で断末魔画面を起動（kill-paneではなくrespawnで**paneを消滅させない**）
+  6. `tmux respawn-pane -k` でClaudeプロセスを再起動（**M3修正: kill-pane廃止、respawn-paneでグリッド保護**）
+  7. 背景をデフォルトに戻す（remain-on-exitは **ONのまま永続維持**）
+  8. 「◆復帰完了◆」を表示
 - **待機時間**: N/A（最終手段）
 - **リトライ**: なし
 - **技名**: 「スレイ」（ニンジャスレイヤーの必殺技 — 画面真っ赤＋プロセス殺害＋再起動）
@@ -127,12 +134,29 @@ inbox_watcher.shの既存エスカレーション機構をベースとする。
 - **配置場所**: `/Users/hrmtz/project/personal/multi-agent-njslyr/scripts/njslyr.sh`
 - **実行権限**: `chmod +x scripts/njslyr.sh`
 
+### 4.1.1 実装済み追加機能（設計後追加）
+
+#### バリキドリンク投与ヘルパー（cmd_277追加）
+
+```bash
+inject_barikidorink "multiagent:0.1"   # yakuza1にOpus投与
+detox_barikidorink "multiagent:0.1"    # yakuza1をSonnetに復帰
+```
+
+- **inject_barikidorink**: `/model opus` + `@model_name=Opus` + 背景紫 + `/clear`
+- **detox_barikidorink**: `/model sonnet` + `@model_name=Sonnet` + 背景デフォルト + `/clear`
+- **用途**: タスク処理速度向上が必要な場合にOpusへ昇格させ、完了後にSonnetへ戻す
+
 ### 4.2 監視方式
 
 - **tmux capture-pane**: エージェントの状態を定期監視（5分間隔）
   - pane内のテキスト（`? for shortcuts`, `Thinking`, `Working`等）から状態判定
 - **タスクYAML監視**: `queue/tasks/` 配下のYAMLファイルから `status` フィールド抽出
+  - **M1修正**: globパターン `${agent_id}*.yaml` で `_subtask_xxx.yaml` 形式のファイルも検索
 - **inbox監視**: `queue/inbox/` 配下のYAMLファイルから未読数カウント
+- **pane動的検索（M2修正）**: `get_pane_target()` が `@agent_id` 変数でpaneを動的検索
+  - 形式: `multiagent:1.{pane_index}` を返す
+  - pane追加・削除があってもインデックスずれが発生しない
 
 ### 4.3 inbox_watcher.shとの統合/連携
 
@@ -191,7 +215,8 @@ njslyrは以下の5段階フローで粛清判定を行う:
 
 1. **inbox未読チェック（bash grep、API不要）**:
    ```bash
-   grep 'read: false' queue/inbox/{agent_id}.yaml
+   # アンカー付きパターン（誤検知防止: メッセージ本文の "read: false" 文字列は無視）
+   grep '^ *read: false$' queue/inbox/{agent_id}.yaml
    ```
    - 未読メッセージが存在しない場合、このエージェントはスキップ（粛清対象外）
    - 未読メッセージが存在する場合、次のステップへ
@@ -215,7 +240,7 @@ njslyrは以下の5段階フローで粛清判定を行う:
 #### メリット
 
 - **APIトークン削減**: アイドルエージェントへの不要なスリケンを回避
-- **シンプルな実装**: `grep 'read: false'` で判定可能。Claude Code APIを叩かず、bashコマンドのみで完結
+- **シンプルな実装**: `grep '^ *read: false$'` で判定可能。Claude Code APIを叩かず、bashコマンドのみで完結
 - **inbox_watcher.shとの整合性**: inbox_watcher.shも「未読あり」をトリガーとしているため、ロジックが統一される
 
 #### 除外ケース
@@ -358,10 +383,11 @@ njslyr.sh 起動時に以下を標準出力:
 [KARATE] yakuza3 に [スリケン] を投げた！
 ```
 
-**断末魔**（エージェント側で表示される想定）:
-- Stage 1失敗: 「アバーッ！」
-- Stage 2失敗: 「グワーッ！」
-- Stage 3: 「サヨナラ！」「爆発四散！」
+**断末魔 `generate_death_cry()`（実装済み）**:
+- 50%確率で**辞世の句**（5-7-5俳句）または**爆発四散**を選択
+- 俳句例:「散りてなお 赤き炎の ヤクザ道」「春風に コンテキスト散る 無常」等
+- 爆発四散例:「アイエエエエ！ナンデ！？グワーッ！！爆発四散！！」等
+- pane内にboxアート付きで全画面表示（`tmux respawn-pane` で実行）
 
 **技名マッピング**:
 - Stage 1（スリケン）: 「スリケン」（軽い警告）
