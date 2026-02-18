@@ -602,15 +602,18 @@ tmux split-window -h -t "multiagent:agents"
 tmux split-window -h -t "multiagent:agents"
 
 # 各列を3行に分割
+# BUG FIX (2026-02-18): PANE_BASE+3/PANE_BASE+6 は作成順のpaneインデックスを指す誤りだった。
+# h-split後のpane: PANE_BASE(col1), PANE_BASE+1(col2), PANE_BASE+2(col3)
+# 正しい列の先頭: col2=PANE_BASE+1, col3=PANE_BASE+2
 tmux select-pane -t "multiagent:agents.${PANE_BASE}"
 tmux split-window -v
 tmux split-window -v
 
-tmux select-pane -t "multiagent:agents.$((PANE_BASE+3))"
+tmux select-pane -t "multiagent:agents.$((PANE_BASE+1))"
 tmux split-window -v
 tmux split-window -v
 
-tmux select-pane -t "multiagent:agents.$((PANE_BASE+6))"
+tmux select-pane -t "multiagent:agents.$((PANE_BASE+2))"
 tmux split-window -v
 tmux split-window -v
 
@@ -679,6 +682,25 @@ for i in {0..8}; do
     PROMPT_STR=$(generate_prompt "${PANE_LABELS[$i]}" "${PANE_COLORS[$i]}" "$SHELL_SETTING")
     tmux send-keys -t "multiagent:agents.${p}" "cd \"$(pwd)\" && export PS1='${PROMPT_STR}' && clear" Enter
 done
+
+# @agent_id 割り当て検証（2026-02-18 恒久対策: 誤設定インシデント防止）
+# 設定直後に実際値を検証し、ミスマッチがあれば即時修正する
+_verify_errors=0
+for i in {0..8}; do
+    p=$((PANE_BASE + i))
+    _expected="${AGENT_IDS[$i]}"
+    _actual=$(tmux show-options -pv -t "multiagent:agents.${p}" @agent_id 2>/dev/null || echo "")
+    if [[ "$_actual" != "$_expected" ]]; then
+        log_war "  ⚠️  @agent_id誤設定検知: pane${p} actual='${_actual}' expected='${_expected}' → 再設定"
+        tmux set-option -p -t "multiagent:agents.${p}" @agent_id "$_expected" 2>/dev/null || true
+        _verify_errors=$((_verify_errors + 1))
+    fi
+done
+if [[ $_verify_errors -eq 0 ]]; then
+    log_success "  └─ @agent_id全ペイン検証OK。ワザマエ！"
+else
+    log_war "  ⚠️  @agent_id誤設定を${_verify_errors}件修正。要インシデント記録。"
+fi
 
 # グレーターヤクザ・ソウカイヤペインの背景色（ヤクザとの視覚的区別）
 # 注: グループセッションで背景色が引き継がれない問題があるため、コメントアウト（2026-02-14）

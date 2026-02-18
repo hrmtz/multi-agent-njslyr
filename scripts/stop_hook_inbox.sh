@@ -41,15 +41,26 @@ if [ -n "${TMUX_PANE:-}" ]; then
     SESSION_NAME=$(tmux display-message -t "$TMUX_PANE" -p '#{session_name}' 2>/dev/null || true)
 fi
 
+# TMUX_PANE inheritance bug workaround: TMUX_PANE may point to a different
+# session's pane if darkninja was launched from within a multiagent pane.
+# Get the actual current session via current tmux client (no -t flag).
+ACTUAL_SESSION=$(tmux display-message -p '#{session_name}' 2>/dev/null || true)
+
 # If we can't identify the agent, approve (exit 0 with no output = approve)
-if [ -z "$AGENT_ID" ]; then
+if [ -z "$AGENT_ID" ] && [ -z "$ACTUAL_SESSION" ]; then
     exit 0
 fi
 
 # ─── Darkninja: always approve (human-controlled) ───
-# Check both agent_id and session_name to handle TMUX_PANE inheritance bug
-# where darkninja session inherits TMUX_PANE pointing to gryakuza's pane
-if [ "$AGENT_ID" = "darkninja" ] || [ "$SESSION_NAME" = "darkninja" ]; then
+# Triple-check: agent_id, session from TMUX_PANE, and actual current session.
+# Handles TMUX_PANE inheritance bug where darkninja session inherits TMUX_PANE
+# pointing to another agent's pane (e.g. yakuza4 → SESSION_NAME="multiagent").
+if [ "$AGENT_ID" = "darkninja" ] || [ "$SESSION_NAME" = "darkninja" ] || [ "$ACTUAL_SESSION" = "darkninja" ]; then
+    exit 0
+fi
+
+# If AGENT_ID is empty but we have an actual session, use session as fallback
+if [ -z "$AGENT_ID" ]; then
     exit 0
 fi
 

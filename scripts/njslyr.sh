@@ -270,6 +270,24 @@ detox_barikidorink() {
     tmux send-keys -t "$pane" "/clear" Enter
 }
 
+# ─── Validate @agent_id assignments (2026-02-18 恒久対策) ───
+# multiagentセッションのpaneに "darkninja" IDが誤設定されていないかを検証し、
+# 検知した場合はダッシュボードへ警告を記録してダークニンジャに通知する。
+validate_agent_ids() {
+    local suspicious_panes
+    suspicious_panes=$(tmux list-panes -t multiagent -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
+        awk '$2 == "darkninja" {print $1}' || true)
+
+    if [[ -n "$suspicious_panes" ]]; then
+        local msg="🚨 @agent_id誤設定検知！multiagentペイン(${suspicious_panes})にdarkninja IDが設定されている。yokubari.shで再起動が必要。"
+        log "ALERT: $msg"
+        update_dashboard "$msg"
+        notify_darkninja "$msg" P0
+        return 1
+    fi
+    return 0
+}
+
 # ─── Get all monitored agents ───
 get_monitored_agents() {
     # Dynamically detect agents from yokubari.sh process list
@@ -807,6 +825,9 @@ main() {
 
     local slain_count=0
     local healthy_count=0
+
+    # @agent_id誤設定検証（darkninja IDがmultiagentペインに混入していないか確認）
+    validate_agent_ids || true
 
     # Get all monitored agents
     local agents
