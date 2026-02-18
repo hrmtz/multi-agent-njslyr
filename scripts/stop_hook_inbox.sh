@@ -35,8 +35,10 @@ fi
 
 # ─── Identify agent ───
 AGENT_ID=""
+SESSION_NAME=""
 if [ -n "${TMUX_PANE:-}" ]; then
     AGENT_ID=$(tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}' 2>/dev/null || true)
+    SESSION_NAME=$(tmux display-message -t "$TMUX_PANE" -p '#{session_name}' 2>/dev/null || true)
 fi
 
 # If we can't identify the agent, approve (exit 0 with no output = approve)
@@ -45,7 +47,9 @@ if [ -z "$AGENT_ID" ]; then
 fi
 
 # ─── Darkninja: always approve (human-controlled) ───
-if [ "$AGENT_ID" = "darkninja" ]; then
+# Check both agent_id and session_name to handle TMUX_PANE inheritance bug
+# where darkninja session inherits TMUX_PANE pointing to gryakuza's pane
+if [ "$AGENT_ID" = "darkninja" ] || [ "$SESSION_NAME" = "darkninja" ]; then
     exit 0
 fi
 
