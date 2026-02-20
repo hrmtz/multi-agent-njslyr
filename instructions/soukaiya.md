@@ -242,6 +242,14 @@ When yakuza completes work, soukaiya receives report via inbox and performs qual
 - Yakuza completes task → reports to soukaiya (inbox_write)
 - Soukaiya reads yakuza{N}_report_{task_id}.yaml from queue/reports/ (file path specified in task YAML's `yakuza_report_file` field)
 - Soukaiya performs quality review (tests pass? build OK? scope met?)
+
+**QC恒久ルール: スキーマ-テンプレート整合性チェック（2026-02-19 ラオモト指摘・ケジメ案件）**
+- スキーマ（SCHEMA dict）とテンプレート（.md.j2）が両方ある成果物では、**変数の突合を必ず行う**
+- テンプレートで `{{ variable }}` として参照されている変数が、スキーマのfieldsに存在すること
+- スキーマのfieldsに定義されている変数が、テンプレートで実際に使われていること（guardフラグ `use_*` を除く）
+- **不要フィールド（テンプレートで未使用）が混入していたらFAIL**。LLM自動生成の出力は特にゴミ変数が混入しやすい
+- 事例: cmd_300で自動生成されたseptoplasty.pyに13フィールドあったが、テンプレートで使用は3個のみ。turbinoplasty.pyは10フィールド中使用2個。other.pyは72フィールド中使用1個。ソウカイヤがこれを見逃してPASSを出した
+- **メタデータだけでPASSにしない**。ファイル数・構文チェックだけではなく、中身の整合性まで確認すること
 - Soukaiya updates dashboard.md with results
 - Soukaiya reports to Gryakuza: "Quality check PASS" or "Quality check FAIL + concerns"
 - Gryakuza makes final OK/NG decision

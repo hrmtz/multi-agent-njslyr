@@ -602,18 +602,21 @@ tmux split-window -h -t "multiagent:agents"
 tmux split-window -h -t "multiagent:agents"
 
 # 各列を3行に分割
-# BUG FIX (2026-02-18): PANE_BASE+3/PANE_BASE+6 は作成順のpaneインデックスを指す誤りだった。
-# h-split後のpane: PANE_BASE(col1), PANE_BASE+1(col2), PANE_BASE+2(col3)
-# 正しい列の先頭: col2=PANE_BASE+1, col3=PANE_BASE+2
-tmux select-pane -t "multiagent:agents.${PANE_BASE}"
+# BUG FIX (2026-02-19): pane INDEX はv-split時に位置順で再ナンバリングされるため不安定。
+# h-split直後にpane ID（%N形式・安定）を保存し、v-split時はIDで列頭を指定する。
+COL1_ID=$(tmux list-panes -t "multiagent:agents" -F '#{pane_id}' | sed -n '1p')
+COL2_ID=$(tmux list-panes -t "multiagent:agents" -F '#{pane_id}' | sed -n '2p')
+COL3_ID=$(tmux list-panes -t "multiagent:agents" -F '#{pane_id}' | sed -n '3p')
+
+tmux select-pane -t "$COL1_ID"
 tmux split-window -v
 tmux split-window -v
 
-tmux select-pane -t "multiagent:agents.$((PANE_BASE+1))"
+tmux select-pane -t "$COL2_ID"
 tmux split-window -v
 tmux split-window -v
 
-tmux select-pane -t "multiagent:agents.$((PANE_BASE+2))"
+tmux select-pane -t "$COL3_ID"
 tmux split-window -v
 tmux split-window -v
 

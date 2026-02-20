@@ -154,3 +154,6 @@
 
 # Always exclude (overrides whitelist)
 .DS_Store
+
+# Memory MCP
+.memory/

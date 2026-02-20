@@ -9,6 +9,37 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/opt/homebrew/lib/node_modules/claude-code-memory/dist/extractor.js\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/opt/homebrew/lib/node_modules/claude-code-memory/dist/extractor.js\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/opt/homebrew/lib/node_modules/claude-code-memory/dist/extractor.js\"",
+            "timeout": 30
+          }
+        ]
       }
     ]
   },
