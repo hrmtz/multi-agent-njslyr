@@ -309,8 +309,78 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 
 <!-- MEMORY:START -->
 # multi-agent-njslyr
+ネオサイタマmod マルチエージェントシステム + instagram-slides/surgery-log-app プロジェクト管理
 
-_Last updated: 2026-02-20 | 0 active memories, 0 total_
+_Last updated: 2026-02-20 | 17 active memories, 17 total_
+
+## Architecture
+- サムネイル/wiggle動画パイプライン（instagram-slides）:
+Step 1: slides.html（4:5スライド）作成
+Step 2: slides_9x16.html（9:16リール用）作成
+Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
+- 4レイヤー合成仕様（2026-02-18 ラオモト承認・恒久）:
+- 合成順序: bg(壁紙・静止) → lines(集中線・回転) → ずんだもん(ジッター) → title(パルス) → fg(静止)
+- 集中線回転: 0.6°/... [instagram-slides, 4-layer, wiggle, spec]
+
+## Key Decisions
+- Gitリモートルール（2026-02-17 ラオモト指示・恒久）:
+- push先は njslyr リモート（hrmtz/multi-agent-njslyr）のみ
+- origin（yohey-w/multi-agent-shogu... [git, remote, rule]
+- ダークニンジャ行動規範の核心:
+- コード編集は原則禁止。例外: グレーターヤクザがパンクしている時のみ支援目的で許可
+- 本業は仕事の割り振り。コード編集は緊急支援
+- チェーン・オブ・コマンド: ダークニンジャ→グレーターヤクザ→... [darkninja, rule, 行動規範]
+- QCルール（恒久・複数ケジメ案件の教訓）:
+- 動画QCはメタデータだけでPASSにしない。描画内容まで確認必須
+- スキーマ-テンプレート整合性チェック: {{variable}}がスキーマfieldsに存在すること、逆も確認。LL... [qc, rule, 恒久ルール]
+- SNSガイドライン例外ルール（2026-02-15 ラオモト裁定・恒久）:
+- 論文のビフォーアフター写真は論文からの引用でありSNSガイドライン違反の例外
+- 引用であることを明示すること（出典表記必須）
+- 全プロジェクト共通 [sns, guideline, 恒久ルール]
+
+## Patterns & Conventions
+- テロップ仕様（2026-02-16 ラオモト承認・恒久）:
+- 文節境界ルール: テロップの改行・フレーム分割は日本語の文節境界でのみ。単語途中での改行禁止
+- 分割優先: 句読点→接続語→助詞の直後
+- 最低4文字制約: 分割後の各... [instagram-slides, telop, spec, 恒久ルール]
+- サムネイル挿入仕様（2026-02-16 ラオモト承認・恒久）:
+- 冒頭サムネイル: 各プロジェクトのreel/thumbnail.png（9x16）を動画冒頭に挿入。存在しなければスキップ
+- 表示時間: 1.5秒（THUMBNA... [instagram-slides, thumbnail, reel, 恒久ルール]
+
+## Gotchas & Pitfalls
+- キャッシュ汚染事故（2026-02-16 ケジメ案件）:
+- コード修正後は中間キャッシュを必ず削除してから再生成
+- 事例: build_reel_generic.pyのnormalize_layer_name()修正後、zunda... [gotcha, cache, reel, 恒久ルール]
+- /tmp/禁止ルール（2026-02-15 ケジメ案件・恒久）:
+- スクリプト・生成物・中間ファイルを/tmp/に置くことは全面禁止。OS再起動で揮発する
+- 永続配置先: プロジェクトのreel/配下、またはskills/配下
+-... [gotcha, tmp, 恒久ルール]
+- pane消失防止ルール（2026-02-18 ケジメ案件・恒久）:
+- respawn-pane -k の前に必ず tmux set-option -p -t $pane remain-on-exit on を設定せよ
+- remai... [gotcha, tmux, pane, 恒久ルール]
+- @agent_id誤設定インシデント（2026-02-18 重大）:
+- 全体再起動後、P2(yakuza1)とP4(yakuza3)の@agent_idがdarkninja に誤設定された
+- クローンヤクザがダークニンジャとして活... [gotcha, tmux, agent_id, incident]
+- generate_thumbnail_batch.py誤削除インシデント（2026-02-20）:
+- P2旧スクリプト削除時に、実はアクティブだったgenerate_thumbnail_batch.py（20KB・回転+ジッター合成... [gotcha, deletion, instagram-slides, incident]
+- inbox_watcherペインターゲットのズレ（2026-02-18 既知問題）:
+- ペインの追加・削除でtmuxのペインインデックスが変わる
+- inbox_watcherは起動時のペインターゲットを使い続けるためズレる
+- 暫... [gotcha, inbox, tmux, known_issue]
+
+## Current Progress
+- instagram-slides 進捗（2026-02-20時点）:
+- 全16プロジェクト: スライド+wiggle動画(102本)+reel完成済み
+- cmd_280: 配色ランダム化実装済み（CSS注入・5スキーム）
+- cm... [instagram-slides, progress]
+- surgery-log-app 進捗（2026-02-20完了）:
+- Phase1（cmd_309b）: goretex/septoplasty/turbinoplasty YAML化完了
+- Phase1.5（cmd_310a/b... [surgery-log-app, progress]
+
+## Context
+- プロジェクト構成（2026-02-20時点）:
+- multi-agent-njslyr: マルチエージェントシステム本体（ネオサイタマmod）。本家はyohey-w/multi-agent-shogun
+- instagram-sl... [project, structure, overview]
 
 _For deeper context, use memory_search, memory_related, or memory_ask tools._
 <!-- MEMORY:END -->
