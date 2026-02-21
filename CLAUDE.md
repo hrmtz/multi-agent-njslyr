@@ -311,7 +311,7 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 # multi-agent-njslyr
 ネオサイタマmod マルチエージェントシステム + instagram-slides/surgery-log-app プロジェクト管理
 
-_Last updated: 2026-02-20 | 17 active memories, 17 total_
+_Last updated: 2026-02-21 | 20 active memories, 21 total_
 
 ## Architecture
 - サムネイル/wiggle動画パイプライン（instagram-slides）:
@@ -337,6 +337,14 @@ Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
 - 論文のビフォーアフター写真は論文からの引用でありSNSガイドライン違反の例外
 - 引用であることを明示すること（出典表記必須）
 - 全プロジェクト共通 [sns, guideline, 恒久ルール]
+- 煽りタイトルのスタイルバリエーション（2026-02-21 ラオモト指示）:
+- 現在の標準: 直球煽り型（「〜が怖すぎる」「〜が多すぎる」）
+- 次回プロジェクトから: ひろゆき風・冷静煽り型を採用する
+- ひろゆき風の特徴: 「〜... [instagram-slides, thumbnail, 煽りタイトル, スタイル]
+- ひろゆきボイス見送り（2026-02-21 ラオモト判断）:
+- CoeFont API: 月55,000円 → コスパ悪すぎ
+- TarakoTalk（非公式）: バックエンドAPI停止（HTTP 500）→ 使用不可
+- 結論: ... [instagram-slides, thumbnail, voice, hiroyuki, 見送り]
 
 ## Patterns & Conventions
 - テロップ仕様（2026-02-16 ラオモト承認・恒久）:
@@ -361,12 +369,16 @@ Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
 - @agent_id誤設定インシデント（2026-02-18 重大）:
 - 全体再起動後、P2(yakuza1)とP4(yakuza3)の@agent_idがdarkninja に誤設定された
 - クローンヤクザがダークニンジャとして活... [gotcha, tmux, agent_id, incident]
-- generate_thumbnail_batch.py誤削除インシデント（2026-02-20）:
-- P2旧スクリプト削除時に、実はアクティブだったgenerate_thumbnail_batch.py（20KB・回転+ジッター合成... [gotcha, deletion, instagram-slides, incident]
 - inbox_watcherペインターゲットのズレ（2026-02-18 既知問題）:
 - ペインの追加・削除でtmuxのペインインデックスが変わる
 - inbox_watcherは起動時のペインターゲットを使い続けるためズレる
 - 暫... [gotcha, inbox, tmux, known_issue]
+- generate_thumbnail_batch.py復元完了（2026-02-20）:
+- git restoreで401行のd14b0ceバージョンを復元。追跡管理下に復帰
+- ただしcommit後に追加されたCOLOR_SCHE... [gotcha, instagram-slides, generate_thumbnail_batch, resolved]
+- @agent_id誤設定バグ再発（2026-02-21）:
+- %95(yakuza3)が再びdarkninjaに誤設定されていた
+- 2026-02-18のケジメ案件と同じバグ。前回commit 8badf57でvalidate_a... [gotcha, tmux, agent_id, incident, priority]
 
 ## Current Progress
 - instagram-slides 進捗（2026-02-20時点）:
