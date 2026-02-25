@@ -1056,6 +1056,17 @@ check_agent() {
 
     # ─── Detection logic ───
 
+    # (0) Yakuza Tengu spawn check (BUG-SPAWN-1 fix: must run BEFORE thinking detection)
+    # Reason: gryakuza is most likely thinking when inbox piles up (= when tengu is needed).
+    # Previously at L1126, blocked by thinking early return. Moved here to ensure evaluation.
+    if [[ "$agent_id" == "gryakuza" ]]; then
+        if ! is_yakuzatengu_active; then
+            if should_spawn_yakuzatengu "$agent_id"; then
+                spawn_yakuzatengu "$agent_id"
+            fi
+        fi
+    fi
+
     # (3) Thinking long time (highest priority)
     # Exception: thinking long time is checked even without inbox unread
     if [[ "$is_thinking" == "true" ]]; then
@@ -1122,12 +1133,7 @@ check_agent() {
     local gryakuza_stage1_only=false
     if [[ "$agent_id" == "gryakuza" ]]; then
         gryakuza_stage1_only=true
-        # BUG-C3 fix: spawn判定はStage1無応答条件とは独立（gryakuzaがスリケン応答中でも発火）
-        if ! is_yakuzatengu_active; then
-            if should_spawn_yakuzatengu "$agent_id"; then
-                spawn_yakuzatengu "$agent_id"
-            fi
-        fi
+        # NOTE: spawn判定は(0)に移動済み（BUG-SPAWN-1 fix）。ここでは不要。
     fi
 
     # (2) スリケン無応答 (Stage 1 → Stage 2)
