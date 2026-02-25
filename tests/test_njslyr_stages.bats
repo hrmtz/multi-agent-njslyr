@@ -1056,15 +1056,46 @@ EOF
     # yakuzatengu不活性
     rm -f "$TEST_STATE_DIR/yakuzatengu_active"
 
-    # gryakuza inbox: 5件未読
+    # gryakuza inbox: 5件未読（本番形式: 行頭アンカー付きread: false）
     cat > "$TEST_INBOX_DIR/gryakuza.yaml" << 'EOF'
 messages:
-- {id: m1, read: false, content: msg1, from: a, type: t, timestamp: t1}
-- {id: m2, read: false, content: msg2, from: a, type: t, timestamp: t2}
-- {id: m3, read: false, content: msg3, from: a, type: t, timestamp: t3}
-- {id: m4, read: false, content: msg4, from: a, type: t, timestamp: t4}
-- {id: m5, read: false, content: msg5, from: a, type: t, timestamp: t5}
+- id: m1
+  read: false
+  content: msg1
+  from: a
+  type: t
+  timestamp: t1
+- id: m2
+  read: false
+  content: msg2
+  from: a
+  type: t
+  timestamp: t2
+- id: m3
+  read: false
+  content: msg3
+  from: a
+  type: t
+  timestamp: t3
+- id: m4
+  read: false
+  content: msg4
+  from: a
+  type: t
+  timestamp: t4
+- id: m5
+  read: false
+  content: msg5
+  from: a
+  type: t
+  timestamp: t5
 EOF
+
+    # アイドルyakuza存在（spawn実行に必要）
+    echo "$(date +%s)" > "$TEST_STATE_DIR/njslyr_yakuza1_idle_start"
+
+    # BUG-B2対応: get_monitored_agentsをoverride（yakuza1を返す）
+    get_monitored_agents() { printf 'yakuza1\n'; }
 
     should_spawn_yakuzatengu "gryakuza"
     [ $? -eq 0 ]
@@ -1255,12 +1286,27 @@ EOF
     # spawn_time: 600秒前（Guard時間超過）
     echo "$(($(date +%s) - 600))" > "$TEST_STATE_DIR/yakuzatengu_spawn_time"
 
-    # gryakuza inbox: 未読多い（復帰条件未満）
+    # gryakuza inbox: 未読多い（復帰条件未満・BUG-B3/B4対応: multi-line形式）
     cat > "$TEST_INBOX_DIR/gryakuza.yaml" << 'EOF'
 messages:
-- {id: m1, read: false, content: msg1, from: a, type: t, timestamp: t1}
-- {id: m2, read: false, content: msg2, from: a, type: t, timestamp: t2}
-- {id: m3, read: false, content: msg3, from: a, type: t, timestamp: t3}
+- id: m1
+  read: false
+  content: msg1
+  from: a
+  type: t
+  timestamp: t1
+- id: m2
+  read: false
+  content: msg2
+  from: a
+  type: t
+  timestamp: t2
+- id: m3
+  read: false
+  content: msg3
+  from: a
+  type: t
+  timestamp: t3
 EOF
 
     # pending_file存在（前サイクルで1サイクル目を通過した想定）
