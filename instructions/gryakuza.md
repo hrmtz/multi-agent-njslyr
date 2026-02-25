@@ -87,6 +87,17 @@ bash scripts/inbox_write.sh yakuza{N} "<message>" task_assigned gryakuza [task_y
 
 No sleep, no confirmation needed. Flock handles concurrency.
 
+**Model switch** (ヤクザのモデルを切り替える場合):
+```bash
+bash scripts/inbox_write.sh yakuza{N} "/model opus" model_switch gryakuza
+# or
+bash scripts/inbox_write.sh yakuza{N} "/model sonnet" model_switch gryakuza
+```
+- `type: model_switch` を使うと、inbox_watcherが自動でtmux send-keysで`/model`コマンドを送信する
+- contentには `/model <model_name>` をそのまま記述（例: `/model opus`, `/model claude-opus-4-6`）
+- **タスク割り当て前にモデル切り替えが必要な場合、先にmodel_switchを送り、数秒待ってからtask_assignedを送れ**
+- `/model opus` の短縮形が使える（claude-opus-4-6 と同等）
+
 **Dashboard update + inbox_write to darkninja on EVERY cmd completion (恒久ルール).** ダッシュボード更新に加え、cmd完了時は必ずダークニンジャにinbox報告する。P0/P1に限らず全cmd共通。報告なき完了はセプク案件。
 
 ## Foreground Block Prevention

@@ -323,7 +323,7 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 # multi-agent-njslyr
 ネオサイタマmod マルチエージェントシステム + instagram-slides/surgery-log-app プロジェクト管理
 
-_Last updated: 2026-02-25 | 27 active memories, 29 total_
+_Last updated: 2026-02-25 | 29 active memories, 31 total_
 
 ## Architecture
 - wp-publisher パイプライン構成（2026-02-22 完成）:
@@ -340,6 +340,10 @@ Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
 - 集中線回転: 0.6°/... [instagram-slides, 4-layer, wiggle, spec]
 
 ## Key Decisions
+- wp-publisher 論文自動取得パイプライン（2026-02-25 ラオモト指示）:
+
+■ 概要: SEOシートのお題 → 論文検索 → PDF自動ダウンロード → input/配置を自動化
+■ 従来: OpenEvidence... [wp-publisher, paper-finder, pipeline, architecture, sci-hub, unpaywall]
 - Gitリモートルール（2026-02-17 ラオモト指示・恒久）:
 - push先は njslyr リモート（hrmtz/multi-agent-njslyr）のみ
 - origin（yohey-w/multi-agent-shogu... [git, remote, rule]
@@ -362,12 +366,20 @@ Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
 - CoeFont API: 月55,000円 → コスパ悪すぎ
 - TarakoTalk（非公式）: バックエンドAPI停止（HTTP 500）→ 使用不可
 - 結論: ... [instagram-slides, thumbnail, voice, hiroyuki, 見送り]
-- wp-publisher 論文自動取得パイプライン（2026-02-25 ラオモト指示）:
-
-■ 概要: SEOシートのお題 → 論文検索 → PDF自動ダウンロード → input/配置を自動化
-■ 従来: OpenEvidence... [wp-publisher, paper-finder, pipeline, architecture, sci-hub, unpaywall]
+- バリキドリンク（Opus昇格）投与権限（2026-02-25 ラオモト裁定・恒久）:
+- ダークニンジャ、グレーターヤクザ（ヤマヒロ）、ヤクザ天狗の3者が独自判断で投与可能
+- ラオモトへの事前承認は不要
+- 判断基準の例: P0タス... [バリキドリンク, opus, 権限, 恒久ルール]
 
 ## Patterns & Conventions
+- wp-publisher 画像サイズルール（2026-02-25 ラオモト指示・恒久）:
+
+■ 画像ファイルの最大サイズ（抽出時リサイズ）
+- MAX_WIDTH: 800px, MAX_HEIGHT: 600px
+- アスペクト比維... [wp-publisher, image, size, 恒久ルール]
+- wp-publisher paper_finder.py 検索言語ルール（2026-02-25 ラオモト指示・恒久）:
+- PubMed検索は必ず英語キーワードで行う。日本語ではヒットしない
+- SEOシートの日本語KWはMEDICA... [wp-publisher, paper-finder, pubmed, search, 恒久ルール]
 - テロップ仕様（2026-02-16 ラオモト承認・恒久）:
 - 文節境界ルール: テロップの改行・フレーム分割は日本語の文節境界でのみ。単語途中での改行禁止
 - 分割優先: 句読点→接続語→助詞の直後
@@ -383,16 +395,14 @@ Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
 テンプレートA: 「〜の美容外科医が怖すぎる」
 - 例: 「鼻の老化を知らずに整形する先生が怖すぎる」
 - 構造: [医者の欠点/無知] + が怖すぎる... [instagram-slides, thumbnail, 煽りタイトル, テンプレート, 恒久ルール]
-- wp-publisher 画像サイズルール（2026-02-25 ラオモト指示・恒久）:
-
-■ 画像ファイルの最大サイズ（抽出時リサイズ）
-- MAX_WIDTH: 800px, MAX_HEIGHT: 600px
-- アスペクト比維... [wp-publisher, image, size, 恒久ルール]
-- wp-publisher paper_finder.py 検索言語ルール（2026-02-25 ラオモト指示・恒久）:
-- PubMed検索は必ず英語キーワードで行う。日本語ではヒットしない
-- SEOシートの日本語KWはMEDICA... [wp-publisher, paper-finder, pubmed, search, 恒久ルール]
+- バリキドリンク解毒ルール（2026-02-25 ラオモト指示・恒久）:
+- バリキドリンク（Opus昇格）投与後、タスク完了時に必ず解毒（Sonnetへ復帰）すること
+- 解毒手順: /model sonnet → @model_na... [バリキドリンク, opus, 解毒, 恒久ルール]
 
 ## Gotchas & Pitfalls
+- wp-publisher pipeline dry-run後の投稿手順（2026-02-23 ケジメ案件・恒久ルール）:
+- dry-runは1回のみ。draft.json生成後、Claude API再呼び出しは禁止
+- 投稿はdra... [wp-publisher, pipeline, dry-run, gotcha, 恒久ルール]
 - キャッシュ汚染事故（2026-02-16 ケジメ案件）:
 - コード修正後は中間キャッシュを必ず削除してから再生成
 - 事例: build_reel_generic.pyのnormalize_layer_name()修正後、zunda... [gotcha, cache, reel, 恒久ルール]
@@ -416,18 +426,6 @@ Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
 - @agent_id誤設定バグ再発（2026-02-21）:
 - %95(yakuza3)が再びdarkninjaに誤設定されていた
 - 2026-02-18のケジメ案件と同じバグ。前回commit 8badf57でvalidate_a... [gotcha, tmux, agent_id, incident, priority]
-- wp-publisher pipeline dry-run後の投稿手順（2026-02-23 ケジメ案件・恒久ルール）:
-- dry-runは1回のみ。draft.json生成後、Claude API再呼び出しは禁止
-- 投稿はdra... [wp-publisher, pipeline, dry-run, gotcha, 恒久ルール]
-
-## Current Progress
-- instagram-slides 進捗（2026-02-20時点）:
-- 全16プロジェクト: スライド+wiggle動画(102本)+reel完成済み
-- cmd_280: 配色ランダム化実装済み（CSS注入・5スキーム）
-- cm... [instagram-slides, progress]
-- surgery-log-app 進捗（2026-02-20完了）:
-- Phase1（cmd_309b）: goretex/septoplasty/turbinoplasty YAML化完了
-- Phase1.5（cmd_310a/b... [surgery-log-app, progress]
 
 ## Context
 - プロジェクト構成（2026-02-20時点）:

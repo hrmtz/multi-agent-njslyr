@@ -521,15 +521,21 @@ send_cli_command() {
     esac
 
     echo "[$(date)] [SEND-KEYS] Sending CLI command to $AGENT_ID ($effective_cli): $actual_cmd" >&2
-    # Clear stale input first, then send command (text and Enter separated for Codex TUI)
+    # Clear stale input first, then send command
     # Codex CLI: C-c when idle causes CLI to exit — skip it
     if [[ "$effective_cli" != "codex" ]]; then
         timeout 5 tmux send-keys -t "$PANE_TARGET" C-c 2>/dev/null
         sleep 0.5
     fi
-    timeout 5 tmux send-keys -t "$PANE_TARGET" "$actual_cmd" 2>/dev/null
-    sleep 0.3
-    timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+    if [[ "$effective_cli" == "codex" ]]; then
+        # Codex TUI: text and Enter must be separated (TUI compatibility)
+        timeout 5 tmux send-keys -t "$PANE_TARGET" "$actual_cmd" 2>/dev/null
+        sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+    else
+        # Claude CLI: send text+Enter together to prevent autocomplete interception
+        timeout 5 tmux send-keys -t "$PANE_TARGET" "$actual_cmd" Enter 2>/dev/null
+    fi
 
     # /clear needs extra wait time before follow-up
     if [[ "$actual_cmd" == "/clear" ]]; then
@@ -573,10 +579,16 @@ send_context_reset() {
         sleep 0.3
     fi
 
-    # Send the command (text and Enter separated for TUI compatibility)
-    timeout 5 tmux send-keys -t "$PANE_TARGET" "$reset_cmd" 2>/dev/null
-    sleep 0.3
-    timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+    # Send the command
+    if [[ "$effective_cli" == "codex" ]]; then
+        # Codex TUI: text and Enter must be separated
+        timeout 5 tmux send-keys -t "$PANE_TARGET" "$reset_cmd" 2>/dev/null
+        sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+    else
+        # Claude CLI: send text+Enter together to prevent autocomplete interception
+        timeout 5 tmux send-keys -t "$PANE_TARGET" "$reset_cmd" Enter 2>/dev/null
+    fi
 
     # Poll until agent becomes idle (prompt ready) instead of fixed sleep.
     # Max 15s (3 attempts × 5s). If still busy after 15s, proceed anyway.
@@ -761,13 +773,10 @@ send_wakeup() {
         return 0
     fi
 
-    # Darkninja: if the pane is focused, never inject keys (it can clobber the Lord's input).
-    # Instead, show a tmux message. If not focused, we can safely send the normal スリケン.
-    if [ "$AGENT_ID" = "darkninja" ] && pane_is_active; then
-        echo "[$(date)] [DISPLAY] darkninja pane is active — showing スリケン: スリケン！inbox${unread_count}" >&2
-        timeout 2 tmux display-message -t "$PANE_TARGET" -d 5000 "スリケン！inbox${unread_count}" 2>/dev/null || true
-        return 0
-    fi
+    # Darkninja: send normal スリケン like other agents.
+    # ラオモトが入力中にテキストが混入するリスクはあるが、
+    # display-message（5秒で消える）ではダークニンジャが起きない問題の方が深刻。
+    # C-u（入力クリア）はpane_is_active時にスキップされるため、ラオモトの入力は保護される。
 
     # 優先度3: tmux send-keys（テキストとEnterを分離 — Codex TUI対策）
     echo "[$(date)] [SEND-KEYS] Sending スリケン to $PANE_TARGET for $AGENT_ID" >&2
