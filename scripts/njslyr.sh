@@ -306,6 +306,15 @@ has_inbox_unread() {
     [[ -f "$inbox" ]] && grep -q '^ *read: false$' "$inbox"
 }
 
+# ─── Get inbox unread count (S-2: should_spawn_yakuzatengu用) ───
+get_inbox_unread_count() {
+    local agent_id="$1"
+    local inbox="$PROJECT_ROOT/queue/inbox/${agent_id}.yaml"
+
+    [[ ! -f "$inbox" ]] && echo "0" && return 0
+    grep -c 'read: false' "$inbox" 2>/dev/null || true
+}
+
 # ─── Check task YAML status ───
 get_task_status() {
     local agent_id="$1"
@@ -691,6 +700,295 @@ update_cooldown() {
     date +%s > "$cooldown_file"
 }
 
+# ─── Yakuza Tengu: STATEファイル存在チェック（M-1） ───
+is_yakuzatengu_active() {
+    [[ -f "$STATE_DIR/yakuzatengu_active" ]]
+}
+
+# ─── Yakuza Tengu: STATEクリーンアップ（M-7: clear_last含む） ───
+cleanup_yakuzatengu_state() {
+    rm -f "$STATE_DIR/yakuzatengu_active" \
+          "$STATE_DIR/yakuzatengu_original_agent_id" \
+          "$STATE_DIR/yakuzatengu_original_pane" \
+          "$STATE_DIR/yakuzatengu_original_model" \
+          "$STATE_DIR/yakuzatengu_spawn_time" \
+          "$STATE_DIR/yakuzatengu_despawn_pending" \
+          "$STATE_DIR/yakuzatengu_done" \
+          "$STATE_DIR/clear_last_yakuzatengu" \
+          "$STATE_DIR/njslyr_yakuzatengu_thinking_start" \
+          "$STATE_DIR/njslyr_yakuzatengu_idle_start"
+}
+
+# ─── Yakuza Tengu: spawn判定（M-4） ───
+# トリガー条件1: gryakuza inbox未読 >= 5
+# トリガー条件2: アイドルyakuza >= 3体 × 300秒
+should_spawn_yakuzatengu() {
+    local agent_id="$1"  # gryakuza
+
+    # 二重spawn防止（M-1）
+    is_yakuzatengu_active && return 1
+
+    # トリガー条件1: inbox未読 >= 5
+    local unread_count
+    unread_count=$(get_inbox_unread_count "$agent_id")
+    if [[ $unread_count -ge 5 ]]; then
+        log "spawn trigger: ${agent_id} inbox未読 ${unread_count}件 >= 5"
+        return 0
+    fi
+
+    # トリガー条件2: アイドルyakuza >= 3体 × 300秒
+    # NOTE: stat -c %Y はmacOS非対応（CB-04/CB-7）。catでidle_start中身を読む（S-4）
+    local idle_count=0
+    local now; now=$(date +%s)
+    while IFS= read -r yid; do
+        [[ ! "$yid" =~ ^yakuza[0-9]+$ ]] && continue
+        local idle_file="$STATE_DIR/njslyr_${yid}_idle_start"
+        [[ ! -f "$idle_file" ]] && continue
+        local idle_start; idle_start=$(cat "$idle_file")
+        local idle_elapsed=$((now - idle_start))
+        [[ $idle_elapsed -ge 300 ]] && idle_count=$(( idle_count + 1 ))
+    done < <(get_monitored_agents)
+
+    if [[ $idle_count -ge 3 ]]; then
+        log "spawn trigger: アイドルyakuza ${idle_count}体 >= 3体(300秒以上)"
+        return 0
+    fi
+
+    return 1
+}
+
+# ─── Yakuza Tengu: spawn実行（M-6: ロールバック付き・M-8: idle/thinking削除・M-9: #3a0025） ───
+# instructions/yakuzatengu.md spawn_banner参照（バナーAA表示: respawn→banner→sleep→respawn→Opus）
+spawn_yakuzatengu() {
+    local gryakuza_id="$1"
+
+    # 二重spawn防止（M-1）
+    is_yakuzatengu_active && { log "SKIP: yakuzatengu already active"; return 0; }
+
+    # アイドルyakuzaNを選択（idle_elapsed最長の1体）
+    local orig_agent=""
+    local max_idle=0
+    local now; now=$(date +%s)
+    while IFS= read -r yid; do
+        [[ ! "$yid" =~ ^yakuza[0-9]+$ ]] && continue
+        local idle_file="$STATE_DIR/njslyr_${yid}_idle_start"
+        if [[ -f "$idle_file" ]]; then
+            local idle_start; idle_start=$(cat "$idle_file")
+            local idle_elapsed=$((now - idle_start))
+            if [[ $idle_elapsed -gt $max_idle ]]; then
+                max_idle=$idle_elapsed
+                orig_agent="$yid"
+            fi
+        fi
+    done < <(get_monitored_agents)
+
+    if [[ -z "$orig_agent" ]]; then
+        log "WARN: spawn_yakuzatengu: アイドルyakuzaN見つからず。spawn中止。"
+        return 1
+    fi
+
+    local pane_target
+    pane_target=$(get_pane_target "$orig_agent")
+    if [[ -z "$pane_target" ]]; then
+        log "ERROR: spawn_yakuzatengu: ${orig_agent} のpane見つからず。spawn中止。"
+        return 1
+    fi
+
+    local orig_model
+    orig_model=$(tmux show-options -pv -t "$pane_target" @model_name 2>/dev/null || echo "")
+    [[ -z "$orig_model" ]] && orig_model="Sonnet"
+
+    log "spawn_yakuzatengu: ${orig_agent}(pane:${pane_target}, model:${orig_model}) → yakuzatengu"
+
+    # M-5: STATEファイル書き込み（respawn-pane前に必ず完了）
+    local spawn_time; spawn_time=$(date +%s)
+    touch "$STATE_DIR/yakuzatengu_active"
+    echo "$orig_agent" > "$STATE_DIR/yakuzatengu_original_agent_id"
+    echo "$pane_target" > "$STATE_DIR/yakuzatengu_original_pane"
+    echo "$orig_model" > "$STATE_DIR/yakuzatengu_original_model"
+    echo "$spawn_time" > "$STATE_DIR/yakuzatengu_spawn_time"
+
+    # M-8: spawn時にidle/thinkingファイル削除
+    rm -f "$STATE_DIR/njslyr_${orig_agent}_thinking_start"
+    rm -f "$STATE_DIR/njslyr_${orig_agent}_idle_start"
+
+    # S-3: 元yakuzaNタスクYAML statusをsuspendedに変更
+    local task_yaml
+    task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${orig_agent}"*.yaml 2>/dev/null | head -1)
+    if [[ -n "$task_yaml" && -f "$task_yaml" ]]; then
+        sed -i '' 's/^ *status: .*/  status: suspended/' "$task_yaml" 2>/dev/null || true
+        log "spawn_yakuzatengu: ${orig_agent} タスクYAML statusをsuspendedに変更"
+    fi
+
+    # remain-on-exit設定（恒久ルール）
+    tmux set-option -p -t "$pane_target" remain-on-exit on 2>/dev/null || true
+
+    # M-9: bg_color=#3a0025（ダークピンク）— バナー表示前に設定
+    tmux select-pane -t "$pane_target" -P "bg=#3a0025" 2>/dev/null || true
+
+    # バナー表示（instructions/yakuzatengu.md spawn_banner参照）
+    # 演出: respawn-pane→バナー→sleep 3→respawn-pane→Opus起動（stage3_slay死亡演出と同パターン）
+    tmux respawn-pane -k -t "$pane_target" \
+        "bash -c 'printf \"\033[2J\033[H\n\n\n\033[1;37m\n  \
+╔═══════════════════════════════════════════════╗\n  \
+║                                               ║\n  \
+║    ＜＜＜  YAKUZA TENGU ONLINE  ＞＞＞        ║\n  \
+║                                               ║\n  \
+║      神 々 の 使 者                           ║\n  \
+║      ヤ ク ザ 天 狗  参 上                    ║\n  \
+║                                               ║\n  \
+║             ブッダエイメン                    ║\n  \
+║                                               ║\n  \
+║         私を呼んだな。                        ║\n  \
+║                                               ║\n  \
+╚═══════════════════════════════════════════════╝\n\n  \
+◆ピンクの光が見える◆\033[0m\n\"; sleep 999999'" \
+        2>/dev/null || true
+    sleep 3
+
+    # M-6: Sonnet起動（失敗時はSTATEロールバック）（仕様変更: Opus→Sonnet by gryakuza 2026-02-25）
+    if ! tmux respawn-pane -k -t "$pane_target" \
+        "claude --model claude-sonnet-4-6 --dangerously-skip-permissions" 2>/dev/null; then
+        log "ERROR: spawn_yakuzatengu respawn-pane失敗。ロールバック。"
+        rm -f "$STATE_DIR/yakuzatengu_active" \
+              "$STATE_DIR/yakuzatengu_original_agent_id" \
+              "$STATE_DIR/yakuzatengu_original_pane" \
+              "$STATE_DIR/yakuzatengu_original_model" \
+              "$STATE_DIR/yakuzatengu_spawn_time"
+        return 1
+    fi
+    sleep 1
+
+    # @agent_id設定: yakuzatengu
+    tmux set-option -p -t "$pane_target" @agent_id "yakuzatengu" 2>/dev/null || true
+
+    # @model_name設定（M-10: 正確なモデルID用途の記録）
+    tmux set-option -p -t "$pane_target" @model_name "Sonnet" 2>/dev/null || true
+
+    # 起床スリケン送信
+    bash "$SCRIPT_DIR/inbox_write.sh" "yakuzatengu" \
+        "ヤクザ天狗spawn完了。instructions/yakuzatengu.mdを読み、任務を開始せよ。" \
+        task_assigned njslyr "" P0 2>/dev/null || true
+
+    log "◆ヤクザ天狗召喚◆ ${orig_agent} → yakuzatengu(claude-sonnet-4-6, #3a0025)。押し売り参上！"
+    return 0
+}
+
+# ─── Yakuza Tengu: despawn判定（M-2: 2サイクル確認+Guard時間+4時間上限） ───
+should_despawn_yakuzatengu() {
+    # Guard時間チェック: spawn後300秒未満はdespawn禁止（M-2）
+    local spawn_time now elapsed
+    spawn_time=$(cat "$STATE_DIR/yakuzatengu_spawn_time" 2>/dev/null || echo 0)
+    now=$(date +%s)
+    elapsed=$((now - spawn_time))
+    if [[ $elapsed -lt 300 ]]; then
+        log "yakuzatengu guard: ${elapsed}秒 < 300秒。despawn保留。"
+        return 1
+    fi
+
+    # 4時間上限: spawn後14400秒超過で強制despawn（M-2）
+    if [[ $elapsed -ge 14400 ]]; then
+        log "yakuzatengu 4時間上限超過。強制despawn。"
+        return 0
+    fi
+
+    # 自己despawnシグナル: yakuzatengu_done存在時は即座despawn（M-2）
+    if [[ -f "$STATE_DIR/yakuzatengu_done" ]]; then
+        log "yakuzatengu自己despawnシグナル検知。"
+        return 0
+    fi
+
+    # ヤマヒロ復帰判定
+    local gryakuza_unread
+    gryakuza_unread=$(get_inbox_unread_count "gryakuza")
+    local gryakuza_thinking=false
+    local pane
+    pane=$(get_pane_target "gryakuza")
+    if [[ -n "$pane" ]] && agent_is_thinking "$pane"; then
+        gryakuza_thinking=true
+    fi
+
+    # 復帰条件: inbox未読<3 AND thinking解消
+    if [[ $gryakuza_unread -lt 3 && "$gryakuza_thinking" == "false" ]]; then
+        # 2サイクル確認（M-2）
+        if [[ -f "$STATE_DIR/yakuzatengu_despawn_pending" ]]; then
+            log "yakuzatengu despawn: 2サイクル目確認OK。despawn実行。"
+            return 0
+        else
+            touch "$STATE_DIR/yakuzatengu_despawn_pending"
+            log "yakuzatengu despawn: 1サイクル目。pending記録。次サイクルで再確認。"
+            return 1
+        fi
+    else
+        # 条件不充足 → pending削除（リセット）
+        rm -f "$STATE_DIR/yakuzatengu_despawn_pending"
+        return 1
+    fi
+}
+
+# ─── Yakuza Tengu: despawn実行（M-6: respawn失敗時STATE保持） ───
+despawn_yakuzatengu() {
+    log "despawn_yakuzatengu: ヤクザ天狗帰還開始"
+
+    # STATEファイル読み込み
+    local orig_agent orig_pane orig_model
+    orig_agent=$(cat "$STATE_DIR/yakuzatengu_original_agent_id" 2>/dev/null || echo "")
+    orig_pane=$(cat "$STATE_DIR/yakuzatengu_original_pane" 2>/dev/null || echo "")
+    orig_model=$(cat "$STATE_DIR/yakuzatengu_original_model" 2>/dev/null || echo "Sonnet")
+
+    if [[ -z "$orig_agent" || -z "$orig_pane" ]]; then
+        log "ERROR: despawn_yakuzatengu: STATEファイル不完全。cleanup実行。"
+        cleanup_yakuzatengu_state
+        return 1
+    fi
+
+    # モデルとbg_colorを決定（M-10: 正確なモデルID）
+    local model bg_color
+    case "$orig_model" in
+        Opus|opus|OPUS)
+            model="claude-opus-4-6"
+            bg_color="#1a002e"
+            ;;
+        *)
+            model="claude-sonnet-4-6"
+            bg_color="default"
+            ;;
+    esac
+
+    log "despawn_yakuzatengu: yakuzatengu → ${orig_agent}(model:${model}, bg:${bg_color})"
+
+    # remain-on-exit設定（恒久ルール）
+    tmux set-option -p -t "$orig_pane" remain-on-exit on 2>/dev/null || true
+
+    # M-6: respawn-pane: 元モデル復元（失敗時はSTATE保持・次サイクルで再試行）
+    if ! tmux respawn-pane -k -t "$orig_pane" \
+        "claude --model ${model} --dangerously-skip-permissions" 2>/dev/null; then
+        log "ERROR: despawn respawn-pane失敗。STATE保持。次サイクルで再試行。"
+        return 1
+    fi
+    sleep 1
+
+    # @agent_id復元
+    tmux set-option -p -t "$orig_pane" @agent_id "$orig_agent" 2>/dev/null || true
+
+    # bg_color復元
+    tmux select-pane -t "$orig_pane" -P "bg=${bg_color}" 2>/dev/null || true
+
+    # @model_name復元
+    tmux set-option -p -t "$orig_pane" @model_name "$orig_model" 2>/dev/null || true
+
+    # M-7: STATEクリーンアップ（M-11: yakuzatenguのthinking/idle含む・clear_last含む）
+    cleanup_yakuzatengu_state
+
+    # 起床スリケン送信
+    bash "$SCRIPT_DIR/inbox_write.sh" "$orig_agent" \
+        "ヤクザ天狗despawn完了。Session Start手順を実行し、タスクYAMLを再読せよ。" \
+        task_assigned njslyr "" P0 2>/dev/null || true
+
+    log "◆ヤクザ天狗帰還◆ yakuzatengu → ${orig_agent}。任務完了、押し売り去る。"
+    return 0
+}
+
 # ─── Main agent check logic ───
 check_agent() {
     local agent_id="$1"
@@ -811,9 +1109,19 @@ check_agent() {
 
         # Check if inbox is still unread after 2 minutes
         if [[ $elapsed -ge $NUDGE_NO_RESPONSE ]] && [[ "$has_unread" == "true" ]]; then
-            # m2 fix: Skip Stage 2 for gryakuza
+            # m2 fix: Skip Stage 2 for gryakuza + Yakuzatengu spawn判定（M-3）
             if [[ "$gryakuza_stage1_only" == "true" ]]; then
+                if ! is_yakuzatengu_active; then
+                    if should_spawn_yakuzatengu "$agent_id"; then
+                        spawn_yakuzatengu "$agent_id"
+                    fi
+                fi
                 log "SKIP: ${agent_id} is limited to Stage 1 (monitor_context.sh priority)"
+                return 0
+            fi
+            # S-5: yakuzatengu is Stage 1 only (don't apply Stage 2 to the tengu)
+            if [[ "$agent_id" == "yakuzatengu" ]]; then
+                log "SKIP: yakuzatengu is Stage 1 only"
                 return 0
             fi
 
@@ -842,8 +1150,8 @@ check_agent() {
 
         # Check if inbox is still unread after 2 minutes AND /clear had no effect
         if [[ $elapsed -ge $NUDGE_NO_RESPONSE ]] && [[ "$has_unread" == "true" ]]; then
-            # m2 fix: Skip Stage 3 for gryakuza
-            if [[ "$gryakuza_stage1_only" == "true" ]]; then
+            # m2 fix: Skip Stage 3 for gryakuza / S-5: yakuzatengu Stage 1 only
+            if [[ "$gryakuza_stage1_only" == "true" ]] || [[ "$agent_id" == "yakuzatengu" ]]; then
                 log "SKIP: ${agent_id} is limited to Stage 1 (monitor_context.sh priority)"
                 return 0
             fi
@@ -982,6 +1290,13 @@ main() {
             echo -e "\033[1;31m☠ 爆発四散！サヨナラ！ニンジャソウル消滅！\033[0m"
         fi
     done <<< "$agents"
+
+    # yakuzatengu despawnチェック（M-3: main()ループ内、check_agent()ループ後）
+    if is_yakuzatengu_active; then
+        if should_despawn_yakuzatengu; then
+            despawn_yakuzatengu
+        fi
+    fi
 
     echo ""
 

@@ -1047,3 +1047,419 @@ EOF
     # Stage 2 timestamp file should also exist
     [ -f "$TEST_STATE_DIR/njslyr_test_agent_stage2_last" ]
 }
+
+# =============================================================================
+# TC-01: should_spawn_yakuzatengu: inbox未読>=5でtrue（P0）
+# =============================================================================
+
+@test "TC-01: should_spawn_yakuzatengu returns true when inbox unread >= 5" {
+    # yakuzatengu不活性
+    rm -f "$TEST_STATE_DIR/yakuzatengu_active"
+
+    # gryakuza inbox: 5件未読
+    cat > "$TEST_INBOX_DIR/gryakuza.yaml" << 'EOF'
+messages:
+- {id: m1, read: false, content: msg1, from: a, type: t, timestamp: t1}
+- {id: m2, read: false, content: msg2, from: a, type: t, timestamp: t2}
+- {id: m3, read: false, content: msg3, from: a, type: t, timestamp: t3}
+- {id: m4, read: false, content: msg4, from: a, type: t, timestamp: t4}
+- {id: m5, read: false, content: msg5, from: a, type: t, timestamp: t5}
+EOF
+
+    should_spawn_yakuzatengu "gryakuza"
+    [ $? -eq 0 ]
+}
+
+# =============================================================================
+# TC-02: should_spawn_yakuzatengu: アイドルyakuza>=3体×300秒でtrue（P0）
+# =============================================================================
+
+@test "TC-02: should_spawn_yakuzatengu returns true when 3+ yakuza idle for 300s" {
+    # yakuzatengu不活性
+    rm -f "$TEST_STATE_DIR/yakuzatengu_active"
+
+    # gryakuza inbox: 未読なし（条件2のみで判定）
+    echo "messages: []" > "$TEST_INBOX_DIR/gryakuza.yaml"
+
+    # get_monitored_agentsをoverride（yakuza1/2/3を返す）
+    get_monitored_agents() { printf 'yakuza1\nyakuza2\nyakuza3\n'; }
+
+    # 3体のidle_startファイルを400秒前に設定（>300秒）
+    local old_ts=$(($(date +%s) - 400))
+    for yid in yakuza1 yakuza2 yakuza3; do
+        echo "$old_ts" > "$TEST_STATE_DIR/njslyr_${yid}_idle_start"
+    done
+
+    should_spawn_yakuzatengu "gryakuza"
+    [ $? -eq 0 ]
+}
+
+# =============================================================================
+# TC-03: should_spawn_yakuzatengu: 二重spawn防止（P0）
+# =============================================================================
+
+@test "TC-03: should_spawn_yakuzatengu returns false when yakuzatengu already active" {
+    # yakuzatengu既にactive
+    touch "$TEST_STATE_DIR/yakuzatengu_active"
+
+    # gryakuza inbox: 5件未読（条件は満たす）
+    cat > "$TEST_INBOX_DIR/gryakuza.yaml" << 'EOF'
+messages:
+- {id: m1, read: false, content: msg1, from: a, type: t, timestamp: t1}
+- {id: m2, read: false, content: msg2, from: a, type: t, timestamp: t2}
+- {id: m3, read: false, content: msg3, from: a, type: t, timestamp: t3}
+- {id: m4, read: false, content: msg4, from: a, type: t, timestamp: t4}
+- {id: m5, read: false, content: msg5, from: a, type: t, timestamp: t5}
+EOF
+
+    # 二重spawn防止 → return 1 (run使用でset -eを回避)
+    run should_spawn_yakuzatengu "gryakuza"
+    [ "$status" -ne 0 ]
+}
+
+# =============================================================================
+# TC-04: should_spawn_yakuzatengu: 条件未達でfalse（P0）
+# =============================================================================
+
+@test "TC-04: should_spawn_yakuzatengu returns false when no conditions met" {
+    # yakuzatengu不活性
+    rm -f "$TEST_STATE_DIR/yakuzatengu_active"
+
+    # gryakuza inbox: 未読なし
+    echo "messages: []" > "$TEST_INBOX_DIR/gryakuza.yaml"
+
+    # get_monitored_agentsをoverride（idle yakuzaなし）
+    get_monitored_agents() { printf 'yakuza1\nyakuza2\n'; }
+
+    # idle_startファイルなし
+    rm -f "$TEST_STATE_DIR/njslyr_yakuza1_idle_start"
+    rm -f "$TEST_STATE_DIR/njslyr_yakuza2_idle_start"
+
+    # 条件未達 → return 1 (run使用でset -eを回避)
+    run should_spawn_yakuzatengu "gryakuza"
+    [ "$status" -ne 0 ]
+}
+
+# =============================================================================
+# TC-05: should_despawn_yakuzatengu: 2サイクル確認（1→pending、2→despawn）（P0）
+# =============================================================================
+
+@test "TC-05: should_despawn_yakuzatengu: 2-cycle confirmation for despawn" {
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # gryakuza pane設定
+    echo "0 gryakuza" > "$TEST_TMPDIR/mock_panes.txt"
+
+    # gryakuza inbox: 未読なし（復帰条件満足）
+    echo "messages: []" > "$TEST_INBOX_DIR/gryakuza.yaml"
+
+    # spawn_time: 600秒前（Guard時間超過）
+    echo "$(($(date +%s) - 600))" > "$TEST_STATE_DIR/yakuzatengu_spawn_time"
+
+    # pending_fileなし（1サイクル目）
+    rm -f "$TEST_STATE_DIR/yakuzatengu_despawn_pending"
+
+    # 1サイクル目: pending記録 → return 1 (run使用でset -eを回避)
+    run should_despawn_yakuzatengu
+    [ "$status" -ne 0 ]
+
+    # pending_fileが作成されているはず
+    [ -f "$TEST_STATE_DIR/yakuzatengu_despawn_pending" ]
+
+    # 2サイクル目: pending存在 → return 0（despawn実行）
+    run should_despawn_yakuzatengu
+    [ "$status" -eq 0 ]
+}
+
+# =============================================================================
+# TC-06: should_despawn_yakuzatengu: Guard時間（spawn後300秒未満はdespawn禁止）（P0）
+# =============================================================================
+
+@test "TC-06: should_despawn_yakuzatengu blocks despawn within 300s guard period" {
+    # spawn_time: 100秒前（Guard時間内）
+    echo "$(($(date +%s) - 100))" > "$TEST_STATE_DIR/yakuzatengu_spawn_time"
+
+    # Guard時間内 → return 1 (run使用でset -eを回避)
+    run should_despawn_yakuzatengu
+    [ "$status" -ne 0 ]
+}
+
+# =============================================================================
+# TC-07: cleanup_yakuzatengu_state: 全STATEファイル+clear_last削除（P1）
+# =============================================================================
+
+@test "TC-07: cleanup_yakuzatengu_state deletes all STATE files including clear_last" {
+    # 全STATEファイルを作成
+    touch "$TEST_STATE_DIR/yakuzatengu_active"
+    echo "yakuza1" > "$TEST_STATE_DIR/yakuzatengu_original_agent_id"
+    echo "multiagent:agents.1" > "$TEST_STATE_DIR/yakuzatengu_original_pane"
+    echo "Sonnet" > "$TEST_STATE_DIR/yakuzatengu_original_model"
+    echo "12345" > "$TEST_STATE_DIR/yakuzatengu_spawn_time"
+    touch "$TEST_STATE_DIR/yakuzatengu_despawn_pending"
+    touch "$TEST_STATE_DIR/yakuzatengu_done"
+    touch "$TEST_STATE_DIR/clear_last_yakuzatengu"
+    touch "$TEST_STATE_DIR/njslyr_yakuzatengu_thinking_start"
+    touch "$TEST_STATE_DIR/njslyr_yakuzatengu_idle_start"
+
+    # cleanup実行
+    cleanup_yakuzatengu_state
+
+    # 全ファイルが削除されているはず
+    [ ! -f "$TEST_STATE_DIR/yakuzatengu_active" ]
+    [ ! -f "$TEST_STATE_DIR/yakuzatengu_original_agent_id" ]
+    [ ! -f "$TEST_STATE_DIR/yakuzatengu_original_pane" ]
+    [ ! -f "$TEST_STATE_DIR/yakuzatengu_original_model" ]
+    [ ! -f "$TEST_STATE_DIR/yakuzatengu_spawn_time" ]
+    [ ! -f "$TEST_STATE_DIR/yakuzatengu_despawn_pending" ]
+    [ ! -f "$TEST_STATE_DIR/yakuzatengu_done" ]
+    [ ! -f "$TEST_STATE_DIR/clear_last_yakuzatengu" ]
+    [ ! -f "$TEST_STATE_DIR/njslyr_yakuzatengu_thinking_start" ]
+    [ ! -f "$TEST_STATE_DIR/njslyr_yakuzatengu_idle_start" ]
+}
+
+# =============================================================================
+# TC-08: yakuzatengu_done自己despawnシグナル: 即座despawn（P1）
+# =============================================================================
+
+@test "TC-08: should_despawn_yakuzatengu triggers immediately on yakuzatengu_done signal" {
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # spawn_time: 600秒前（Guard時間超過）
+    echo "$(($(date +%s) - 600))" > "$TEST_STATE_DIR/yakuzatengu_spawn_time"
+
+    # 自己despawnシグナル: yakuzatengu_done作成
+    touch "$TEST_STATE_DIR/yakuzatengu_done"
+
+    # gryakuza inbox: 未読多い（復帰条件を満たさない状態でもdoneシグナルで即座despawn）
+    cat > "$TEST_INBOX_DIR/gryakuza.yaml" << 'EOF'
+messages:
+- {id: m1, read: false, content: msg1, from: a, type: t, timestamp: t1}
+- {id: m2, read: false, content: msg2, from: a, type: t, timestamp: t2}
+- {id: m3, read: false, content: msg3, from: a, type: t, timestamp: t3}
+- {id: m4, read: false, content: msg4, from: a, type: t, timestamp: t4}
+- {id: m5, read: false, content: msg5, from: a, type: t, timestamp: t5}
+EOF
+
+    # yakuzatengu_doneシグナルで即座despawn
+    should_despawn_yakuzatengu
+    [ $? -eq 0 ]
+}
+
+# =============================================================================
+# TC-09: idle_threshold判定: idle_count<3時にpendingリセット（P1）
+# =============================================================================
+
+@test "TC-09: should_despawn_yakuzatengu resets pending when conditions not met" {
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # spawn_time: 600秒前（Guard時間超過）
+    echo "$(($(date +%s) - 600))" > "$TEST_STATE_DIR/yakuzatengu_spawn_time"
+
+    # gryakuza inbox: 未読多い（復帰条件未満）
+    cat > "$TEST_INBOX_DIR/gryakuza.yaml" << 'EOF'
+messages:
+- {id: m1, read: false, content: msg1, from: a, type: t, timestamp: t1}
+- {id: m2, read: false, content: msg2, from: a, type: t, timestamp: t2}
+- {id: m3, read: false, content: msg3, from: a, type: t, timestamp: t3}
+EOF
+
+    # pending_file存在（前サイクルで1サイクル目を通過した想定）
+    touch "$TEST_STATE_DIR/yakuzatengu_despawn_pending"
+
+    # 条件不充足 → pendingをリセット → return 1 (run使用でset -eを回避)
+    run should_despawn_yakuzatengu
+    [ "$status" -ne 0 ]
+
+    # pending_fileが削除されているはず
+    [ ! -f "$TEST_STATE_DIR/yakuzatengu_despawn_pending" ]
+}
+
+# =============================================================================
+# TC-10: 4時間上限: spawn_time+14400秒超過で強制despawn（P1）
+# =============================================================================
+
+@test "TC-10: should_despawn_yakuzatengu forces despawn after 4-hour limit" {
+    # spawn_time: 14401秒前（4時間超過）
+    echo "$(($(date +%s) - 14401))" > "$TEST_STATE_DIR/yakuzatengu_spawn_time"
+
+    should_despawn_yakuzatengu
+    [ $? -eq 0 ]
+}
+
+# =============================================================================
+# TC-11: spawn respawn失敗時のSTATEロールバック（P2）
+# =============================================================================
+
+@test "TC-11: spawn_yakuzatengu rolls back STATE files on respawn failure" {
+    # respawn-paneが失敗するtmuxモック
+    cat > "$MOCK_TMUX_DIR/tmux" << 'FAIL_MOCK'
+#!/bin/bash
+case "$1" in
+    respawn-pane)
+        echo "tmux respawn-pane $*" >> "${TEST_TMPDIR}/tmux_calls.log"
+        # 2回目のrespawn-pane（Opus起動）は失敗させる
+        if grep -q "claude --model" "$*" 2>/dev/null || echo "$*" | grep -q "claude"; then
+            exit 1
+        fi
+        exit 0
+        ;;
+    list-panes)
+        if [ -f "${TEST_TMPDIR}/mock_panes.txt" ]; then
+            cat "${TEST_TMPDIR}/mock_panes.txt"
+        fi
+        ;;
+    show-options) echo "Sonnet" ;;
+    *) echo "tmux $*" >> "${TEST_TMPDIR}/tmux_calls.log" ;;
+esac
+exit 0
+FAIL_MOCK
+    chmod +x "$MOCK_TMUX_DIR/tmux"
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # Always-fail respawn mock（最もシンプルな方法）
+    cat > "$MOCK_TMUX_DIR/tmux" << 'ALWAYSFAIL_MOCK'
+#!/bin/bash
+case "$1" in
+    respawn-pane)
+        # 2回目（claude --model）は失敗
+        if echo "$*" | grep -q -- "--model"; then
+            exit 1
+        fi
+        exit 0
+        ;;
+    list-panes)
+        if [ -f "${TEST_TMPDIR}/mock_panes.txt" ]; then cat "${TEST_TMPDIR}/mock_panes.txt"; fi
+        ;;
+    show-options) echo "Sonnet" ;;
+    *) ;;
+esac
+exit 0
+ALWAYSFAIL_MOCK
+    chmod +x "$MOCK_TMUX_DIR/tmux"
+
+    # アイドルyakuza設定（get_pane_target用: INDEX agent_id形式）
+    echo "3 yakuza3" > "$TEST_TMPDIR/mock_panes.txt"
+    echo "$(($(date +%s) - 400))" > "$TEST_STATE_DIR/njslyr_yakuza3_idle_start"
+
+    # gryakuza inbox（spawn判定用）
+    echo "messages: []" > "$TEST_INBOX_DIR/gryakuza.yaml"
+
+    # yakuzatengu不活性
+    rm -f "$TEST_STATE_DIR/yakuzatengu_active"
+
+    # get_monitored_agentsをoverride（mock_panes.txtの2フィールド問題を回避）
+    get_monitored_agents() { printf 'yakuza3\n'; }
+
+    # spawn実行 → respawn失敗 → ロールバック
+    spawn_yakuzatengu "gryakuza" || true
+
+    # STATEファイルがロールバックされているはず
+    [ ! -f "$TEST_STATE_DIR/yakuzatengu_active" ]
+    [ ! -f "$TEST_STATE_DIR/yakuzatengu_original_agent_id" ]
+    [ ! -f "$TEST_STATE_DIR/yakuzatengu_original_pane" ]
+    [ ! -f "$TEST_STATE_DIR/yakuzatengu_original_model" ]
+    [ ! -f "$TEST_STATE_DIR/yakuzatengu_spawn_time" ]
+}
+
+# =============================================================================
+# TC-12: despawn respawn失敗時STATE保持（次サイクル再試行）（P2）
+# =============================================================================
+
+@test "TC-12: despawn_yakuzatengu keeps STATE when respawn fails" {
+    # respawn-pane失敗モック
+    cat > "$MOCK_TMUX_DIR/tmux" << 'FAIL_MOCK'
+#!/bin/bash
+case "$1" in
+    respawn-pane) exit 1 ;;
+    *) ;;
+esac
+exit 0
+FAIL_MOCK
+    chmod +x "$MOCK_TMUX_DIR/tmux"
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # STATE設定
+    touch "$TEST_STATE_DIR/yakuzatengu_active"
+    echo "yakuza3" > "$TEST_STATE_DIR/yakuzatengu_original_agent_id"
+    echo "multiagent:agents.3" > "$TEST_STATE_DIR/yakuzatengu_original_pane"
+    echo "Sonnet" > "$TEST_STATE_DIR/yakuzatengu_original_model"
+    echo "$(($(date +%s) - 600))" > "$TEST_STATE_DIR/yakuzatengu_spawn_time"
+
+    # despawn実行 → respawn失敗 → STATE保持
+    run despawn_yakuzatengu
+    [ "$status" -ne 0 ]
+
+    # STATEファイルが保持されているはず
+    [ -f "$TEST_STATE_DIR/yakuzatengu_active" ]
+    [ -f "$TEST_STATE_DIR/yakuzatengu_original_agent_id" ]
+}
+
+# =============================================================================
+# TC-13: spawn→despawnライフサイクル統合テスト（P2）
+# =============================================================================
+
+@test "TC-13: spawn_yakuzatengu and despawn_yakuzatengu full lifecycle" {
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # Mock panes
+    echo "1 yakuza1" > "$TEST_TMPDIR/mock_panes.txt"
+
+    # アイドルyakuza1: 400秒前からアイドル
+    echo "$(($(date +%s) - 400))" > "$TEST_STATE_DIR/njslyr_yakuza1_idle_start"
+
+    # タスクYAML
+    cat > "$TEST_TASKS_DIR/yakuza1.yaml" << 'EOF'
+task:
+  task_id: lifecycle_test_001
+  status: assigned
+EOF
+
+    # gryakuza inbox
+    echo "messages: []" > "$TEST_INBOX_DIR/gryakuza.yaml"
+
+    # yakuzatengu inbox初期化
+    echo "messages: []" > "$TEST_INBOX_DIR/yakuzatengu.yaml"
+
+    # yakuzatengu不活性
+    rm -f "$TEST_STATE_DIR/yakuzatengu_active"
+
+    # get_monitored_agentsをoverride
+    get_monitored_agents() { printf 'yakuza1\n'; }
+
+    > "$TEST_TMPDIR/tmux_calls.log"
+
+    # === spawn実行 ===
+    spawn_yakuzatengu "gryakuza"
+    [ $? -eq 0 ]
+
+    # STATEファイルが作成されているはず
+    [ -f "$TEST_STATE_DIR/yakuzatengu_active" ]
+    [ -f "$TEST_STATE_DIR/yakuzatengu_original_agent_id" ]
+    [ -f "$TEST_STATE_DIR/yakuzatengu_original_pane" ]
+    [ -f "$TEST_STATE_DIR/yakuzatengu_original_model" ]
+    [ -f "$TEST_STATE_DIR/yakuzatengu_spawn_time" ]
+
+    # 元yakuza1のidle_startが削除されているはず（M-8）
+    [ ! -f "$TEST_STATE_DIR/njslyr_yakuza1_idle_start" ]
+
+    # @agent_idがyakuzatenguに設定されているはず
+    grep -q 'set-option.*@agent_id.*yakuzatengu' "$TEST_TMPDIR/tmux_calls.log"
+
+    # bg_color=#3a0025が設定されているはず（M-9）
+    grep -q 'select-pane.*bg=#3a0025' "$TEST_TMPDIR/tmux_calls.log"
+
+    # タスクYAMLがsuspendedに変更されているはず（S-3）
+    grep -q 'status: suspended' "$TEST_TASKS_DIR/yakuza1.yaml"
+
+    # === despawn実行 ===
+    > "$TEST_TMPDIR/tmux_calls.log"
+    despawn_yakuzatengu
+    [ $? -eq 0 ]
+
+    # STATEファイルがcleanupされているはず
+    [ ! -f "$TEST_STATE_DIR/yakuzatengu_active" ]
+    [ ! -f "$TEST_STATE_DIR/yakuzatengu_original_agent_id" ]
+
+    # @agent_idがyakuza1に復元されているはず
+    grep -q 'set-option.*@agent_id.*yakuza1' "$TEST_TMPDIR/tmux_calls.log"
+}
