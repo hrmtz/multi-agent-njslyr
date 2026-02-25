@@ -212,7 +212,7 @@ Race condition is eliminated: `/clear` wipes old context. Agent re-reads YAML wi
 |-----------|--------|--------|
 | Yakuza → Soukaiya | Report YAML + inbox_write | Quality check & dashboard aggregation |
 | Soukaiya → Gryakuza | Report YAML + inbox_write | Quality check result + strategic reports |
-| Gryakuza → Darkninja/ラオモト | dashboard.md update + inbox_write permitted | Dashboard update is primary. inbox_write to darkninja permitted for urgent reports (P0/P1). |
+| Gryakuza → Darkninja/ラオモト | dashboard.md update + inbox_write **mandatory** | Dashboard update + ダークニンジャへのinbox報告は**全cmd完了時に必須**。報告なき完了はセプク案件。 |
 | Gryakuza → Soukaiya | YAML + inbox_write | Strategic task or quality check delegation |
 | Top → Down | YAML + inbox_write | Standard wake-up |
 
@@ -311,9 +311,14 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 # multi-agent-njslyr
 ネオサイタマmod マルチエージェントシステム + instagram-slides/surgery-log-app プロジェクト管理
 
-_Last updated: 2026-02-21 | 20 active memories, 21 total_
+_Last updated: 2026-02-25 | 27 active memories, 29 total_
 
 ## Architecture
+- wp-publisher パイプライン構成（2026-02-22 完成）:
+
+■ 概要: 論文PDF → SEO最適化ブログ記事 → WordPress下書き投稿（Zetith Beauty Clinic）
+
+■ 2段階アーキテクチャ... [wp-publisher, pipeline, architecture, notebooklm, doi, crossref]
 - サムネイル/wiggle動画パイプライン（instagram-slides）:
 Step 1: slides.html（4:5スライド）作成
 Step 2: slides_9x16.html（9:16リール用）作成
@@ -345,6 +350,10 @@ Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
 - CoeFont API: 月55,000円 → コスパ悪すぎ
 - TarakoTalk（非公式）: バックエンドAPI停止（HTTP 500）→ 使用不可
 - 結論: ... [instagram-slides, thumbnail, voice, hiroyuki, 見送り]
+- wp-publisher 論文自動取得パイプライン（2026-02-25 ラオモト指示）:
+
+■ 概要: SEOシートのお題 → 論文検索 → PDF自動ダウンロード → input/配置を自動化
+■ 従来: OpenEvidence... [wp-publisher, paper-finder, pipeline, architecture, sci-hub, unpaywall]
 
 ## Patterns & Conventions
 - テロップ仕様（2026-02-16 ラオモト承認・恒久）:
@@ -354,6 +363,22 @@ Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
 - サムネイル挿入仕様（2026-02-16 ラオモト承認・恒久）:
 - 冒頭サムネイル: 各プロジェクトのreel/thumbnail.png（9x16）を動画冒頭に挿入。存在しなければスキップ
 - 表示時間: 1.5秒（THUMBNA... [instagram-slides, thumbnail, reel, 恒久ルール]
+- 煽りタイトル最適化ルール（2026-02-22 ラオモトFB）:
+- 文字数カウントは読み上げベース（ひらがな/カタカナ換算）で計測する。漢字込み文字数は不正確
+- 成功例: saddle_nose(読み19字)、nose_aging... [instagram-slides, thumbnail, 煽りタイトル, 読み上げ, 恒久ルール]
+- 煽りタイトル高成功率テンプレート（2026-02-22 ラオモトFB・恒久）:
+
+テンプレートA: 「〜の美容外科医が怖すぎる」
+- 例: 「鼻の老化を知らずに整形する先生が怖すぎる」
+- 構造: [医者の欠点/無知] + が怖すぎる... [instagram-slides, thumbnail, 煽りタイトル, テンプレート, 恒久ルール]
+- wp-publisher 画像サイズルール（2026-02-25 ラオモト指示・恒久）:
+
+■ 画像ファイルの最大サイズ（抽出時リサイズ）
+- MAX_WIDTH: 800px, MAX_HEIGHT: 600px
+- アスペクト比維... [wp-publisher, image, size, 恒久ルール]
+- wp-publisher paper_finder.py 検索言語ルール（2026-02-25 ラオモト指示・恒久）:
+- PubMed検索は必ず英語キーワードで行う。日本語ではヒットしない
+- SEOシートの日本語KWはMEDICA... [wp-publisher, paper-finder, pubmed, search, 恒久ルール]
 
 ## Gotchas & Pitfalls
 - キャッシュ汚染事故（2026-02-16 ケジメ案件）:
@@ -379,6 +404,9 @@ Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
 - @agent_id誤設定バグ再発（2026-02-21）:
 - %95(yakuza3)が再びdarkninjaに誤設定されていた
 - 2026-02-18のケジメ案件と同じバグ。前回commit 8badf57でvalidate_a... [gotcha, tmux, agent_id, incident, priority]
+- wp-publisher pipeline dry-run後の投稿手順（2026-02-23 ケジメ案件・恒久ルール）:
+- dry-runは1回のみ。draft.json生成後、Claude API再呼び出しは禁止
+- 投稿はdra... [wp-publisher, pipeline, dry-run, gotcha, 恒久ルール]
 
 ## Current Progress
 - instagram-slides 進捗（2026-02-20時点）:

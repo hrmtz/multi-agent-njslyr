@@ -275,7 +275,7 @@ detox_barikidorink() {
 # 検知した場合はダッシュボードへ警告を記録してダークニンジャに通知する。
 validate_agent_ids() {
     local suspicious_panes
-    suspicious_panes=$(tmux list-panes -t multiagent -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
+    suspicious_panes=$(tmux list-panes -t multiagent:agents -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
         awk '$2 == "darkninja" {print $1}' || true)
 
     if [[ -n "$suspicious_panes" ]]; then
@@ -292,7 +292,7 @@ validate_agent_ids() {
 get_monitored_agents() {
     # Dynamically detect agents from yokubari.sh process list
     # Exclude darkninja (human agent)
-    tmux list-panes -t multiagent -F '#{@agent_id}' 2>/dev/null | \
+    tmux list-panes -t multiagent:agents -F '#{@agent_id}' 2>/dev/null | \
         grep -v '^$' | \
         grep -v '^darkninja$' | \
         sort -u || true
@@ -327,9 +327,9 @@ get_task_status() {
 # ─── Get pane target for agent ───
 get_pane_target() {
     local agent_id="$1"
-    # Find pane with matching @agent_id
-    tmux list-panes -t multiagent -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
-        awk -v id="$agent_id" '$2 == id {print "multiagent:1." $1; exit}'
+    # Find pane with matching @agent_id (BUG-2 fix: use named window "agents")
+    tmux list-panes -t multiagent:agents -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
+        awk -v id="$agent_id" '$2 == id {print "multiagent:agents." $1; exit}'
 }
 
 # ─── Agent busy detection (from inbox_watcher.sh pattern) ───
@@ -339,8 +339,8 @@ agent_is_busy() {
 
     pane_tail=$(timeout 1 tmux capture-pane -t "$pane_target" -p 2>/dev/null | tail -5 || echo "")
 
-    # Check for busy markers
-    if echo "$pane_tail" | grep -qiE '(Working|Thinking|Planning|Sending|思考中|考え中|計画中|送信中|処理中|実行中|esc to interrupt)'; then
+    # Check for busy markers (BUG-3 fix: expanded patterns — confirmed Claude Code outputs only)
+    if echo "$pane_tail" | grep -qiE '(Working|Thinking|Planning|Sending|Generating|\(thinking\)|thought for|Cogitated|思考中|考え中|計画中|送信中|処理中|実行中|生成中|esc to interrupt)'; then
         return 0  # busy
     fi
 
@@ -354,8 +354,8 @@ agent_is_thinking() {
 
     pane_content=$(timeout 1 tmux capture-pane -t "$pane_target" -p 2>/dev/null | tail -10 || echo "")
 
-    # Check for thinking markers
-    if echo "$pane_content" | grep -qiE '(Thinking|思考中|Planning|考え中|計画中)'; then
+    # Check for thinking markers (BUG-3 fix: add bracketed (thinking) pattern)
+    if echo "$pane_content" | grep -qiE '(Thinking|\(thinking\)|思考中|Planning|考え中|計画中)'; then
         return 0  # thinking
     fi
 
@@ -374,17 +374,19 @@ is_long_running_task() {
 # ─── Check inbox_watcher recent /clear ───
 inbox_watcher_recently_cleared() {
     local agent_id="$1"
-    local state_file="$METRICS_DIR/inbox_watcher_state_${agent_id}.yaml"
+    # BUG-6 fix: Use shared clear lock file (written by njslyr stage2, inbox_watcher clear_command/Phase 3)
+    # Note: TOCTOU with inbox_watcher.sh. Mitigated by multi-layer cooldown.
+    local clear_lock="$STATE_DIR/clear_last_${agent_id}"
 
-    [[ ! -f "$state_file" ]] && return 1
+    [[ ! -f "$clear_lock" ]] && return 1
 
     local last_clear_ts
-    last_clear_ts=$(grep 'LAST_CLEAR_TS:' "$state_file" 2>/dev/null | sed 's/.*: *//' || echo "0")
+    last_clear_ts=$(cat "$clear_lock" 2>/dev/null || echo "0")
 
     local now
     now=$(date +%s)
 
-    # If inbox_watcher sent /clear within last 5 minutes, skip
+    # If any /clear was sent within last 5 minutes, skip
     [[ $((now - last_clear_ts)) -lt 300 ]]
 }
 
@@ -479,6 +481,10 @@ stage2_chop() {
     local stage2_ts_file="$STATE_DIR/njslyr_${agent_id}_stage2_last"
     date +%s > "$stage2_ts_file"
 
+    # BUG-6 fix: Write shared clear lock
+    local clear_lock="$STATE_DIR/clear_last_${agent_id}"
+    date +%s > "$clear_lock"
+
     log_execution "$agent_id" "Stage 2 (チョップ)" "success" "$reason"
 
     return 0
@@ -570,6 +576,11 @@ SLAY_EOF
 
     # ─── End pre-slay data preservation ───
 
+    # BUG-1 fix: Read @model_name before slay (to restore correct model/bg_color)
+    local pane_model
+    pane_model=$(tmux show-options -pv -t "$pane_target" @model_name 2>/dev/null || echo "")
+    log "Pre-slay @model_name for ${agent_id}: '${pane_model}'"
+
     # Step 0: Prevent pane from closing when process dies
     # Without this, killing the process may close the pane and shrink the tmux window
     tmux set-option -p -t "$pane_target" remain-on-exit on 2>/dev/null || true
@@ -583,7 +594,7 @@ SLAY_EOF
     death_cry=$(generate_death_cry "$agent_id")
     log "断末魔: ${agent_id}"
     tmux respawn-pane -k -t "$pane_target" "bash -c 'printf \"\033[2J\033[H\n\n\n\033[1;37;41m\n\n     ╔══════════════════════════════════════════════════════════════════════════╗\n     ║    ＜＜＜ SLAY ＞＞＞                                                   ║\n     ║                                                                          ║\n${death_cry}\n     ║                                                                          ║\n     ║    【 ${agent_id} — 爆発四散！ 】                                  ║\n     ╚══════════════════════════════════════════════════════════════════════════╝\n\n     ◆ニンジャソウル消滅◆ サヨナラ！\033[0m\n\"; sleep 999999'" 2>/dev/null || true
-    sleep 3
+    sleep 5
 
     # Step 3: Determine agent type for restart command
     local agent_type
@@ -599,23 +610,45 @@ SLAY_EOF
         return 1
     fi
 
-    # Step 4: Determine model based on agent_type (C3 fix)
+    # Step 4: Determine model from @model_name (BUG-1 fix)
     local model
-    if [[ "$agent_id" == "soukaiya" ]]; then
-        model="opus"
+    local bg_color="default"
+    if [[ -n "$pane_model" ]]; then
+        case "$pane_model" in
+            Opus|opus|OPUS)
+                model="opus"
+                bg_color="#1a002e"
+                ;;
+            Sonnet|sonnet|SONNET)
+                model="sonnet"
+                ;;
+            *)
+                log "WARNING: Unknown @model_name '${pane_model}' for ${agent_id}, defaulting to sonnet"
+                model="sonnet"
+                ;;
+        esac
     else
-        model="sonnet"
+        # Fallback: agent type default (backward compatible)
+        if [[ "$agent_id" == "soukaiya" ]]; then
+            model="opus"
+        else
+            model="sonnet"
+        fi
     fi
 
+    # ADDON-1: Clear thinking/idle state (prevent false positive after restart)
+    rm -f "$STATE_DIR/njslyr_${agent_id}_thinking_start"
+    rm -f "$STATE_DIR/njslyr_${agent_id}_idle_start"
+
     # Step 5: Restart agent using respawn-pane (M3 fix - preserves grid layout)
-    log "◆再ショウカン◆ ${agent_id}（type: ${agent_type}, model: ${model}）…ニンジャソウル再覚醒！"
+    log "◆再ショウカン◆ ${agent_id}（type: ${agent_type}, model: ${model}, bg: ${bg_color}）…ニンジャソウル再覚醒！"
     sleep 1
     tmux respawn-pane -k -t "$pane_target" "claude --model ${model} --dangerously-skip-permissions" 2>/dev/null || true
     sleep 2
 
     # Step 6: Reset pane background (keep remain-on-exit ON permanently)
     # remain-on-exit stays on so if Claude CLI crashes later, the pane survives
-    tmux select-pane -t "$pane_target" -P 'bg=default' 2>/dev/null || true
+    tmux select-pane -t "$pane_target" -P "bg=${bg_color}" 2>/dev/null || true
 
     # Step 7: Increment restart counter
     increment_restart_count "$agent_id"
@@ -662,6 +695,10 @@ update_cooldown() {
 check_agent() {
     local agent_id="$1"
 
+    # State file paths (BUG-4/5: declared once, used in thinking/idle blocks)
+    local thinking_state_file="$STATE_DIR/njslyr_${agent_id}_thinking_start"
+    local idle_state_file="$STATE_DIR/njslyr_${agent_id}_idle_start"
+
     # Get pane target
     local pane_target
     pane_target=$(get_pane_target "$agent_id")
@@ -681,6 +718,11 @@ check_agent() {
     local task_status
     task_status=$(get_task_status "$agent_id")
 
+    # BUG-5 fix: Clear idle tracking when agent has a task
+    if [[ "$task_status" != "idle" ]]; then
+        rm -f "$idle_state_file"
+    fi
+
     # Check if agent is thinking
     local is_thinking=false
     if agent_is_thinking "$pane_target"; then
@@ -698,15 +740,55 @@ check_agent() {
             return 0
         fi
 
-        # TODO: Track thinking start time (requires state file)
-        # For now, we skip thinking detection in Phase 2
-        # Will be implemented in Phase 2.1 with state tracking
-        log "INFO: ${agent_id} is thinking (tracking not yet implemented)"
+        # BUG-4 fix: Track thinking start time via state file
+        if [[ ! -f "$thinking_state_file" ]]; then
+            # First detection — record start time
+            date +%s > "$thinking_state_file"
+            log "INFO: ${agent_id} thinking開始を記録"
+            return 0
+        fi
+
+        # Calculate elapsed thinking time
+        local thinking_start
+        thinking_start=$(cat "$thinking_state_file" 2>/dev/null || echo "0")
+        local now
+        now=$(date +%s)
+        local thinking_elapsed=$((now - thinking_start))
+
+        if [[ $thinking_elapsed -ge $THINKING_TIMEOUT ]]; then
+            log "[KARATE] ${agent_id} がThinking${thinking_elapsed}秒！THINKING_TIMEOUT(${THINKING_TIMEOUT}秒)超過！"
+            rm -f "$thinking_state_file"
+
+            # gryakuza is limited to Stage 1 only (m2 fix)
+            if [[ "$agent_id" == "gryakuza" ]]; then
+                stage1_suriken "$agent_id" "thinking超過（${thinking_elapsed}秒）"
+                update_cooldown "$agent_id" "stage1"
+                return 0
+            fi
+
+            # Other agents: escalate to Stage 2
+            if check_cooldown "$agent_id" "stage2"; then
+                stage2_chop "$agent_id" "thinking超過（${thinking_elapsed}秒）"
+                update_cooldown "$agent_id" "stage2"
+            else
+                log "SKIP: ${agent_id} Stage 2 cooldown active (thinking超過)"
+            fi
+            return 0
+        fi
+
+        log "INFO: ${agent_id} thinking中（${thinking_elapsed}秒経過 / timeout: ${THINKING_TIMEOUT}秒）"
         return 0
     fi
 
-    # Cost optimization filter: Skip if no inbox unread (unless thinking)
-    if [[ "$has_unread" == "false" ]]; then
+    # BUG-4 fix: Clear thinking state if agent is no longer thinking
+    if [[ -f "$thinking_state_file" ]]; then
+        log "INFO: ${agent_id} thinking終了を検知。state file削除。"
+        rm -f "$thinking_state_file"
+    fi
+
+    # Cost optimization filter: Skip if no inbox unread (unless thinking or idle)
+    # BUG-5 fix: Allow idle agents to pass through even without inbox unread
+    if [[ "$has_unread" == "false" && "$task_status" != "idle" ]]; then
         log "SKIP: ${agent_id} has no inbox unread (cost optimization)"
         return 0
     fi
@@ -787,10 +869,32 @@ check_agent() {
     # (1) Idle timeout
     # Check if agent has no task and has been idle for 5+ minutes
     if [[ "$task_status" == "idle" ]]; then
-        # TODO: Track idle start time (requires state file)
-        # For now, we skip idle detection in Phase 2
-        # Will be implemented in Phase 2.1 with state tracking
-        log "INFO: ${agent_id} is idle (tracking not yet implemented)"
+        local now
+        now=$(date +%s)
+
+        if [[ ! -f "$idle_state_file" ]]; then
+            # First idle detection: record start time
+            echo "$now" > "$idle_state_file"
+            log "INFO: ${agent_id} is idle — tracking started"
+            return 0
+        fi
+
+        local idle_start
+        idle_start=$(cat "$idle_state_file" 2>/dev/null || echo "0")
+        local idle_elapsed=$((now - idle_start))
+
+        if [[ $idle_elapsed -ge $IDLE_TIMEOUT ]]; then
+            # Idle too long → Stage 1 suriken
+            # Note: idle suriken送信後は通常のスリケン無応答エスカレーション
+            # (Stage 1→2→3) が引き継ぐ。inbox_write.shでinboxに書き込まれた
+            # surikenが未読となり、次サイクルからhas_unread=trueで通常フローに移行。
+            stage1_suriken "$agent_id" "アイドル超過（${idle_elapsed}秒）"
+            update_cooldown "$agent_id" "stage1"
+            # Reset idle timer (next suriken after another IDLE_TIMEOUT)
+            echo "$now" > "$idle_state_file"
+        else
+            log "INFO: ${agent_id} is idle (${idle_elapsed}s / ${IDLE_TIMEOUT}s threshold)"
+        fi
         return 0
     fi
 

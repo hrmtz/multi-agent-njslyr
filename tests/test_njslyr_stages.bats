@@ -131,6 +131,13 @@ case "$1" in
         echo "tmux capture-pane $*" >> "${TEST_TMPDIR}/tmux_calls.log"
         echo ""  # empty output
         ;;
+    show-options)
+        echo "tmux show-options $*" >> "${TEST_TMPDIR}/tmux_calls.log"
+        # Return mock model name if configured
+        if [ -f "${TEST_TMPDIR}/mock_model_name.txt" ]; then
+            cat "${TEST_TMPDIR}/mock_model_name.txt"
+        fi
+        ;;
     list-panes)
         echo "tmux list-panes $*" >> "${TEST_TMPDIR}/tmux_calls.log"
         # Return mock pane data if available
@@ -449,17 +456,17 @@ EOF
     # tmuxモック使用
     export PATH="$MOCK_TMUX_DIR:$PATH"
 
-    # yakuza3のペインターゲット取得
+    # yakuza3のペインターゲット取得 (BUG-2 fix: multiagent:agents.N format)
     result=$(get_pane_target "yakuza3")
-    [ "$result" = "multiagent:1.3" ]
+    [ "$result" = "multiagent:agents.3" ]
 
     # gryakuzaのペインターゲット取得
     result=$(get_pane_target "gryakuza")
-    [ "$result" = "multiagent:1.0" ]
+    [ "$result" = "multiagent:agents.0" ]
 
     # soukaiyaのペインターゲット取得
     result=$(get_pane_target "soukaiya")
-    [ "$result" = "multiagent:1.8" ]
+    [ "$result" = "multiagent:agents.8" ]
 
     # 存在しないエージェント → 空文字
     result=$(get_pane_target "nonexistent_agent")
@@ -524,4 +531,519 @@ EOF
     # 出力が空でないことを確認
     result=$(generate_farewell_haiku)
     [ -n "$result" ]
+}
+
+# =============================================================================
+# TC-B3-1: agent_is_busy() — BUG-3 expanded pattern detection
+# =============================================================================
+
+@test "TC-B3-1: agent_is_busy detects expanded patterns" {
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    local patterns=(
+        "Thinking..."
+        "(thinking)"
+        "thought for 3.2s"
+        "Cogitated for 5.1s"
+        "Working on task"
+        "Generating output"
+        "Planning next steps"
+        "Sending request"
+        "esc to interrupt"
+        "思考中"
+        "処理中"
+        "生成中"
+        "計画中"
+        "送信中"
+        "実行中"
+    )
+
+    for pattern in "${patterns[@]}"; do
+        # Override capture-pane mock to return this pattern
+        cat > "$MOCK_TMUX_DIR/tmux" << MOCK_EOF
+#!/bin/bash
+case "\$1" in
+    capture-pane) echo "$pattern" ;;
+    *) echo "" ;;
+esac
+exit 0
+MOCK_EOF
+        chmod +x "$MOCK_TMUX_DIR/tmux"
+
+        run agent_is_busy "multiagent:agents.2"
+        [ "$status" -eq 0 ] || {
+            echo "FAIL: pattern '$pattern' not detected by agent_is_busy"
+            false
+        }
+    done
+}
+
+# =============================================================================
+# TC-B3-2: agent_is_thinking() — BUG-3 pattern detection + negative tests
+# =============================================================================
+
+@test "TC-B3-2: agent_is_thinking detects thinking patterns and rejects non-thinking" {
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # Positive: should detect as thinking
+    local thinking_patterns=(
+        "Thinking..."
+        "(thinking)"
+        "思考中..."
+        "Planning next steps"
+        "考え中"
+        "計画中"
+    )
+
+    for pattern in "${thinking_patterns[@]}"; do
+        cat > "$MOCK_TMUX_DIR/tmux" << MOCK_EOF
+#!/bin/bash
+case "\$1" in
+    capture-pane) echo "$pattern" ;;
+    *) echo "" ;;
+esac
+exit 0
+MOCK_EOF
+        chmod +x "$MOCK_TMUX_DIR/tmux"
+
+        run agent_is_thinking "multiagent:agents.2"
+        [ "$status" -eq 0 ] || {
+            echo "FAIL: thinking pattern '$pattern' not detected"
+            false
+        }
+    done
+
+    # Negative: should NOT detect as thinking
+    local non_thinking_patterns=(
+        "Working on the task"
+        "Sending message"
+        "Generating output"
+        "Cogitated for 3.2s"
+        "thought for 5.1s"
+        "送信中"
+        "生成中"
+        "処理中"
+        "実行中"
+    )
+
+    for pattern in "${non_thinking_patterns[@]}"; do
+        cat > "$MOCK_TMUX_DIR/tmux" << MOCK_EOF
+#!/bin/bash
+case "\$1" in
+    capture-pane) echo "$pattern" ;;
+    *) echo "" ;;
+esac
+exit 0
+MOCK_EOF
+        chmod +x "$MOCK_TMUX_DIR/tmux"
+
+        run agent_is_thinking "multiagent:agents.2"
+        [ "$status" -ne 0 ] || {
+            echo "FAIL: non-thinking pattern '$pattern' wrongly detected as thinking"
+            false
+        }
+    done
+}
+
+# =============================================================================
+# TC-B4-1-revised: check_agent() creates thinking state file on first detection
+# =============================================================================
+
+@test "TC-B4-1-revised: check_agent creates thinking state file on first thinking detection" {
+    # Custom tmux mock: capture-pane returns "Thinking..."
+    cat > "$MOCK_TMUX_DIR/tmux" << 'THINKING_MOCK'
+#!/bin/bash
+case "$1" in
+    capture-pane)
+        echo "Thinking..."
+        ;;
+    list-panes)
+        if [ -f "${TEST_TMPDIR}/mock_panes.txt" ]; then
+            cat "${TEST_TMPDIR}/mock_panes.txt"
+        fi
+        ;;
+    show-options)
+        echo ""
+        ;;
+    *)
+        echo "tmux $*" >> "${TEST_TMPDIR}/tmux_calls.log"
+        ;;
+esac
+exit 0
+THINKING_MOCK
+    chmod +x "$MOCK_TMUX_DIR/tmux"
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # Set up mock panes
+    echo "3 yakuza3" > "$TEST_TMPDIR/mock_panes.txt"
+
+    # Task YAML (assigned, not idle — needed to avoid idle detection)
+    cat > "$TEST_TASKS_DIR/yakuza3.yaml" << 'EOF'
+task:
+  task_id: "thinking_test_001"
+  status: assigned
+EOF
+
+    # Empty inbox (no unread — thinking is checked regardless)
+    echo "messages: []" > "$TEST_INBOX_DIR/yakuza3.yaml"
+
+    # Ensure thinking state file doesn't exist
+    rm -f "$TEST_STATE_DIR/njslyr_yakuza3_thinking_start"
+
+    run check_agent "yakuza3"
+    [ "$status" -eq 0 ]
+
+    # Thinking state file should be created
+    [ -f "$TEST_STATE_DIR/njslyr_yakuza3_thinking_start" ]
+
+    # Content should be a recent epoch timestamp
+    local ts
+    ts=$(cat "$TEST_STATE_DIR/njslyr_yakuza3_thinking_start")
+    [[ "$ts" =~ ^[0-9]+$ ]]
+    local now
+    now=$(date +%s)
+    local diff=$((now - ts))
+    [ "$diff" -lt 5 ]
+}
+
+# =============================================================================
+# TC-B4-2-revised: thinking timeout triggers Stage 2 via check_agent
+# =============================================================================
+
+@test "TC-B4-2-revised: thinking timeout triggers Stage 2 escalation" {
+    # Custom tmux mock: capture-pane returns "Thinking..."
+    cat > "$MOCK_TMUX_DIR/tmux" << 'THINKING_MOCK'
+#!/bin/bash
+case "$1" in
+    capture-pane)
+        echo "Thinking..."
+        ;;
+    list-panes)
+        if [ -f "${TEST_TMPDIR}/mock_panes.txt" ]; then
+            cat "${TEST_TMPDIR}/mock_panes.txt"
+        fi
+        ;;
+    send-keys)
+        echo "tmux send-keys $*" >> "${TEST_TMPDIR}/tmux_calls.log"
+        ;;
+    show-options)
+        echo ""
+        ;;
+    *)
+        echo "tmux $*" >> "${TEST_TMPDIR}/tmux_calls.log"
+        ;;
+esac
+exit 0
+THINKING_MOCK
+    chmod +x "$MOCK_TMUX_DIR/tmux"
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    echo "5 yakuza5" > "$TEST_TMPDIR/mock_panes.txt"
+
+    # Task YAML (assigned, not idle)
+    cat > "$TEST_TASKS_DIR/yakuza5.yaml" << 'EOF'
+task:
+  task_id: "thinking_timeout_test"
+  status: assigned
+EOF
+
+    # Empty inbox
+    echo "messages: []" > "$TEST_INBOX_DIR/yakuza5.yaml"
+
+    # Set thinking state file to 700 seconds ago (> THINKING_TIMEOUT=600)
+    echo "$(($(date +%s) - 700))" > "$TEST_STATE_DIR/njslyr_yakuza5_thinking_start"
+
+    # Clear stage2 cooldown (so stage2_chop is allowed)
+    rm -f "$TEST_STATE_DIR/njslyr_yakuza5_stage2_last"
+
+    # Initialize tmux_calls log
+    > "$TEST_TMPDIR/tmux_calls.log"
+
+    run check_agent "yakuza5"
+    [ "$status" -eq 0 ]
+
+    # Thinking state file should be deleted (timeout → cleanup)
+    [ ! -f "$TEST_STATE_DIR/njslyr_yakuza5_thinking_start" ]
+
+    # Stage 2 cooldown should have been set
+    [ -f "$TEST_STATE_DIR/njslyr_yakuza5_stage2_last" ]
+}
+
+# =============================================================================
+# TC-BUG5-1: idle_start file created on first idle detection
+# =============================================================================
+
+@test "TC-BUG5-1: idle_start file created on first idle detection" {
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # No task YAML → idle status
+    rm -f "$TEST_TASKS_DIR/test_agent"*.yaml
+
+    # No inbox unread (BUG-5 cost optimization fix allows idle through)
+    echo "messages: []" > "$TEST_INBOX_DIR/test_agent.yaml"
+
+    # Set up mock panes
+    echo "3 test_agent" > "$TEST_TMPDIR/mock_panes.txt"
+
+    # Ensure idle state file doesn't exist
+    rm -f "$TEST_STATE_DIR/njslyr_test_agent_idle_start"
+
+    run check_agent "test_agent"
+    [ "$status" -eq 0 ]
+
+    # Idle state file should be created
+    [ -f "$TEST_STATE_DIR/njslyr_test_agent_idle_start" ]
+
+    # Content should be a recent epoch timestamp
+    local ts
+    ts=$(cat "$TEST_STATE_DIR/njslyr_test_agent_idle_start")
+    [[ "$ts" =~ ^[0-9]+$ ]]
+    local now
+    now=$(date +%s)
+    local diff=$((now - ts))
+    [ "$diff" -lt 5 ]
+}
+
+# =============================================================================
+# TC-BUG5-2: idle timeout triggers Stage 1 suriken
+# =============================================================================
+
+@test "TC-BUG5-2: idle timeout triggers Stage 1 suriken" {
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # No task YAML → idle status
+    rm -f "$TEST_TASKS_DIR/test_agent"*.yaml
+
+    # No inbox unread
+    echo "messages: []" > "$TEST_INBOX_DIR/test_agent.yaml"
+
+    # Set up mock panes
+    echo "3 test_agent" > "$TEST_TMPDIR/mock_panes.txt"
+
+    # Set idle_start to 360 seconds ago (> IDLE_TIMEOUT=300)
+    local old_ts=$(($(date +%s) - 360))
+    echo "$old_ts" > "$TEST_STATE_DIR/njslyr_test_agent_idle_start"
+
+    run check_agent "test_agent"
+    [ "$status" -eq 0 ]
+
+    # idle_start should be reset to approximately now (not the old value)
+    local new_ts
+    new_ts=$(cat "$TEST_STATE_DIR/njslyr_test_agent_idle_start")
+    [ "$new_ts" -gt "$old_ts" ]
+
+    # Stage 1 cooldown should have been set
+    [ -f "$TEST_STATE_DIR/njslyr_test_agent_stage1_last" ]
+
+    # Suriken should have been sent via inbox_write.sh (creates inbox entry)
+    grep -q 'read: [Ff]alse' "$TEST_INBOX_DIR/test_agent.yaml"
+}
+
+# =============================================================================
+# TC-BUG5-3: idle tracking cleared when agent gets a task
+# =============================================================================
+
+@test "TC-BUG5-3: idle tracking cleared when agent gets a task" {
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # Create task YAML (not idle)
+    cat > "$TEST_TASKS_DIR/test_agent.yaml" << 'YAMLEOF'
+task:
+  task_id: active_task_001
+  status: assigned
+YAMLEOF
+
+    # Create stale idle_start file
+    echo "$(($(date +%s) - 100))" > "$TEST_STATE_DIR/njslyr_test_agent_idle_start"
+    [ -f "$TEST_STATE_DIR/njslyr_test_agent_idle_start" ]
+
+    # Set up mock panes
+    echo "3 test_agent" > "$TEST_TMPDIR/mock_panes.txt"
+    echo "messages: []" > "$TEST_INBOX_DIR/test_agent.yaml"
+
+    run check_agent "test_agent"
+
+    # idle_start file should be removed
+    [ ! -f "$TEST_STATE_DIR/njslyr_test_agent_idle_start" ]
+}
+
+# =============================================================================
+# TC-S13: stage3_slay respects @model_name=Opus (BUG-1 fix)
+# =============================================================================
+
+@test "TC-S13: stage3_slay respects @model_name=Opus" {
+    rm -f "$TEST_METRICS_DIR/njslyr_restarts_yakuza3.yaml"
+
+    cat > "$TEST_TASKS_DIR/yakuza3.yaml" << 'EOF'
+task:
+  task_id: "model_name_opus_test"
+  status: assigned
+EOF
+
+    # Mock tmux: show-options returns "Opus" for @model_name
+    echo "Opus" > "$TEST_TMPDIR/mock_model_name.txt"
+
+    # Set up mock panes
+    echo "3 yakuza3" > "$TEST_TMPDIR/mock_panes.txt"
+
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+    > "$TEST_TMPDIR/tmux_calls.log"
+
+    run stage3_slay "yakuza3" "test_reason" "multiagent:agents.3"
+    [ "$status" -eq 0 ]
+
+    # respawn-pane should use opus model
+    grep -q 'respawn-pane.*--model opus' "$TEST_TMPDIR/tmux_calls.log"
+
+    # select-pane should restore bg=#1a002e (barikidorink purple)
+    grep -q 'select-pane.*bg=#1a002e' "$TEST_TMPDIR/tmux_calls.log"
+}
+
+# =============================================================================
+# TC-S14: stage3_slay falls back to default when @model_name is empty (BUG-1)
+# =============================================================================
+
+@test "TC-S14: stage3_slay falls back to default when @model_name is empty" {
+    rm -f "$TEST_METRICS_DIR/njslyr_restarts_yakuza3.yaml"
+    rm -f "$TEST_METRICS_DIR/njslyr_restarts_soukaiya.yaml"
+
+    for agent in yakuza3 soukaiya; do
+        cat > "$TEST_TASKS_DIR/${agent}.yaml" << EOF
+task:
+  task_id: "fallback_test_${agent}"
+  status: assigned
+EOF
+    done
+
+    # Mock tmux: show-options returns empty (no @model_name)
+    rm -f "$TEST_TMPDIR/mock_model_name.txt"
+
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # yakuza3: should default to sonnet
+    > "$TEST_TMPDIR/tmux_calls.log"
+    run stage3_slay "yakuza3" "test_reason" "multiagent:agents.3"
+    [ "$status" -eq 0 ]
+    grep -q 'respawn-pane.*--model sonnet' "$TEST_TMPDIR/tmux_calls.log"
+    grep -q 'select-pane.*bg=default' "$TEST_TMPDIR/tmux_calls.log"
+
+    # soukaiya: should default to opus
+    > "$TEST_TMPDIR/tmux_calls.log"
+    rm -f "$TEST_METRICS_DIR/njslyr_restarts_soukaiya.yaml"
+    run stage3_slay "soukaiya" "test_reason" "multiagent:agents.8"
+    [ "$status" -eq 0 ]
+    grep -q 'respawn-pane.*--model opus' "$TEST_TMPDIR/tmux_calls.log"
+}
+
+# =============================================================================
+# TC-S15: get_pane_target returns multiagent:agents.N format (BUG-2 fix)
+# =============================================================================
+
+@test "TC-S15: get_pane_target returns multiagent:agents.N format" {
+    # Mock panes with various agents
+    cat > "$TEST_TMPDIR/mock_panes.txt" << 'EOF'
+0 gryakuza
+1 yakuza1
+5 yakuza5
+8 soukaiya
+EOF
+
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # Verify multiagent:agents.N format (not multiagent:1.N)
+    result=$(get_pane_target "yakuza1")
+    [ "$result" = "multiagent:agents.1" ]
+    [[ "$result" != *"multiagent:1."* ]]
+
+    result=$(get_pane_target "yakuza5")
+    [ "$result" = "multiagent:agents.5" ]
+
+    result=$(get_pane_target "gryakuza")
+    [ "$result" = "multiagent:agents.0" ]
+
+    result=$(get_pane_target "soukaiya")
+    [ "$result" = "multiagent:agents.8" ]
+}
+
+# =============================================================================
+# TC-S16: stage3_slay restores bg=default for Sonnet agents (BUG-1 fix)
+# =============================================================================
+
+@test "TC-S16: stage3_slay restores bg=default for Sonnet agents" {
+    rm -f "$TEST_METRICS_DIR/njslyr_restarts_yakuza2.yaml"
+
+    cat > "$TEST_TASKS_DIR/yakuza2.yaml" << 'EOF'
+task:
+  task_id: "sonnet_bg_test"
+  status: assigned
+EOF
+
+    # Mock tmux: show-options returns "Sonnet"
+    echo "Sonnet" > "$TEST_TMPDIR/mock_model_name.txt"
+
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+    > "$TEST_TMPDIR/tmux_calls.log"
+
+    run stage3_slay "yakuza2" "test_reason" "multiagent:agents.2"
+    [ "$status" -eq 0 ]
+
+    # respawn-pane should use sonnet model
+    grep -q 'respawn-pane.*--model sonnet' "$TEST_TMPDIR/tmux_calls.log"
+
+    # select-pane should restore bg=default (not purple)
+    grep -q 'select-pane.*bg=default' "$TEST_TMPDIR/tmux_calls.log"
+
+    # bg=#1a002e should NOT appear (it's for Opus only)
+    ! grep -q 'bg=#1a002e' "$TEST_TMPDIR/tmux_calls.log"
+}
+
+# =============================================================================
+# TC-BUG6-1: inbox_watcher_recently_cleared detects shared clear lock
+# =============================================================================
+
+@test "TC-BUG6-1: inbox_watcher_recently_cleared detects shared clear lock" {
+    # Case 1: No lock file → not recently cleared (return 1)
+    rm -f "$TEST_STATE_DIR/clear_last_test_agent"
+    run inbox_watcher_recently_cleared "test_agent"
+    [ "$status" -eq 1 ]
+
+    # Case 2: Lock file with recent timestamp (60s ago) → recently cleared (return 0)
+    echo "$(($(date +%s) - 60))" > "$TEST_STATE_DIR/clear_last_test_agent"
+    run inbox_watcher_recently_cleared "test_agent"
+    [ "$status" -eq 0 ]
+
+    # Case 3: Lock file with old timestamp (600s ago, > 300s threshold) → not recent (return 1)
+    echo "$(($(date +%s) - 600))" > "$TEST_STATE_DIR/clear_last_test_agent"
+    run inbox_watcher_recently_cleared "test_agent"
+    [ "$status" -eq 1 ]
+}
+
+# =============================================================================
+# TC-BUG6-2: stage2_chop writes shared clear lock
+# =============================================================================
+
+@test "TC-BUG6-2: stage2_chop writes shared clear lock" {
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # Ensure lock file doesn't exist
+    rm -f "$TEST_STATE_DIR/clear_last_test_agent"
+
+    # Run stage2_chop
+    run stage2_chop "test_agent" "test_chop_reason"
+    [ "$status" -eq 0 ]
+
+    # Shared clear lock file should exist
+    [ -f "$TEST_STATE_DIR/clear_last_test_agent" ]
+
+    # Content should be a recent epoch timestamp
+    local ts
+    ts=$(cat "$TEST_STATE_DIR/clear_last_test_agent")
+    [[ "$ts" =~ ^[0-9]+$ ]]
+    local now
+    now=$(date +%s)
+    local diff=$((now - ts))
+    [ "$diff" -lt 5 ]
+
+    # Stage 2 timestamp file should also exist
+    [ -f "$TEST_STATE_DIR/njslyr_test_agent_stage2_last" ]
 }

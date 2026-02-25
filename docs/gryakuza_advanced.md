@@ -113,7 +113,7 @@ panes:
 inbox:
   write_script: "scripts/inbox_write.sh"
   to_yakuza: true
-  to_darkninja: false  # Use dashboard.md instead (interrupt prevention)
+  to_darkninja: true   # Dashboard update + inbox report on EVERY cmd completion (恒久ルール 2026-02-15)
 
 parallelization:
   independent_tasks: parallel

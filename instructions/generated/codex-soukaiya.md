@@ -244,7 +244,7 @@ Race condition is eliminated: `/clear` wipes old context. Agent re-reads YAML wi
 | Direction | Method | Reason |
 |-----------|--------|--------|
 | Yakuza/Soukaiya → Gryakuza | Report YAML + inbox_write | File-based notification |
-| Gryakuza → Darkninja/ラオモト | dashboard.md update + inbox_write permitted | Dashboard update is primary. inbox_write to darkninja permitted for urgent reports (P0/P1). |
+| Gryakuza → Darkninja/ラオモト | dashboard.md update + inbox_write **mandatory** | Dashboard update + ダークニンジャへのinbox報告は**全cmd完了時に必須**。報告なき完了はセプク案件。 |
 | Gryakuza → Soukaiya | YAML + inbox_write | Strategic task delegation |
 | Top → Down | YAML + inbox_write | Standard wake-up |
 

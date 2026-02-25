@@ -43,7 +43,8 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
     INBOX="$SCRIPT_DIR/queue/inbox/${AGENT_ID}.yaml"
     LOCKFILE="${INBOX}.lock"
     CACHE_DIR="$SCRIPT_DIR/queue/.cache"
-    mkdir -p "$CACHE_DIR"
+    STATE_DIR="$SCRIPT_DIR/.state"
+    mkdir -p "$CACHE_DIR" "$STATE_DIR"
 
     if [ -z "$AGENT_ID" ] || [ -z "$PANE_TARGET" ]; then
         echo "Usage: inbox_watcher.sh <agent_id> <pane_target> [cli_type]" >&2
@@ -928,6 +929,8 @@ for s in data.get('specials', []):
             [ -n "$msg_type" ] || continue
             if [ "$msg_type" = "clear_command" ]; then
                 clear_seen=1
+                # BUG-6 fix: Update shared clear lock on delivery
+                echo "$(date +%s)" > "${STATE_DIR}/clear_last_${AGENT_ID}"
             fi
             cmd=$(normalize_special_command "$msg_type" "$msg_content")
             [ -n "$cmd" ] && send_cli_command "$cmd"
@@ -1028,6 +1031,8 @@ for s in data.get('specials', []):
                 else
                     echo "[$(date)] ESCALATION Phase 3: Agent $AGENT_ID unresponsive for ${age}s. Sending /clear." >&2
                     send_cli_command "/clear"
+                    # BUG-6 fix: Update shared clear lock on Phase 3 /clear
+                    echo "$(date +%s)" > "${STATE_DIR}/clear_last_${AGENT_ID}"
                     LAST_CLEAR_TS=$now
                     FIRST_UNREAD_SEEN=0  # Reset — will re-detect on next cycle
                     NEW_CONTEXT_SENT=0
