@@ -497,7 +497,7 @@ EOF
     > "$TEST_TMPDIR/tmux_calls.log"
 
     # yakuza3のslay → sonnetモデルで再起動
-    stage3_slay "yakuza3" "test_reason" "multiagent:1.3"
+    stage3_slay "yakuza3" "test_reason" "multiagent:agents.3"
 
     # tmux respawn-paneがsonnetモデルで呼ばれたことを確認
     grep -q 'respawn-pane.*--model sonnet' "$TEST_TMPDIR/tmux_calls.log"
@@ -507,7 +507,7 @@ EOF
 
     # soukaiyaのslay → opusモデルで再起動
     rm -f "$TEST_METRICS_DIR/njslyr_restarts_soukaiya.yaml"
-    stage3_slay "soukaiya" "test_reason" "multiagent:1.8"
+    stage3_slay "soukaiya" "test_reason" "multiagent:agents.8"
 
     # tmux respawn-paneがopusモデルで呼ばれたことを確認
     grep -q 'respawn-pane.*--model opus' "$TEST_TMPDIR/tmux_calls.log"
