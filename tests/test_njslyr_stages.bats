@@ -1283,6 +1283,9 @@ EOF
 @test "TC-09: should_despawn_yakuzatengu resets pending when conditions not met" {
     export PATH="$MOCK_TMUX_DIR:$PATH"
 
+    # テスト分離: TC-08が残したyakuzatengu_doneを確実にクリア（即座despawnシグナルを排除）
+    rm -f "$TEST_STATE_DIR/yakuzatengu_done"
+
     # spawn_time: 600秒前（Guard時間超過）
     echo "$(($(date +%s) - 600))" > "$TEST_STATE_DIR/yakuzatengu_spawn_time"
 
@@ -1337,38 +1340,15 @@ EOF
 # =============================================================================
 
 @test "TC-11: spawn_yakuzatengu rolls back STATE files on respawn failure" {
-    # respawn-paneが失敗するtmuxモック
-    cat > "$MOCK_TMUX_DIR/tmux" << 'FAIL_MOCK'
-#!/bin/bash
-case "$1" in
-    respawn-pane)
-        echo "tmux respawn-pane $*" >> "${TEST_TMPDIR}/tmux_calls.log"
-        # 2回目のrespawn-pane（Opus起動）は失敗させる
-        if grep -q "claude --model" "$*" 2>/dev/null || echo "$*" | grep -q "claude"; then
-            exit 1
-        fi
-        exit 0
-        ;;
-    list-panes)
-        if [ -f "${TEST_TMPDIR}/mock_panes.txt" ]; then
-            cat "${TEST_TMPDIR}/mock_panes.txt"
-        fi
-        ;;
-    show-options) echo "Sonnet" ;;
-    *) echo "tmux $*" >> "${TEST_TMPDIR}/tmux_calls.log" ;;
-esac
-exit 0
-FAIL_MOCK
-    chmod +x "$MOCK_TMUX_DIR/tmux"
+    # respawn-pane（--model付き）のみ失敗するtmuxモック
     export PATH="$MOCK_TMUX_DIR:$PATH"
-
-    # Always-fail respawn mock（最もシンプルな方法）
-    cat > "$MOCK_TMUX_DIR/tmux" << 'ALWAYSFAIL_MOCK'
+    local bg_log="$TEST_TMPDIR/select_pane_bg.log"
+    cat > "$MOCK_TMUX_DIR/tmux" << ALWAYSFAIL_MOCK
 #!/bin/bash
-case "$1" in
+case "\$1" in
     respawn-pane)
         # 2回目（claude --model）は失敗
-        if echo "$*" | grep -q -- "--model"; then
+        if echo "\$*" | grep -q -- "--model"; then
             exit 1
         fi
         exit 0
@@ -1377,6 +1357,10 @@ case "$1" in
         if [ -f "${TEST_TMPDIR}/mock_panes.txt" ]; then cat "${TEST_TMPDIR}/mock_panes.txt"; fi
         ;;
     show-options) echo "Sonnet" ;;
+    select-pane)
+        # BUG-T3: bg_color復元コールを記録
+        echo "\$*" >> "${bg_log}"
+        ;;
     *) ;;
 esac
 exit 0
@@ -1393,6 +1377,10 @@ ALWAYSFAIL_MOCK
     # yakuzatengu不活性
     rm -f "$TEST_STATE_DIR/yakuzatengu_active"
 
+    # BUG-T3: yakuza3のタスクYAML（status: assigned）を準備
+    local task_yaml="$TEST_TASKS_DIR/yakuza3_test_task.yaml"
+    printf 'task:\n  task_id: test_t3\n  status: assigned\n' > "$task_yaml"
+
     # get_monitored_agentsをoverride（mock_panes.txtの2フィールド問題を回避）
     get_monitored_agents() { printf 'yakuza3\n'; }
 
@@ -1405,6 +1393,14 @@ ALWAYSFAIL_MOCK
     [ ! -f "$TEST_STATE_DIR/yakuzatengu_original_pane" ]
     [ ! -f "$TEST_STATE_DIR/yakuzatengu_original_model" ]
     [ ! -f "$TEST_STATE_DIR/yakuzatengu_spawn_time" ]
+
+    # BUG-T3: bg_colorが元に戻っているはず（Sonnet → default）
+    grep -q 'bg=default' "$bg_log"
+
+    # BUG-T3: task YAML statusがassignedに戻っているはず（done/suspendedではない）
+    grep -q 'status: assigned' "$task_yaml"
+    ! grep -q 'status: suspended' "$task_yaml"
+    ! grep -q 'status: done' "$task_yaml"
 }
 
 # =============================================================================

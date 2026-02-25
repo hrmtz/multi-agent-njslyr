@@ -806,13 +806,24 @@ spawn_yakuzatengu() {
     orig_model=$(tmux show-options -pv -t "$pane_target" @model_name 2>/dev/null || echo "")
     [[ -z "$orig_model" ]] && orig_model="Sonnet"
 
+    # BUG-T3 fix: 元のbg_colorを保存（rollback時に復元する）
+    local orig_bg_color
+    case "$orig_model" in
+        Opus|opus|OPUS) orig_bg_color="#1a002e" ;;
+        *) orig_bg_color="default" ;;
+    esac
+
     log "spawn_yakuzatengu: ${orig_agent}(pane:${pane_target}, model:${orig_model}) → yakuzatengu"
 
     # M-5: STATEファイル書き込み（respawn-pane前に必ず完了）
     local spawn_time; spawn_time=$(date +%s)
     touch "$STATE_DIR/yakuzatengu_active"
     echo "$orig_agent" > "$STATE_DIR/yakuzatengu_original_agent_id"
-    echo "$pane_target" > "$STATE_DIR/yakuzatengu_original_pane"
+    # BUG-T5 fix: pane_id（%N形式）を保存（pane_indexはペイン追加削除でズレる可能性あり）
+    local orig_pane_id
+    orig_pane_id=$(tmux list-panes -t multiagent:agents -F '#{pane_index} #{pane_id} #{@agent_id}' 2>/dev/null | \
+        awk -v id="$orig_agent" '$3 == id {print $2; exit}')
+    echo "${orig_pane_id:-$pane_target}" > "$STATE_DIR/yakuzatengu_original_pane"
     echo "$orig_model" > "$STATE_DIR/yakuzatengu_original_model"
     echo "$spawn_time" > "$STATE_DIR/yakuzatengu_spawn_time"
 
@@ -821,11 +832,13 @@ spawn_yakuzatengu() {
     rm -f "$STATE_DIR/njslyr_${orig_agent}_idle_start"
 
     # S-3: 元yakuzaNタスクYAML statusをsuspendedに変更
-    local task_yaml
+    local task_yaml orig_task_status
     task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${orig_agent}"*.yaml 2>/dev/null | head -1)
     if [[ -n "$task_yaml" && -f "$task_yaml" ]]; then
+        # BUG-T3 fix: 変更前のstatusを保存（rollback時に復元する）
+        orig_task_status=$(grep '^ *status:' "$task_yaml" | head -1 | awk '{print $2}' | tr -d "'\"")
         sed -i '' 's/^ *status: .*/  status: suspended/' "$task_yaml" 2>/dev/null || true
-        log "spawn_yakuzatengu: ${orig_agent} タスクYAML statusをsuspendedに変更"
+        log "spawn_yakuzatengu: ${orig_agent} タスクYAML statusをsuspendedに変更（元: ${orig_task_status}）"
     fi
 
     # remain-on-exit設定（恒久ルール）
@@ -858,11 +871,11 @@ spawn_yakuzatengu() {
     if ! tmux respawn-pane -k -t "$pane_target" \
         "claude --model claude-sonnet-4-6 --dangerously-skip-permissions" 2>/dev/null; then
         log "ERROR: spawn_yakuzatengu respawn-pane失敗。ロールバック。"
-        # bg_color復元
-        tmux select-pane -t "$pane_target" -P "bg=default" 2>/dev/null || true
-        # task YAML status復元（suspended → 元のstatusに戻す）
+        # BUG-T3 fix: bg_color復元（Opusなら#1a002e、それ以外はdefault）
+        tmux select-pane -t "$pane_target" -P "bg=${orig_bg_color}" 2>/dev/null || true
+        # BUG-T3 fix: task YAML status復元（suspendedから元のstatusに戻す）
         if [[ -n "${task_yaml:-}" && -f "${task_yaml:-}" ]]; then
-            sed -i '' 's/^ *status: suspended/  status: done/' "$task_yaml" 2>/dev/null || true
+            sed -i '' "s/^ *status: suspended/  status: ${orig_task_status:-assigned}/" "$task_yaml" 2>/dev/null || true
         fi
         rm -f "$STATE_DIR/yakuzatengu_active" \
               "$STATE_DIR/yakuzatengu_original_agent_id" \
@@ -1109,6 +1122,12 @@ check_agent() {
     local gryakuza_stage1_only=false
     if [[ "$agent_id" == "gryakuza" ]]; then
         gryakuza_stage1_only=true
+        # BUG-C3 fix: spawn判定はStage1無応答条件とは独立（gryakuzaがスリケン応答中でも発火）
+        if ! is_yakuzatengu_active; then
+            if should_spawn_yakuzatengu "$agent_id"; then
+                spawn_yakuzatengu "$agent_id"
+            fi
+        fi
     fi
 
     # (2) スリケン無応答 (Stage 1 → Stage 2)
@@ -1123,13 +1142,8 @@ check_agent() {
 
         # Check if inbox is still unread after 2 minutes
         if [[ $elapsed -ge $NUDGE_NO_RESPONSE ]] && [[ "$has_unread" == "true" ]]; then
-            # m2 fix: Skip Stage 2 for gryakuza + Yakuzatengu spawn判定（M-3）
+            # m2 fix: Skip Stage 2 for gryakuza (spawn already handled above)
             if [[ "$gryakuza_stage1_only" == "true" ]]; then
-                if ! is_yakuzatengu_active; then
-                    if should_spawn_yakuzatengu "$agent_id"; then
-                        spawn_yakuzatengu "$agent_id"
-                    fi
-                fi
                 log "SKIP: ${agent_id} is limited to Stage 1 (monitor_context.sh priority)"
                 return 0
             fi
