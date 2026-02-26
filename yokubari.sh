@@ -60,16 +60,16 @@ fi
 LANG_SETTING="${LANG_SETTING:-ja}"
 SHELL_SETTING="${SHELL_SETTING:-bash}"
 
-# マシンロール読み取り（ryzen: フル構成9体, mbp: 軽量構成5体）
+# マシンロール読み取り（kyoto: フル構成9体, neosaitama: フル構成9体）
 MACHINE_ROLE=""
 if [ -f "./config/settings.yaml" ]; then
     MACHINE_ROLE=$(awk '/^  role:/{print $2}' ./config/settings.yaml 2>/dev/null)
 fi
-MACHINE_ROLE="${MACHINE_ROLE:-ryzen}"
+MACHINE_ROLE="${MACHINE_ROLE:-kyoto}"
 
 # マシンロール依存の早期定義（CLEAN_MODEブロックで使用されるため、STEP 5より前に必要）
-if [[ "$MACHINE_ROLE" == "mbp" ]]; then
-    YAKUZA_MAX=3
+if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+    YAKUZA_MAX=7
     MONITOR_AGENT="master_crane"
 else
     YAKUZA_MAX=7
@@ -243,8 +243,8 @@ while [[ $# -gt 0 ]]; do
             echo "  silent（--silent）:   echo表示なし（API節約）"
             echo ""
             echo "マシンロール (config/settings.yaml machine.role):"
-            echo "  ryzen（デフォルト）: フル構成（darkninja + gryakuza + yakuza1-7 + soukaiya + master_tortoise）"
-            echo "  mbp:               軽量構成（darkninja + gryakuza + yakuza1-3 + soukaiya + master_crane）"
+            echo "  kyoto（デフォルト）: フル構成（darkninja(main+monitor) + gryakuza + yakuza1-7 + soukaiya + master_tortoise）"
+            echo "  neosaitama:        フル構成（crane(master_crane) + gryakuza + yakuza1-7 + soukaiya）"
             echo ""
             echo "エイリアス:"
             echo "  csst  → cd /mnt/c/tools/multi-agent-shogun && ./shutsujin_departure.sh"
@@ -489,13 +489,16 @@ launch_watcher() {
 show_battle_cry
 
 echo -e "  \033[1;33m◆陣立て開始◆ ドーモ。ネオサイタマ・デプロイメントを開始する。イヤーッ！\033[0m"
-echo -e "  \033[1;36m◆マシンロール◆ ${MACHINE_ROLE} $([ "$MACHINE_ROLE" = "mbp" ] && echo "(軽量構成5体)" || echo "(フル構成9体)")\033[0m"
+echo -e "  \033[1;36m◆マシンロール◆ ${MACHINE_ROLE} (フル構成9体)\033[0m"
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 0.5: 起動時auto-sync（state pullのみ。handoverはntfy経由のラオモト明示的指示で実行）
 # ═══════════════════════════════════════════════════════════════════════════════
 if [[ -f queue/active_machine.yaml ]]; then
+    # NOTE: simultaneous mode (mode: simultaneous) の場合、active_machine:フィールドが存在しないため
+    # ACTIVE_MACHINEは空になり、このauto-syncブロックはスキップされる（両マシンがアクティブ）。
+    # exclusive mode (mode: exclusive または modeなし) の場合のみ、active_machine:を参照して動作する。
     ACTIVE_MACHINE=$(awk '/active_machine:/{print $2}' queue/active_machine.yaml 2>/dev/null)
     if [[ -n "$ACTIVE_MACHINE" && "$ACTIVE_MACHINE" != "$MACHINE_ROLE" ]]; then
         # NOTE: active_machine.yamlは更新しない。排他稼働切り替えはntfy handover:{target}のみ。
@@ -524,10 +527,18 @@ if tmux kill-session -t multiagent 2>/dev/null; then
 else
     log_info "  └─ multiagent…存在セズ。ナムアミダブツ"
 fi
-if tmux kill-session -t darkninja 2>/dev/null; then
-    log_info "  └─ darkninja…サヨナラ！爆発四散！"
+if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+    if tmux kill-session -t crane 2>/dev/null; then
+        log_info "  └─ crane…サヨナラ！爆発四散！"
+    else
+        log_info "  └─ crane…存在セズ。ナムアミダブツ"
+    fi
 else
-    log_info "  └─ darkninja…存在セズ。ナムアミダブツ"
+    if tmux kill-session -t darkninja 2>/dev/null; then
+        log_info "  └─ darkninja…サヨナラ！爆発四散！"
+    else
+        log_info "  └─ darkninja…存在セズ。ナムアミダブツ"
+    fi
 fi
 tmux kill-session -t shogun 2>/dev/null || true
 
@@ -732,27 +743,45 @@ if ! command -v tmux &> /dev/null; then
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 5: darkninja セッション作成（1ペイン・window 0 を必ず確保）
+# STEP 5: 本部セッション作成
+#   kyoto:      darkninja セッション（main: ラオモト本体, monitor: master_tortoise）
+#   neosaitama: crane セッション（main: master_crane）
 # ═══════════════════════════════════════════════════════════════════════════════
-log_war "👑 ラオモトのホンジンをコンストラクト中...イヤーッ！"
-
-# darkninja セッションがなければ作る（-s 時もここで必ず darkninja が存在するようにする）
-# window 0 のみ作成し -n main で名前付け（第二 window にするとアタッチ時に空ペインが開くため 1 window に限定）
-# TOCTOU防止: has-session → new-session の間の競合を回避し、直接作成を試みる
-tmux new-session -d -s darkninja -n main 2>/dev/null || true
-
 # スマホ等の小画面クライアント対策: aggressive-resize + latest
-# css関数がスマホ用に専用ウィンドウを作るので、PCのウィンドウに干渉しない
 tmux set-option -g window-size latest
 tmux set-option -g aggressive-resize on
 
-# ダークニンジャペインはウィンドウ名 "main" で指定（base-index 1 環境でも動く）
-SHOGUN_PROMPT=$(generate_prompt "ラオモト" "magenta" "$SHELL_SETTING")
-tmux send-keys -t darkninja:main "cd \"$(pwd)\" && export PS1='${SHOGUN_PROMPT}' && clear" Enter
-tmux select-pane -t darkninja:main -P 'bg=#001520'  # ダークニンジャの Dark Blue
-tmux set-option -p -t darkninja:main @agent_id "darkninja"
-
-log_success "  └─ ラオモトのホンジン、コンストラクト完了！ワザマエ！"
+if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+    # neosaitama: crane セッションにmaster_crane常駐
+    log_war "🦢 クレイン・ホンジンをコンストラクト中...イヤーッ！"
+    # TOCTOU防止: 直接作成を試みる
+    tmux new-session -d -s crane -n main 2>/dev/null || true
+    CRANE_PROMPT=$(generate_prompt "crane" "cyan" "$SHELL_SETTING")
+    tmux send-keys -t crane:main "cd \"$(pwd)\" && export PS1='${CRANE_PROMPT}' && clear" Enter
+    tmux set-option -p -t crane:main @agent_id "master_crane"
+    tmux set-option -p -t crane:main @model_name "Sonnet"
+    tmux set-option -p -t crane:main @current_task ""
+    MONITOR_PANE="crane:main"
+    log_success "  └─ クレイン・ホンジン、コンストラクト完了！ワザマエ！"
+else
+    # kyoto: darkninja セッション（main: ラオモト本体, monitor: master_tortoise）
+    log_war "👑 ラオモトのホンジンをコンストラクト中...イヤーッ！"
+    # window 0 のみ作成し -n main で名前付け。TOCTOU防止: 直接作成を試みる
+    tmux new-session -d -s darkninja -n main 2>/dev/null || true
+    SHOGUN_PROMPT=$(generate_prompt "ラオモト" "magenta" "$SHELL_SETTING")
+    tmux send-keys -t darkninja:main "cd \"$(pwd)\" && export PS1='${SHOGUN_PROMPT}' && clear" Enter
+    tmux select-pane -t darkninja:main -P 'bg=#001520'  # ダークニンジャの Dark Blue
+    tmux set-option -p -t darkninja:main @agent_id "darkninja"
+    # darkninja:monitor ウィンドウ - master_tortoise監視
+    tmux new-window -t darkninja -n monitor
+    TORTOISE_PROMPT=$(generate_prompt "tortoise" "cyan" "$SHELL_SETTING")
+    tmux send-keys -t darkninja:monitor "cd \"$(pwd)\" && export PS1='${TORTOISE_PROMPT}' && clear" Enter
+    tmux set-option -p -t darkninja:monitor @agent_id "master_tortoise"
+    tmux set-option -p -t darkninja:monitor @model_name "Sonnet"
+    tmux set-option -p -t darkninja:monitor @current_task ""
+    MONITOR_PANE="darkninja:monitor"
+    log_success "  └─ ラオモトのホンジン（main + monitor）、コンストラクト完了！ワザマエ！"
+fi
 echo ""
 
 # pane-base-index を取得（1 の環境ではペインは 1,2,... になる）
@@ -761,8 +790,8 @@ PANE_BASE=$(tmux show-options -gv pane-base-index 2>/dev/null || echo 0)
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 5.1: multiagent セッション作成（9ペイン：gryakuza + yakuza1-8）
 # ═══════════════════════════════════════════════════════════════════════════════
-if [[ "$MACHINE_ROLE" == "mbp" ]]; then
-    log_war "⚔️ グレーターヤクザ・ヤクザ・ソウカイヤをジェネレート中…5名配備！（MBP軽量構成）"
+if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+    log_war "⚔️ グレーターヤクザ・ヤクザ・ソウカイヤをジェネレート中…9名配備！（neosaitama）"
 else
     log_war "⚔️ グレーターヤクザ・ヤクザ・ソウカイヤをジェネレート中…9名配備！"
 fi
@@ -792,24 +821,38 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════════
 # エージェント構成（マシンロール依存）
 # ═══════════════════════════════════════════════════════════════════════════════
-if [[ "$MACHINE_ROLE" == "mbp" ]]; then
-    # MBP軽量構成: gryakuza + yakuza1-3 + soukaiya = 5 panes
-    PANE_LABELS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "soukaiya")
-    PANE_COLORS=("red" "blue" "blue" "blue" "yellow")
-    AGENT_IDS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "soukaiya")
-    YAKUZA_MAX=3
+if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+    # neosaitama フル構成9体: gryakuza + yakuza1-7 + soukaiya = 9 panes
+    PANE_LABELS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
+    PANE_COLORS=("red" "blue" "blue" "blue" "blue" "blue" "blue" "blue" "yellow")
+    AGENT_IDS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
+    YAKUZA_MAX=7
     if [ "$KESSEN_MODE" = true ]; then
-        MODEL_NAMES=("Opus" "Opus" "Opus" "Opus" "Opus")
+        MODEL_NAMES=("Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus")
     else
-        MODEL_NAMES=("Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus")
+        MODEL_NAMES=("Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus")
     fi
 
-    # 5 panes: 4 splits then tiled layout
-    for _mbp_split in {1..4}; do
-        tmux split-window -t "multiagent:agents"
-    done
+    # 3x3グリッド作成（合計9ペイン）
+    tmux split-window -h -t "multiagent:agents"
+    tmux split-window -h -t "multiagent:agents"
+
+    { read -r COL1_ID; read -r COL2_ID; read -r COL3_ID; } \
+        < <(tmux list-panes -t "multiagent:agents" -F '#{pane_id}')
+
+    tmux select-pane -t "$COL1_ID"
+    tmux split-window -v
+    tmux split-window -v
+
+    tmux select-pane -t "$COL2_ID"
+    tmux split-window -v
+    tmux split-window -v
+
+    tmux select-pane -t "$COL3_ID"
+    tmux split-window -v
+    tmux split-window -v
 else
-    # Ryzenフル構成: gryakuza + yakuza1-7 + soukaiya = 9 panes (現行)
+    # kyotoフル構成: gryakuza + yakuza1-7 + soukaiya = 9 panes (現行)
     PANE_LABELS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
     PANE_COLORS=("red" "blue" "blue" "blue" "blue" "blue" "blue" "blue" "yellow")
     AGENT_IDS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
@@ -929,37 +972,12 @@ log_success "  └─ グレーターヤクザ・ヤクザ・ソウカイヤの�
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 5.2: multiagent:monitors ウィンドウ作成（crane/tortoise監視エージェント）
+# STEP 5.2: multiagent:agents ウィンドウをアクティブに戻す
+#   監視エージェント配置は STEP 5 で完了済み
+#   （kyoto: darkninja:monitor, neosaitama: crane:main）
 # ═══════════════════════════════════════════════════════════════════════════════
-log_war "🔍 マスター・クレイン/トータス監視陣を構築中..."
-
-tmux new-window -t multiagent -n "monitors"
-
-# マシンロールに応じた監視エージェント配置
-if [[ "$MACHINE_ROLE" == "mbp" ]]; then
-    MONITOR_AGENT="master_crane"
-    MONITOR_LABEL="crane"
-else
-    MONITOR_AGENT="master_tortoise"
-    MONITOR_LABEL="tortoise"
-fi
-
-MONITOR_PANE="multiagent:monitors.${PANE_BASE}"
-MONITOR_PROMPT=$(generate_prompt "$MONITOR_LABEL" "cyan" "$SHELL_SETTING")
-tmux send-keys -t "$MONITOR_PANE" "cd \"$(pwd)\" && export PS1='${MONITOR_PROMPT}' && clear" Enter
-tmux set-option -p -t "$MONITOR_PANE" @agent_id "$MONITOR_AGENT"
-tmux set-option -p -t "$MONITOR_PANE" @model_name "Sonnet"
-tmux set-option -p -t "$MONITOR_PANE" @current_task ""
-
-# pane-border-format（agentsウィンドウと同一フォーマット）
-tmux set-option -t multiagent:monitors -w pane-border-status top
-tmux set-option -t multiagent:monitors -w pane-border-format \
-    '#{?pane_active,#[reverse],}#[bold]#{@agent_id}#[default] (#{@model_name}) #{@current_task}'
-
-# agentsウィンドウに戻す（STEP 6以降はagentsを操作対象とするため）
 tmux select-window -t multiagent:agents
-
-log_success "  └─ ${MONITOR_AGENT} 監視陣、コンストラクト完了！ワザマエ！"
+log_success "  └─ ${MONITOR_AGENT} 監視陣、コンストラクト完了！（${MONITOR_PANE}）ワザマエ！"
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -988,13 +1006,15 @@ if [ "$SETUP_ONLY" = false ]; then
     # 削減時間: 40-60秒 → 期待10秒以下
     # ═════════════════════════════════════════════════════════════
 
-    # ダークニンジャ起動（バックグラウンド）
-    _darkninja_extra=""
-    if [ "$SHOGUN_NO_THINKING" = true ]; then
-        _darkninja_extra="MAX_THINKING_TOKENS=0"
+    # ダークニンジャ起動（バックグラウンド）（kyoto のみ）
+    if [[ "$MACHINE_ROLE" != "neosaitama" && "$MACHINE_ROLE" != "mbp" ]]; then
+        _darkninja_extra=""
+        if [ "$SHOGUN_NO_THINKING" = true ]; then
+            _darkninja_extra="MAX_THINKING_TOKENS=0"
+        fi
+        ( launch_agent "darkninja:main" "darkninja" "opus" "$_darkninja_extra" ) &
+        log_info "  ◆召喚◆ ダークニンジャ…ニンジャソウル覚醒！イヤーッ！"
     fi
-    ( launch_agent "darkninja:main" "darkninja" "opus" "$_darkninja_extra" ) &
-    log_info "  ◆召喚◆ ダークニンジャ…ニンジャソウル覚醒！イヤーッ！"
 
     # グレーターヤクザ起動（バックグラウンド）
     ( launch_agent "multiagent:agents.$((PANE_BASE + 0))" "gryakuza" "sonnet" ) &
@@ -1137,9 +1157,11 @@ NINJA_EOF
     pkill -f "fswatch.*${SCRIPT_DIR}/queue/inbox" 2>/dev/null || true
     sleep 0.3  # 【Phase 1高速化: 1秒→0.3秒】
 
-    # ダークニンジャのwatcher（安全モード: エスカレーション無効、event-drivenのみ）
-    launch_watcher "darkninja" "darkninja:main" \
-        "ASW_DISABLE_ESCALATION=1 ASW_PROCESS_TIMEOUT=0 ASW_DISABLE_NORMAL_NUDGE=0"
+    # ダークニンジャのwatcher（安全モード: エスカレーション無効、event-drivenのみ）（kyoto のみ）
+    if [[ "$MACHINE_ROLE" != "neosaitama" && "$MACHINE_ROLE" != "mbp" ]]; then
+        launch_watcher "darkninja" "darkninja:main" \
+            "ASW_DISABLE_ESCALATION=1 ASW_PROCESS_TIMEOUT=0 ASW_DISABLE_NORMAL_NUDGE=0"
+    fi
 
     # グレーターヤクザ・ヤクザ・ソウカイヤのwatcher
     launch_watcher "gryakuza" "multiagent:agents.${PANE_BASE}"
@@ -1152,7 +1174,13 @@ NINJA_EOF
     # 監視エージェントのwatcher
     launch_watcher "$MONITOR_AGENT" "$MONITOR_PANE"
 
-    _total_watchers=$((YAKUZA_MAX + 4))  # darkninja + gryakuza + yakuzaN + soukaiya + monitor
+    # kyoto: darkninja + gryakuza + yakuzaN + soukaiya + monitor = YAKUZA_MAX + 4
+    # neosaitama: gryakuza + yakuzaN + soukaiya + monitor = YAKUZA_MAX + 3
+    if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+        _total_watchers=$((YAKUZA_MAX + 3))
+    else
+        _total_watchers=$((YAKUZA_MAX + 4))
+    fi
     log_success "  └─ ◆実際完了◆ ${_total_watchers}エージェント分のIRC監視起動完了！全チャンネル接続！ワザマエ！"
 
     # ═══════════════════════════════════════════════════════════════════
@@ -1234,8 +1262,8 @@ fi
 # STEP 6.8: ntfy入力リスナー起動
 # ═══════════════════════════════════════════════════════════════════════════════
 # NTFY_TOPIC は起動時の settings.yaml 読み込みで取得済み（grep|awk|tr → 0 fork）
-# ntfy_listener起動: ryzenのみ（MBP側は別途対応）。PIDチェックで二重起動防止。
-if [ -n "$NTFY_TOPIC" ] && [[ "$MACHINE_ROLE" == "ryzen" ]]; then
+# ntfy_listener起動: kyotoのみ（neosaitama側は別途対応）。PIDチェックで二重起動防止。
+if [ -n "$NTFY_TOPIC" ] && [[ "$MACHINE_ROLE" == "kyoto" || "$MACHINE_ROLE" == "ryzen" ]]; then
     [ ! -f ./queue/ntfy_inbox.yaml ] && echo "inbox:" > ./queue/ntfy_inbox.yaml
     if pgrep -f "ntfy_listener.sh" > /dev/null 2>&1; then
         log_info "📱 ntfyリスナー既に起動中。二重起動スキップ (topic: ${NTFY_TOPIC:0:8}...)"
@@ -1253,7 +1281,7 @@ if [ -n "$NTFY_TOPIC" ] && [[ "$MACHINE_ROLE" == "ryzen" ]]; then
         log_info "📱 ntfy_listener supervisor起動 (クラッシュ時30秒以内に自動再起動)"
     fi
 elif [ -n "$NTFY_TOPIC" ]; then
-    log_info "📱 MBP構成: ntfyリスナーはMBP側で起動。Ryzenスキップ"
+    log_info "📱 neosaitama構成: ntfyリスナーはneosaitama側で起動。kyotoスキップ"
 else
     log_info "📱 ntfy未設定。ラオモトのスマホ回線は未接続…ナムアミダブツ"
 fi
@@ -1273,22 +1301,33 @@ echo "  ┌───────────────────────
 echo "  │  📋 フジンズ (Battle Formation)                           │"
 echo "  └──────────────────────────────────────────────────────────┘"
 echo ""
-echo "     【darkninjaセッション】ラオモトのホンジン"
-echo "     ┌─────────────────────────────────┐"
-echo "     │  Pane 0: ラオモト (DARKNINJA)    │  ← メガコーポCEO・プロジェクト統括"
-echo "     └─────────────────────────────────┘"
-echo ""
-if [[ "$MACHINE_ROLE" == "mbp" ]]; then
-    echo "     【multiagent:agents】MBP軽量構成（5ペイン）"
-    echo "     ┌──────────┬─────────┐"
-    echo "     │ gryakuza │ yakuza2 │"
-    echo "     ├──────────┼─────────┤"
-    echo "     │ yakuza1  │ yakuza3 │"
-    echo "     ├──────────┼─────────┤"
-    echo "     │ soukaiya │         │"
-    echo "     └──────────┴─────────┘"
+if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+    echo "     【craneセッション】クレイン・ホンジン"
+    echo "     ┌─────────────────────────────────┐"
+    echo "     │  crane:main: master_crane        │  ← 監視エージェント（crane）"
+    echo "     └─────────────────────────────────┘"
 else
-    echo "     【multiagent:agents】Ryzenフル構成（9ペイン）"
+    echo "     【darkninjaセッション】ラオモトのホンジン"
+    echo "     ┌──────────────┬────────────────────┐"
+    echo "     │ main         │ monitor            │"
+    echo "     │ ラオモト(CEO) │ master_tortoise    │"
+    echo "     └──────────────┴────────────────────┘"
+fi
+echo ""
+if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+    echo "     【multiagent:agents】neosaitama フル構成（9ペイン）"
+    echo "     ┌──────────┬─────────┬─────────┐"
+    echo "     │ gryakuza │ yakuza3 │ yakuza6 │"
+    echo "     │(GrYakuza)│  (Y3)   │  (Y6)   │"
+    echo "     ├──────────┼─────────┼─────────┤"
+    echo "     │ yakuza1  │ yakuza4 │ yakuza7 │"
+    echo "     │   (Y1)   │  (Y4)   │  (Y7)   │"
+    echo "     ├──────────┼─────────┼─────────┤"
+    echo "     │ yakuza2  │ yakuza5 │soukaiya │"
+    echo "     │   (Y2)   │  (Y5)   │(Soukaiya)│"
+    echo "     └──────────┴─────────┴─────────┘"
+else
+    echo "     【multiagent:agents】kyotoフル構成（9ペイン）"
     echo "     ┌──────────┬─────────┬─────────┐"
     echo "     │ gryakuza │ yakuza3 │ yakuza6 │"
     echo "     │(GrYakuza)│  (Y3)   │  (Y6)   │"
@@ -1301,10 +1340,7 @@ else
     echo "     └──────────┴─────────┴─────────┘"
 fi
 echo ""
-echo "     【multiagent:monitors】監視エージェント（1ペイン）"
-echo "     ┌─────────────────────┐"
-echo "     │ ${MONITOR_AGENT}$(printf '%*s' $((18 - ${#MONITOR_AGENT})) '')│"
-echo "     └─────────────────────┘"
+echo "     監視エージェント: ${MONITOR_AGENT} → ${MONITOR_PANE}"
 echo ""
 
 echo ""
@@ -1333,8 +1369,13 @@ fi
 
 echo "  ◆ ツギノ・アクション:"
 echo "  ┌──────────────────────────────────────────────────────────┐"
+if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+echo "  │  クレイン・ホンジンにアタッチ（監視開始）:                          │"
+echo "  │     tmux attach-session -t crane        (または: css)    │"
+else
 echo "  │  ラオモトのホンジンにアタッチしてメイレイを開始:                    │"
 echo "  │     tmux attach-session -t darkninja   (または: css)     │"
+fi
 echo "  │                                                          │"
 echo "  │  グレーターヤクザ・ヤクザのジンを確認する:                            │"
 echo "  │     tmux attach-session -t multiagent   (または: csm)    │"

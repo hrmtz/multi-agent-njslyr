@@ -37,7 +37,7 @@ PEER_HOST=$(awk '/^  peer_host:/ {print $2; exit}' "$SETTINGS")
 PEER_PROJECT_ROOT=$(awk '/^  peer_project_root:/ {print $2; exit}' "$SETTINGS")
 PEER_WSL=$(awk '/^  peer_wsl:/ {gsub(/"/, "", $2); print $2; exit}' "$SETTINGS")
 
-MACHINE_ROLE="${MACHINE_ROLE:-ryzen}"
+MACHINE_ROLE="${MACHINE_ROLE:-kyoto}"
 
 # ─── Input validation (SEC-001) ──────────────────────────────
 # Validate settings.yaml-derived values to prevent shell injection / path traversal
@@ -232,17 +232,17 @@ sync_mcp_memory() {
     _peer_slug=$(echo "$PEER_PROJECT_ROOT" | sed 's|^/||; s|/|-|g')
     local remote_mcp="$PEER_HOST:~/.claude/projects/-${_peer_slug}/memory/"
 
-    if [[ "$direction" == "push" && "$MACHINE_ROLE" == "ryzen" ]]; then
+    if [[ "$direction" == "push" && ("$MACHINE_ROLE" == "kyoto" || "$MACHINE_ROLE" == "ryzen") ]]; then
         if [[ ! -d "$MCP_MEMORY_DIR" ]]; then
             log_warn "MCP memory directory not found: $MCP_MEMORY_DIR — skipping"
             return 0
         fi
         rsync_with_retry "$MCP_MEMORY_DIR" "$remote_mcp" || return 1
-    elif [[ "$direction" == "pull" && "$MACHINE_ROLE" == "mbp" ]]; then
+    elif [[ "$direction" == "pull" && ("$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp") ]]; then
         mkdir -p "$MCP_MEMORY_DIR"
         rsync_with_retry "$remote_mcp" "$MCP_MEMORY_DIR" || return 1
     else
-        log_info "MCP memory sync skipped (role=$MACHINE_ROLE direction=$direction — Ryzen=master)"
+        log_info "MCP memory sync skipped (role=$MACHINE_ROLE direction=$direction — kyoto=master)"
     fi
     return 0
 }

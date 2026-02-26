@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # test_ntfy_listener.bats — ntfy_listener.sh heartbeat/prefix routing ユニットテスト
-# cmd_275 Round3 Group B
+# cmd_275 Round3 Group B / cmd_278 T2 追加
 #
 # テスト構成:
 #   T-NL-HB-001: 正常HBメッセージのパース（全フィールド正常値）
@@ -13,6 +13,10 @@
 #   T-NL-PFX-002: sync:メッセージの正常ルーティング
 #   T-NL-PFX-003: 未知prefixのデフォルト処理
 #   T-NL-PFX-004: prefix偽装（"push:; rm -rf /"）の安全な処理
+#   T-NL-RPT-001: report: 正常処理（YAML書き込み + gryakuza inbox通知確認）
+#   T-NL-RPT-002: report: 不正base64 → エラーログ・ファイル未作成
+#   T-NL-RPT-003: report: worker_id/task_id バリデーション失敗 → 拒否
+#   T-NL-RPT-004: report: 既存ファイル重複処理（タイムスタンプsuffix付与）
 
 # --- セットアップ ---
 
@@ -31,7 +35,7 @@ setup() {
 
     # Mock project directory structure
     MOCK_PROJECT="$TEST_TMP/project"
-    mkdir -p "$MOCK_PROJECT"/{config,lib,scripts,queue/heartbeat,logs/ntfy_inbox_corrupt}
+    mkdir -p "$MOCK_PROJECT"/{config,lib,scripts,queue/{heartbeat,reports},logs/ntfy_inbox_corrupt}
 
     # Variables needed by ntfy_listener.sh functions (used by sourced functions.sh)
     # shellcheck disable=SC2034
@@ -297,4 +301,245 @@ call_with_stderr() {
 
     grep -q "status: pending" "$INBOX"
     grep -q "msg_test_002" "$INBOX"
+}
+
+# ═══════════════════════════════════════════════════════════════
+# report: handler tests (cmd_278 T2)
+# ═══════════════════════════════════════════════════════════════
+
+# --- T-NL-RPT-001: report: 正常処理 ---
+
+@test "T-NL-RPT-001: handle_report saves YAML and notifies gryakuza inbox" {
+    # 正常なレポートYAMLをbase64エンコード
+    local valid_yaml="worker_id: yakuza3
+task_id: subtask_278c
+status: completed
+result: success
+"
+    local payload
+    payload=$(printf '%s' "$valid_yaml" | base64 | tr -d '\n')
+
+    run call_with_stderr handle_report "$payload"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"report: saved"* ]]
+
+    # レポートファイルが正しいパスに作成されているか確認
+    local report_file="$MOCK_PROJECT/queue/reports/yakuza3_report_subtask_278c.yaml"
+    [ -f "$report_file" ]
+    grep -q "worker_id: yakuza3" "$report_file"
+    grep -q "task_id: subtask_278c" "$report_file"
+
+    # gryakuza inbox_write が呼ばれたか確認
+    [ -f "$INBOX_WRITE_LOG" ]
+    grep -q "gryakuza" "$INBOX_WRITE_LOG"
+    grep -q "report_received" "$INBOX_WRITE_LOG"
+    grep -q "subtask_278c" "$INBOX_WRITE_LOG"
+}
+
+# --- T-NL-RPT-002: report: 不正base64 → エラーログ・ファイル未作成 ---
+
+@test "T-NL-RPT-002: handle_report rejects invalid base64, no file created" {
+    # !!! は base64 デコード不可または空worker_id/task_idとなりバリデーション失敗
+    run call_with_stderr handle_report "!!!invalid_base64!!!"
+    [ "$status" -ne 0 ]
+
+    # queue/reports/ にファイルが作成されていないこと
+    local count
+    count=$(find "$MOCK_PROJECT/queue/reports" -type f -name "*.yaml" | wc -l)
+    [ "$count" -eq 0 ]
+
+    # gryakuza inbox_write が呼ばれていないこと
+    [ ! -f "$INBOX_WRITE_LOG" ] || ! grep -q "gryakuza" "$INBOX_WRITE_LOG"
+}
+
+# --- T-NL-RPT-003: report: worker_id/task_id バリデーション失敗 → 拒否 ---
+
+@test "T-NL-RPT-003: handle_report rejects YAML with missing worker_id field" {
+    # worker_id フィールドなし（task_id のみ）
+    local invalid_yaml="task_id: subtask_278c
+status: completed
+"
+    local payload
+    payload=$(printf '%s' "$invalid_yaml" | base64 | tr -d '\n')
+
+    run call_with_stderr handle_report "$payload"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"invalid or missing worker_id"* ]]
+
+    # ファイル未作成
+    local count
+    count=$(find "$MOCK_PROJECT/queue/reports" -type f -name "*.yaml" | wc -l)
+    [ "$count" -eq 0 ]
+}
+
+@test "T-NL-RPT-003b: handle_report rejects YAML with path-traversal worker_id" {
+    # worker_id にパストラバーサル文字（スラッシュ）を含む
+    local bad_yaml="worker_id: ../../../etc/passwd
+task_id: subtask_278c
+status: completed
+"
+    local payload
+    payload=$(printf '%s' "$bad_yaml" | base64 | tr -d '\n')
+
+    run call_with_stderr handle_report "$payload"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"invalid or missing worker_id"* ]]
+
+    local count
+    count=$(find "$MOCK_PROJECT/queue/reports" -type f -name "*.yaml" | wc -l)
+    [ "$count" -eq 0 ]
+}
+
+# --- T-NL-RPT-004: report: 既存ファイル重複処理（タイムスタンプsuffix付与） ---
+
+@test "T-NL-RPT-004: handle_report adds timestamp suffix when report file already exists" {
+    local valid_yaml="worker_id: yakuza3
+task_id: subtask_278c
+status: completed
+"
+    local payload
+    payload=$(printf '%s' "$valid_yaml" | base64 | tr -d '\n')
+
+    # 1回目: 通常ファイル作成
+    run call_with_stderr handle_report "$payload"
+    [ "$status" -eq 0 ]
+    [ -f "$MOCK_PROJECT/queue/reports/yakuza3_report_subtask_278c.yaml" ]
+
+    # 2回目: 既存ファイルあり → タイムスタンプsuffix付きで作成
+    run call_with_stderr handle_report "$payload"
+    [ "$status" -eq 0 ]
+
+    # queue/reports/ に2ファイル存在（元 + suffix付き）
+    local count
+    count=$(find "$MOCK_PROJECT/queue/reports" -type f -name "yakuza3_report_subtask_278c*.yaml" | wc -l)
+    [ "$count" -eq 2 ]
+}
+
+# --- T-NL-RPT-005: route_message report: → return 0 (ntfy_inbox処理) ---
+
+@test "T-NL-RPT-005: route_message dispatches report: prefix and returns 0" {
+    local valid_yaml="worker_id: yakuza3
+task_id: subtask_test
+status: completed
+"
+    local payload
+    payload=$(printf '%s' "$valid_yaml" | base64 | tr -d '\n')
+
+    run call_with_stderr route_message "report:${payload}" ""
+    [ "$status" -eq 0 ]
+
+    # レポートファイルが作成されているか確認
+    [ -f "$MOCK_PROJECT/queue/reports/yakuza3_report_subtask_test.yaml" ]
+}
+
+# ═══════════════════════════════════════════════════════════════
+# dispatch: handler tests (cmd_278 T1)
+# ═══════════════════════════════════════════════════════════════
+
+# --- T-NL-DSP-001: dispatch: 正常処理 ---
+
+@test "T-NL-DSP-001: handle_task_dispatch writes YAML and notifies worker inbox" {
+    local valid_yaml
+    valid_yaml="task:
+  task_id: subtask_test_dsp
+  parent_cmd: cmd_278
+  assigned_to: yakuza3
+  status: assigned
+"
+    local payload
+    payload=$(printf '%s' "$valid_yaml" | base64 | tr -d '\n')
+
+    run call_with_stderr handle_task_dispatch "$payload"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"dispatch: task_id=subtask_test_dsp"* ]]
+
+    # queue/tasks/ にYAMLが作成されているか確認
+    local task_file="$MOCK_PROJECT/queue/tasks/yakuza3_subtask_test_dsp.yaml"
+    [ -f "$task_file" ]
+    grep -q "task_id: subtask_test_dsp" "$task_file"
+    grep -q "parent_cmd: cmd_278" "$task_file"
+
+    # yakuza3 inbox_write が呼ばれたか確認
+    [ -f "$INBOX_WRITE_LOG" ]
+    grep -q "yakuza3" "$INBOX_WRITE_LOG"
+    grep -q "task_assigned" "$INBOX_WRITE_LOG"
+}
+
+# --- T-NL-DSP-002: dispatch: 不正base64 → エラーログ・ファイル未作成 ---
+
+@test "T-NL-DSP-002: handle_task_dispatch rejects invalid base64, no file created" {
+    run call_with_stderr handle_task_dispatch "!!!invalid_base64!!!"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"base64 decode failed"* ]]
+
+    # queue/tasks/ にファイルが作成されていないこと
+    mkdir -p "$MOCK_PROJECT/queue/tasks"
+    local count
+    count=$(find "$MOCK_PROJECT/queue/tasks" -type f -name "*.yaml" | wc -l)
+    [ "$count" -eq 0 ]
+}
+
+# --- T-NL-DSP-003: dispatch: task_id/parent_cmd欠如 → バリデーション失敗 ---
+
+@test "T-NL-DSP-003: handle_task_dispatch rejects YAML missing required fields" {
+    # task_id のみ、parent_cmd なし
+    local incomplete_yaml
+    incomplete_yaml="task:
+  task_id: subtask_test_dsp
+  assigned_to: yakuza3
+"
+    local payload
+    payload=$(printf '%s' "$incomplete_yaml" | base64 | tr -d '\n')
+
+    run call_with_stderr handle_task_dispatch "$payload"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"missing task_id or parent_cmd"* ]]
+
+    # ファイル未作成
+    mkdir -p "$MOCK_PROJECT/queue/tasks"
+    local count
+    count=$(find "$MOCK_PROJECT/queue/tasks" -type f -name "*.yaml" | wc -l)
+    [ "$count" -eq 0 ]
+}
+
+# --- T-NL-DSP-004: dispatch: task_id バリデーション失敗（パストラバーサル）→ 拒否 ---
+
+@test "T-NL-DSP-004: handle_task_dispatch rejects path-traversal task_id" {
+    local bad_yaml
+    bad_yaml="task:
+  task_id: ../../../etc/cron.d/evil
+  parent_cmd: cmd_278
+  assigned_to: yakuza3
+"
+    local payload
+    payload=$(printf '%s' "$bad_yaml" | base64 | tr -d '\n')
+
+    run call_with_stderr handle_task_dispatch "$payload"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"invalid task_id"* ]]
+
+    mkdir -p "$MOCK_PROJECT/queue/tasks"
+    local count
+    count=$(find "$MOCK_PROJECT/queue/tasks" -type f -name "*.yaml" | wc -l)
+    [ "$count" -eq 0 ]
+}
+
+# --- T-NL-DSP-005: route_message dispatch: → return 0 (ntfy_inbox記録) ---
+
+@test "T-NL-DSP-005: route_message dispatches dispatch: prefix and returns 0" {
+    local valid_yaml
+    valid_yaml="task:
+  task_id: subtask_route_test
+  parent_cmd: cmd_278
+  assigned_to: yakuza4
+  status: assigned
+"
+    local payload
+    payload=$(printf '%s' "$valid_yaml" | base64 | tr -d '\n')
+
+    run call_with_stderr route_message "dispatch:${payload}" ""
+    [ "$status" -eq 0 ]
+
+    # タスクファイルが作成されているか確認
+    [ -f "$MOCK_PROJECT/queue/tasks/yakuza4_subtask_route_test.yaml" ]
 }

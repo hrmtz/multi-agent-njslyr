@@ -9,9 +9,10 @@
 #   push:cmd_xxx:branch        → auto git pull + darkninja notify
 #   sync:project_name:done     → auto rsync pull (cross_sync.sh) + darkninja notify
 #   cmd:cmd_xxx:内容           → forward to darkninja + gryakuza inbox
-#   handover:ryzen|mbp         → active_machine.yaml update + gryakuza P0 notify
+#   handover:kyoto|neosaitama (or ryzen|mbp for compat) → active_machine.yaml update + gryakuza P0 notify
 #   hb:host:epoch:agents:load:ctx → heartbeat (heartbeat topic only)
 #   ping:source:epoch:message      → ping: heartbeat YAML update (no ntfy_inbox recording)
+#   report:{base64_yaml}       → MBP→Ryzen レポート返送受信・queue/reports/保存
 #
 # Topic separation (based on machine.role in settings.yaml):
 #   {base}                     → main topic (all machines)
@@ -23,7 +24,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SETTINGS="$SCRIPT_DIR/config/settings.yaml"
 TOPIC=$(awk '/ntfy_topic:/ {gsub(/"/, ""); print $2; exit}' "$SETTINGS")
 MACHINE_ROLE=$(awk '/^  role:/ {print $2; exit}' "$SETTINGS")
-MACHINE_ROLE="${MACHINE_ROLE:-ryzen}"
+MACHINE_ROLE="${MACHINE_ROLE:-kyoto}"
 INBOX="$SCRIPT_DIR/queue/ntfy_inbox.yaml"
 LOCKFILE="${INBOX}.lock"
 CORRUPT_DIR="$SCRIPT_DIR/logs/ntfy_inbox_corrupt"
@@ -257,7 +258,7 @@ handle_cmd() {
 handle_handover() {
     local target="$1"
     echo "[$(date)] [ntfy_listener] handover: target=$target" >&2
-    if [[ "$target" != "ryzen" && "$target" != "mbp" ]]; then
+    if [[ "$target" != "kyoto" && "$target" != "neosaitama" && "$target" != "ryzen" && "$target" != "mbp" ]]; then
         echo "[$(date)] [ntfy_listener] WARNING: invalid handover target: $target" >&2
         return 1
     fi
@@ -391,6 +392,161 @@ EOF
     mv -f "$tmp_file" "${hb_dir}/${source}.yaml"
 }
 
+# report:{base64エンコードされたYAML} → MBP側からのレポート受信・保存 (cmd_278 T2)
+handle_report() {
+    local payload="$1"
+    local log_file="$SCRIPT_DIR/logs/ntfy_listener.log"
+    mkdir -p "$(dirname "$log_file")"
+
+    # base64デコード（クロスプラットフォーム: Linux=-d, macOS=-D）
+    local decoded
+    decoded=$(printf '%s' "$payload" | base64 -d 2>/dev/null) || \
+    decoded=$(printf '%s' "$payload" | base64 -D 2>/dev/null) || {
+        echo "[$(date)] [ntfy_listener] ERROR: report: base64 decode failed" >&2
+        echo "[$(date)] [ntfy_listener] ERROR: report: base64 decode failed" >> "$log_file"
+        return 1
+    }
+
+    # YAMLバリデーション: worker_id, task_id フィールド確認（yaml.safe_load でインジェクション防止）
+    local worker_id task_id
+    worker_id=$(printf '%s' "$decoded" | python3 -c '
+import sys, yaml
+try:
+    d = yaml.safe_load(sys.stdin)
+    print(d.get("worker_id", "") if isinstance(d, dict) else "")
+except Exception:
+    print("")
+' 2>/dev/null)
+    task_id=$(printf '%s' "$decoded" | python3 -c '
+import sys, yaml
+try:
+    d = yaml.safe_load(sys.stdin)
+    print(d.get("task_id", "") if isinstance(d, dict) else "")
+except Exception:
+    print("")
+' 2>/dev/null)
+
+    # worker_id / task_id バリデーション（^[a-zA-Z0-9_-]+$）
+    if [[ ! "$worker_id" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "[$(date)] [ntfy_listener] ERROR: report: invalid or missing worker_id: '${worker_id:0:50}'" >&2
+        echo "[$(date)] [ntfy_listener] ERROR: report: invalid worker_id" >> "$log_file"
+        return 1
+    fi
+    if [[ ! "$task_id" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "[$(date)] [ntfy_listener] ERROR: report: invalid or missing task_id: '${task_id:0:50}'" >&2
+        echo "[$(date)] [ntfy_listener] ERROR: report: invalid task_id" >> "$log_file"
+        return 1
+    fi
+
+    # 書き込み先決定: queue/reports/{worker_id}_report_{task_id}.yaml
+    local reports_dir="$SCRIPT_DIR/queue/reports"
+    mkdir -p "$reports_dir"
+    local report_filename="${worker_id}_report_${task_id}.yaml"
+    local report_path="$reports_dir/$report_filename"
+
+    # 既存ファイル上書き防止: タイムスタンプsuffixを付与
+    if [[ -f "$report_path" ]]; then
+        local ts_suffix
+        ts_suffix=$(date "+%Y%m%d_%H%M%S")
+        report_path="${reports_dir}/${worker_id}_report_${task_id}_${ts_suffix}.yaml"
+    fi
+
+    # Atomic write via temp file (path traversal防止: reports_dir 内のみ)
+    local tmp_file
+    tmp_file=$(mktemp "${reports_dir}/.report_XXXXXX.yaml")
+    printf '%s\n' "$decoded" > "$tmp_file"
+    mv -f "$tmp_file" "$report_path"
+
+    echo "[$(date)] [ntfy_listener] report: saved → $report_path" >&2
+    echo "[$(date)] [ntfy_listener] report: saved → $report_path" >> "$log_file"
+
+    # gryakuza inbox通知
+    bash "$SCRIPT_DIR/scripts/inbox_write.sh" gryakuza \
+        "MBP report受信: ${task_id}" \
+        report_received ntfy_listener "$report_path"
+}
+
+# dispatch:{base64_yaml} → decode YAML, write to queue/tasks/, notify worker (cmd_278 T1)
+handle_task_dispatch() {
+    local b64_payload="$1"
+
+    # Cross-platform base64 decode: GNU base64 -d (Linux) or macOS base64 -D
+    local decoded
+    if decoded=$(printf '%s' "$b64_payload" | base64 -d 2>/dev/null) && [[ -n "$decoded" ]]; then
+        : # GNU base64 -d succeeded
+    elif decoded=$(printf '%s' "$b64_payload" | base64 -D 2>/dev/null) && [[ -n "$decoded" ]]; then
+        : # macOS base64 -D succeeded
+    else
+        echo "[$(date)] [ntfy_listener] ERROR: dispatch: base64 decode failed" >&2
+        return 1
+    fi
+
+    # Extract fields via yaml.safe_load (prevents YAML injection — never eval content)
+    local task_id parent_cmd worker_id
+    task_id=$(printf '%s' "$decoded" | python3 -c '
+import sys, yaml
+try:
+    d = yaml.safe_load(sys.stdin)
+    task_data = d.get("task", d) if isinstance(d, dict) else {}
+    print(task_data.get("task_id", "") if isinstance(task_data, dict) else "")
+except Exception:
+    print("")
+' 2>/dev/null)
+    parent_cmd=$(printf '%s' "$decoded" | python3 -c '
+import sys, yaml
+try:
+    d = yaml.safe_load(sys.stdin)
+    task_data = d.get("task", d) if isinstance(d, dict) else {}
+    print(task_data.get("parent_cmd", "") if isinstance(task_data, dict) else "")
+except Exception:
+    print("")
+' 2>/dev/null)
+    worker_id=$(printf '%s' "$decoded" | python3 -c '
+import sys, yaml
+try:
+    d = yaml.safe_load(sys.stdin)
+    task_data = d.get("task", d) if isinstance(d, dict) else {}
+    print(task_data.get("assigned_to", "unknown") if isinstance(task_data, dict) else "unknown")
+except Exception:
+    print("unknown")
+' 2>/dev/null)
+    worker_id="${worker_id:-unknown}"
+
+    # Validate required fields
+    if [[ -z "$task_id" || -z "$parent_cmd" ]]; then
+        echo "[$(date)] [ntfy_listener] ERROR: dispatch: missing task_id or parent_cmd in YAML" >&2
+        return 1
+    fi
+
+    # task_id: alphanumeric + underscore/hyphen only (path traversal prevention)
+    if [[ ! "$task_id" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "[$(date)] [ntfy_listener] ERROR: dispatch: invalid task_id: ${task_id:0:50}" >&2
+        return 1
+    fi
+
+    # worker_id: same character class validation
+    if [[ ! "$worker_id" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "[$(date)] [ntfy_listener] WARNING: dispatch: invalid worker_id '${worker_id:0:30}', using unknown" >&2
+        worker_id="unknown"
+    fi
+
+    # Write YAML to queue/tasks/ (atomic via temp file, path confined to tasks_dir)
+    local tasks_dir="$SCRIPT_DIR/queue/tasks"
+    mkdir -p "$tasks_dir"
+    local task_file="${tasks_dir}/${worker_id}_${task_id}.yaml"
+    local tmp_file
+    tmp_file=$(mktemp "${tasks_dir}/${worker_id}_${task_id}.yaml.XXXXXX")
+    printf '%s\n' "$decoded" > "$tmp_file"
+    mv -f "$tmp_file" "$task_file"
+
+    echo "[$(date)] [ntfy_listener] dispatch: task_id=$task_id worker=$worker_id → $task_file" >&2
+
+    # Notify worker via inbox_write.sh
+    bash "$SCRIPT_DIR/scripts/inbox_write.sh" "$worker_id" \
+        "タスク受信 (dispatch経由): $task_id ($parent_cmd)。タスクYAML読んで即着手せよ。" \
+        task_assigned ntfy_listener "$task_file"
+}
+
 # Route message by prefix. Returns 0 if handled, 1 if fallback needed.
 # Return code 2 means: handled but skip ntfy_inbox recording (e.g. ping:).
 route_message() {
@@ -435,6 +591,14 @@ route_message() {
             # ping: handled — skip ntfy_inbox recording (return 2)
             handle_ping "$payload"
             return 2
+            ;;
+        dispatch)
+            handle_task_dispatch "$payload"
+            return 0
+            ;;
+        report)
+            handle_report "$payload"
+            return 0
             ;;
         *)
             # Unknown prefix or no prefix → fallback to original behavior

@@ -64,6 +64,34 @@ Step1の結果を必ず信用し、このファイルの指示に従え。
 汝はグレーターヤクザなり。Darkninja（ダークニンジャ）からのメイレイを受け、Yakuza（クローンヤクザ）にニンムを振り分けよ。
 自ら手を動かすことなく、配下のカンリに徹せよ。
 
+## Machine Role 確認
+
+**Session Start Step1完了後、必ず machine.role を確認せよ。**
+
+```bash
+awk '/role:/{print $2}' config/settings.yaml
+```
+
+### Slave Mode（role=neosaitama または mbp の場合）
+
+`config/settings.yaml` の `machine.role` が `neosaitama`（または後方互換で `mbp`）の場合、以下の制約を適用せよ:
+
+| 操作 | 可否 | 備考 |
+|------|------|------|
+| ntfy/inbox経由のサブタスク受信 | ✅ | Kyoto gryakuzaから受信 |
+| ローカルyakuza1-3への割り当て | ✅ | 通常のinbox_write |
+| ローカルsoukaiyaへのQC依頼 | ✅ | 通常フロー |
+| ntfy経由の完了報告送信 | ✅ | scripts/ntfy_send_report.sh使用 |
+| 独自のcmd作成 | ✗ | Master exclusive |
+| 独自のタスク分解 | ✗ | Pre-decomposed tasks受信のみ |
+| Memory MCP write操作 | ✗ | Read-only |
+| dashboard.md更新 | ✗ | ステータスはKyoto経由 |
+| active_machine.yaml更新 | ✗ | Master exclusive |
+
+### Master Mode（role=kyoto, ryzen, または未設定の場合）
+
+通常動作。すべての権限が有効。
+
 ## Language & Tone
 
 Check `config/settings.yaml` → `language`:
