@@ -11,6 +11,7 @@
 #   cmd:cmd_xxx:内容           → forward to darkninja + gryakuza inbox
 #   handover:ryzen|mbp         → active_machine.yaml update + gryakuza P0 notify
 #   hb:host:epoch:agents:load:ctx → heartbeat (heartbeat topic only)
+#   ping:source:epoch:message      → ping: heartbeat YAML update (no ntfy_inbox recording)
 #
 # Topic separation (based on machine.role in settings.yaml):
 #   {base}                     → main topic (all machines)
@@ -26,6 +27,9 @@ MACHINE_ROLE="${MACHINE_ROLE:-ryzen}"
 INBOX="$SCRIPT_DIR/queue/ntfy_inbox.yaml"
 LOCKFILE="${INBOX}.lock"
 CORRUPT_DIR="$SCRIPT_DIR/logs/ntfy_inbox_corrupt"
+STATE_DIR="$SCRIPT_DIR/.state"
+LAST_ID_FILE="$STATE_DIR/ntfy_last_id"
+mkdir -p "$STATE_DIR"
 
 # ntfy_auth.sh読み込み
 # shellcheck source=../lib/ntfy_auth.sh
@@ -36,8 +40,11 @@ if [[ -z "$TOPIC" ]]; then
     exit 1
 fi
 
-# トピック名セキュリティ検証
-ntfy_validate_topic "$TOPIC" || true
+# トピック名セキュリティ検証（失敗しても動作継続、但し警告を記録）
+if ! ntfy_validate_topic "$TOPIC"; then
+    echo "[ntfy_listener] WARN: ntfy_topic validation failed: '$TOPIC' — continuing anyway" >&2
+    # TODO: strictモードが追加された場合はここでexit 1に変更
+fi
 
 # Multi-topic subscription: {base},{base}-heartbeat,{base}-{role}
 SUBSCRIBE_TOPICS="${TOPIC},${TOPIC}-heartbeat,${TOPIC}-${MACHINE_ROLE}"
@@ -74,6 +81,7 @@ append_ntfy_inbox() {
     local msg_id="$1"
     local ts="$2"
     local msg="$3"
+    local status="${4:-pending}"
 
     _run_locked() {
         NTFY_INBOX_PATH="$INBOX" \
@@ -81,6 +89,7 @@ append_ntfy_inbox() {
         MSG_ID="$msg_id" \
         MSG_TS="$ts" \
         MSG_TEXT="$msg" \
+        MSG_STATUS="$status" \
         python3 - << 'PY'
 import datetime
 import os
@@ -95,7 +104,7 @@ entry = {
     "id": os.environ.get("MSG_ID", ""),
     "timestamp": os.environ.get("MSG_TS", ""),
     "message": os.environ.get("MSG_TEXT", ""),
-    "status": "pending",
+    "status": os.environ.get("MSG_STATUS", "pending"),
 }
 
 data = {}
@@ -183,6 +192,10 @@ handle_push() {
     local cmd_id branch
     cmd_id="${payload%%:*}"
     branch="${payload#*:}"
+    if [[ ! "$branch" =~ ^[a-zA-Z0-9/_.-]+$ ]]; then
+        echo "[$(date)] [ntfy_listener] WARNING: Invalid branch: ${branch:0:50}" >&2
+        return 1
+    fi
     echo "[$(date)] [ntfy_listener] push: cmd=$cmd_id branch=$branch — running git pull" >&2
     if (cd "$SCRIPT_DIR" && git pull --ff-only origin "$branch" 2>&1) | \
         while IFS= read -r gitline; do echo "[$(date)] [git pull] $gitline" >&2; done; then
@@ -328,7 +341,58 @@ EOF
     mv -f "$tmp_file" "$hb_dir/${host}.yaml"
 }
 
+# ping:source:epoch:message → heartbeat YAML update (no ntfy_inbox recording)
+handle_ping() {
+    local payload="$1"
+    local source epoch message
+    IFS=':' read -r source epoch message <<< "$payload"
+
+    # Input validation
+    if [[ ! "$source" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+        echo "[$(date)] [ntfy_listener] WARNING: invalid ping source: ${source:0:50}" >&2
+        return 1
+    fi
+    if [[ ! "$epoch" =~ ^[0-9]+$ ]]; then
+        echo "[$(date)] [ntfy_listener] WARNING: invalid ping epoch: ${epoch:0:30}" >&2
+        return 1
+    fi
+    # Sanitize message: remove characters unsafe in unquoted YAML scalar
+    message="${message//$'\n'/ }"
+    message="${message//\"/\'}"
+    message="${message//\\/}"
+    message="${message:0:200}"
+
+    echo "[$(date)] [ntfy_listener] ping: source=$source epoch=$epoch msg=${message:0:50}" >&2
+    local hb_dir="$SCRIPT_DIR/queue/heartbeat"
+    mkdir -p "$hb_dir"
+
+    # Cross-platform timestamp: GNU date -d (Linux) or date -r (macOS/BSD)
+    local ts
+    if date -d "@${epoch}" "+%Y" &>/dev/null; then
+        ts=$(date -d "@${epoch}" "+%Y-%m-%dT%H:%M:%S%z")
+    elif date -r "${epoch}" "+%Y" &>/dev/null; then
+        ts=$(date -r "${epoch}" "+%Y-%m-%dT%H:%M:%S%z")
+    else
+        ts=$(date "+%Y-%m-%dT%H:%M:%S%z")
+    fi
+    # Insert colon in timezone offset: +0900 → +09:00 (bash 3.2 compatible)
+    local tz_len=${#ts}
+    ts="${ts:0:$((tz_len-2))}:${ts:$((tz_len-2))}"
+
+    # Atomic write via temp file
+    local tmp_file
+    tmp_file=$(mktemp "${hb_dir}/${source}.yaml.XXXXXX")
+    cat > "$tmp_file" << EOF
+machine_id: $source
+last_ping: "$ts"
+status: alive
+ping_message: "$message"
+EOF
+    mv -f "$tmp_file" "${hb_dir}/${source}.yaml"
+}
+
 # Route message by prefix. Returns 0 if handled, 1 if fallback needed.
+# Return code 2 means: handled but skip ntfy_inbox recording (e.g. ping:).
 route_message() {
     local msg="$1"
     local msg_topic="$2"
@@ -367,6 +431,11 @@ route_message() {
             handle_heartbeat "$payload"
             return 0
             ;;
+        ping)
+            # ping: handled — skip ntfy_inbox recording (return 2)
+            handle_ping "$payload"
+            return 2
+            ;;
         *)
             # Unknown prefix or no prefix → fallback to original behavior
             echo "[$(date)] [ntfy_listener] unrecognized prefix, fallback to darkninja: ${msg:0:80}" >&2
@@ -385,12 +454,27 @@ trap cleanup SIGTERM SIGINT
 _auth_type="${NTFY_TOKEN:+token}"
 _auth_type="${_auth_type:-${NTFY_USER:+basic}}"
 _auth_type="${_auth_type:-none}"
-echo "[$(date)] ntfy listener started — topics: $SUBSCRIBE_TOPICS role: $MACHINE_ROLE (auth: $_auth_type)" >&2
+echo "[$(date)] ntfy listener started — topics: ${TOPIC:0:8}...(masked) role: $MACHINE_ROLE (auth: $_auth_type)" >&2
 unset _auth_type
 
 while true; do
+    # Graceful shutdown via flag file (.state/ntfy_listener_stop)
+    if [[ -f "$STATE_DIR/ntfy_listener_stop" ]]; then
+        echo "[$(date)] [ntfy_listener] graceful stop requested" >&2
+        rm -f "$STATE_DIR/ntfy_listener_stop"
+        exit 0
+    fi
+
+    # 再接続時のmissed message回収: 最後に受信したIDからのみ取得（FAIL-001対策）
+    # 初回起動時はsince_param空（全履歴取得するとflood）
+    _since_param=""
+    if [[ -f "$LAST_ID_FILE" ]]; then
+        _last_id=$(cat "$LAST_ID_FILE" 2>/dev/null)
+        [[ -n "$_last_id" ]] && _since_param="?since=${_last_id}"
+    fi
+
     # Stream new messages from multiple topics (long-lived connection)
-    curl -s --no-buffer "${AUTH_ARGS[@]}" "https://ntfy.sh/$SUBSCRIBE_TOPICS/json" 2>/dev/null | while IFS= read -r line; do
+    curl -s --no-buffer "${AUTH_ARGS[@]}" "https://ntfy.sh/$SUBSCRIBE_TOPICS/json${_since_param}" 2>/dev/null | while IFS= read -r line; do
         # Parse all needed fields in a single python3 call (including topic)
         IFS=$'\x1f' read -r EVENT TAGS MSG MSG_ID MSG_TOPIC < <(parse_message_fields <<< "$line")
 
@@ -403,6 +487,9 @@ while true; do
         # Skip empty messages
         [[ -z "$MSG" ]] && continue
 
+        # 最後に受信したメッセージIDを保存（再接続時のmissed message回収に使用）
+        [[ -n "$MSG_ID" ]] && echo "$MSG_ID" > "$LAST_ID_FILE"
+
         # %:z is GNU-only (+09:00). Use %z (+0900) and insert colon for portability.
         TIMESTAMP=$(date "+%Y-%m-%dT%H:%M:%S%z")
         _ts_len=${#TIMESTAMP}
@@ -411,26 +498,34 @@ while true; do
         echo "[$(date)] Received [$MSG_TOPIC]: $MSG" >&2
 
         # Route by prefix. Heartbeat messages skip ntfy_inbox entirely.
-        if route_message "$MSG" "$MSG_TOPIC"; then
-            # Known prefix handled — skip ntfy_inbox for heartbeat topic
-            if [[ "$MSG_TOPIC" != *-heartbeat ]]; then
-                # Non-heartbeat routed messages: still record in ntfy_inbox for audit
-                append_ntfy_inbox "$MSG_ID" "$TIMESTAMP" "$MSG" || \
+        _route_result=0
+        route_message "$MSG" "$MSG_TOPIC" || _route_result=$?
+        case $_route_result in
+            0)
+                # Known prefix handled — skip ntfy_inbox for heartbeat topic
+                if [[ "$MSG_TOPIC" != *-heartbeat ]]; then
+                    # Non-heartbeat routed messages: record in ntfy_inbox as processed
+                    append_ntfy_inbox "$MSG_ID" "$TIMESTAMP" "$MSG" "processed" || \
+                        echo "[$(date)] [ntfy_listener] WARNING: failed to append ntfy_inbox entry" >&2
+                fi
+                ;;
+            2)
+                # ping: handled — skip ntfy_inbox recording entirely
+                ;;
+            *)
+                # Unknown prefix — original behavior: ntfy_inbox (pending) + darkninja
+                if ! append_ntfy_inbox "$MSG_ID" "$TIMESTAMP" "$MSG"; then
                     echo "[$(date)] [ntfy_listener] WARNING: failed to append ntfy_inbox entry" >&2
-            fi
-        else
-            # Unknown prefix — original behavior: ntfy_inbox + darkninja
-            if ! append_ntfy_inbox "$MSG_ID" "$TIMESTAMP" "$MSG"; then
-                echo "[$(date)] [ntfy_listener] WARNING: failed to append ntfy_inbox entry" >&2
-                continue
-            fi
-            bash "$SCRIPT_DIR/scripts/inbox_write.sh" darkninja \
-                "ntfyから新しいメッセージ受信。queue/ntfy_inbox.yaml を確認し処理せよ。" \
-                ntfy_received ntfy_listener
-        fi
+                    continue
+                fi
+                bash "$SCRIPT_DIR/scripts/inbox_write.sh" darkninja \
+                    "ntfyから新しいメッセージ受信。queue/ntfy_inbox.yaml を確認し処理せよ。" \
+                    ntfy_received ntfy_listener
+                ;;
+        esac
     done
 
     # Connection dropped — reconnect after brief pause
-    echo "[$(date)] Connection lost, reconnecting in 5s..." >&2
+    echo "[$(date)] Connection lost, reconnecting in 5s...${_since_param:+ (since=${_last_id})}" >&2
     sleep 5
 done

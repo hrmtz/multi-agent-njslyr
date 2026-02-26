@@ -35,6 +35,7 @@ RETRY_INTERVAL=5
 MACHINE_ROLE=$(awk '/^  role:/ {print $2; exit}' "$SETTINGS")
 PEER_HOST=$(awk '/^  peer_host:/ {print $2; exit}' "$SETTINGS")
 PEER_PROJECT_ROOT=$(awk '/^  peer_project_root:/ {print $2; exit}' "$SETTINGS")
+PEER_WSL=$(awk '/^  peer_wsl:/ {gsub(/"/, "", $2); print $2; exit}' "$SETTINGS")
 
 MACHINE_ROLE="${MACHINE_ROLE:-ryzen}"
 
@@ -48,6 +49,14 @@ fi
 if [[ -z "$PEER_PROJECT_ROOT" ]] || [[ ! "$PEER_PROJECT_ROOT" =~ ^/[a-zA-Z0-9/_.-]+$ ]] || [[ "$PEER_PROJECT_ROOT" == *..* ]]; then
     echo "$LOG_TAG ERROR: Invalid PEER_PROJECT_ROOT: '$PEER_PROJECT_ROOT'" >&2
     exit 1
+fi
+
+# ─── Peer rsync path override (WSL peer support) ─────────────
+# When peer_wsl=true in settings.yaml, rsync on the peer must be invoked via wsl.exe.
+# This is needed when SSHing from macOS/Linux into a Windows host running WSL.
+PEER_RSYNC_EXTRA=()
+if [[ "${PEER_WSL:-false}" == "true" ]]; then
+    PEER_RSYNC_EXTRA=("--rsync-path=wsl.exe rsync")
 fi
 
 # ─── Cleanup trap for temp files ─────────────────────────────
@@ -133,11 +142,14 @@ ntfy_notify_failure() {
 # Check Tailscale connectivity to peer
 check_tailscale() {
     log_info "Checking Tailscale connectivity to $PEER_HOST..."
-    if ! command -v tailscale &>/dev/null; then
-        log_error "tailscale command not found"
+    # WSL support: tailscale.exe on Windows PATH
+    local _ts_cmd
+    _ts_cmd=$(command -v tailscale 2>/dev/null || command -v tailscale.exe 2>/dev/null || echo "")
+    if [[ -z "$_ts_cmd" ]]; then
+        log_error "tailscale command not found (tried: tailscale, tailscale.exe)"
         return 1
     fi
-    if ! tailscale ping --timeout=5s "$PEER_HOST" &>/dev/null; then
+    if ! "$_ts_cmd" ping --timeout=5s "$PEER_HOST" &>/dev/null; then
         log_error "Tailscale ping to $PEER_HOST failed — peer unreachable"
         return 1
     fi
@@ -162,6 +174,7 @@ rsync_with_retry() {
         if rsync -avz --timeout=30 \
             -e "ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new" \
             "${EXCLUDE_ARGS[@]}" \
+            ${PEER_RSYNC_EXTRA[@]:+"${PEER_RSYNC_EXTRA[@]}"} \
             ${extra_args[@]:+"${extra_args[@]}"} \
             "$src" "$dest" 2>>"$LOG_FILE" | \
             while IFS= read -r line; do log_info "  rsync: $line"; done; then

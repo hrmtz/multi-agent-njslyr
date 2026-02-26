@@ -190,3 +190,83 @@ YAML
     role=$(read_machine_role "${TEST_TMP}/settings.yaml")
     [ "$role" = "ryzen" ]
 }
+
+# =============================================================================
+# ntfy_listener自動起動テスト（cmd_277 subtask_277b）
+# T-YK-NTFY-001: ryzen → ntfy_listener起動条件が真
+# T-YK-NTFY-002: mbp → ntfy_listener起動条件が偽
+# T-YK-NTFY-003: ryzen + 既に起動中 → PIDチェックでスキップ（二重起動防止）
+# T-YK-NTFY-004: ryzen + 未起動 → ntfy_listener起動
+# T-YK-NTFY-005: ntfy_topic未設定 → 起動しない
+# =============================================================================
+
+# ヘルパー: yokubari.sh STEP6.8のntfy起動条件を評価
+# 引数: machine_role ntfy_topic
+# 出力: "start" | "skip_pid" | "skip_mbp" | "skip_notopic"
+eval_ntfy_startup_condition() {
+    local machine_role="$1"
+    local ntfy_topic="$2"
+    local already_running="${3:-false}"
+
+    if [ -n "$ntfy_topic" ] && [[ "$machine_role" == "ryzen" ]]; then
+        if [[ "$already_running" == "true" ]]; then
+            echo "skip_pid"
+        else
+            echo "start"
+        fi
+    elif [ -n "$ntfy_topic" ]; then
+        echo "skip_mbp"
+    else
+        echo "skip_notopic"
+    fi
+}
+
+@test "T-YK-NTFY-001: ryzen + ntfy_topic設定 → 起動条件が真" {
+    local result
+    result=$(eval_ntfy_startup_condition "ryzen" "test-topic-xyz")
+    [ "$result" = "start" ]
+}
+
+@test "T-YK-NTFY-002: mbp + ntfy_topic設定 → MBP側スキップ" {
+    local result
+    result=$(eval_ntfy_startup_condition "mbp" "test-topic-xyz")
+    [ "$result" = "skip_mbp" ]
+}
+
+@test "T-YK-NTFY-003: ryzen + 既に起動中 → PIDチェックでスキップ" {
+    local result
+    result=$(eval_ntfy_startup_condition "ryzen" "test-topic-xyz" "true")
+    [ "$result" = "skip_pid" ]
+}
+
+@test "T-YK-NTFY-004: ryzen + 未起動 → 起動実行" {
+    local result
+    result=$(eval_ntfy_startup_condition "ryzen" "test-topic-xyz" "false")
+    [ "$result" = "start" ]
+}
+
+@test "T-YK-NTFY-005: ntfy_topic未設定 → 起動しない" {
+    local result
+    result=$(eval_ntfy_startup_condition "ryzen" "")
+    [ "$result" = "skip_notopic" ]
+}
+
+@test "T-YK-NTFY-006: yokubari.shにPIDチェック実装が存在することを確認" {
+    # yokubari.shにpgrepによるPIDチェックが実装されているか検証
+    grep -q 'pgrep -f "ntfy_listener.sh"' "$PROJECT_ROOT/yokubari.sh"
+}
+
+@test "T-YK-NTFY-007: yokubari.shにMACHINE_ROLE=ryzen条件が存在することを確認" {
+    # MACHINE_ROLE == ryzen かつ NTFY_TOPIC の複合条件が実装されているか検証
+    grep -q 'MACHINE_ROLE.*==.*ryzen' "$PROJECT_ROOT/yokubari.sh"
+}
+
+@test "T-YK-NTFY-008: yokubari.sh STEP6.8でpkill無条件kill削除を確認" {
+    # 旧実装: pkill -f "ntfy_listener.sh" が無条件に実行されていた
+    # 新実装: PIDチェック後のみ起動 → pkillによる強制killは削除
+    # ntfy起動ブロック内に無条件pkillがないことを確認
+    local ntfy_block
+    ntfy_block=$(sed -n '/STEP 6.8/,/STEP 7/p' "$PROJECT_ROOT/yokubari.sh")
+    # pkillが含まれていないことを確認
+    ! echo "$ntfy_block" | grep -q 'pkill.*ntfy_listener'
+}

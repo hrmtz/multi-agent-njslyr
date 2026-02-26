@@ -207,14 +207,94 @@ call_with_stderr() {
 
 @test "T-NL-PFX-004: route_message handles injection payload safely (push:; rm -rf /)" {
     run call_with_stderr route_message "push:; rm -rf /" ""
-    # push handler should run (prefix "push" is valid)
+    # push handler should run (prefix "push" is valid), returns 0 regardless
     [ "$status" -eq 0 ]
 
-    # Verify mock git was called (not actual rm -rf)
-    [ -f "$GIT_CALL_LOG" ]
-    grep -q "pull" "$GIT_CALL_LOG"
+    # Verify mock git was NOT called (branch validation rejected the invalid payload)
+    [ ! -f "$GIT_CALL_LOG" ]
+
+    # Verify WARNING about invalid branch was logged
+    [[ "$output" == *"WARNING: Invalid branch"* ]]
 
     # Critical: project directory must still exist (no injection executed)
     [ -d "$MOCK_PROJECT/queue" ]
     [ -d "$MOCK_PROJECT/scripts" ]
+}
+
+# ═══════════════════════════════════════════════════════════════
+# ping: handler tests
+# ═══════════════════════════════════════════════════════════════
+
+# --- T-NL-PNG-001: ping: 正常メッセージ → heartbeat YAML記録 ---
+
+@test "T-NL-PNG-001: handle_ping creates heartbeat YAML for valid payload" {
+    run call_with_stderr handle_ping "mbp:1772124024:MBP calling Ryzen. respond."
+    [ "$status" -eq 0 ]
+
+    local hb_file="$MOCK_PROJECT/queue/heartbeat/mbp.yaml"
+    [ -f "$hb_file" ]
+    grep -q "machine_id: mbp" "$hb_file"
+    grep -q "status: alive" "$hb_file"
+    grep -q "last_ping:" "$hb_file"
+    grep -q "ping_message:" "$hb_file"
+}
+
+# --- T-NL-PNG-002: ping: 不正source → return 1, ファイル未作成 ---
+
+@test "T-NL-PNG-002: handle_ping rejects invalid source with warning" {
+    run call_with_stderr handle_ping "evil;host:1772124024:hello"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"invalid ping source"* ]]
+
+    local count
+    count=$(find "$MOCK_PROJECT/queue/heartbeat" -type f | wc -l)
+    [ "$count" -eq 0 ]
+}
+
+# --- T-NL-PNG-003: ping: 非数値epoch → return 1, ファイル未作成 ---
+
+@test "T-NL-PNG-003: handle_ping rejects non-numeric epoch with warning" {
+    run call_with_stderr handle_ping "mbp:not_a_number:hello"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"invalid ping epoch"* ]]
+
+    [ ! -f "$MOCK_PROJECT/queue/heartbeat/mbp.yaml" ]
+}
+
+# --- T-NL-PNG-004: route_message ping: → return 2 (ntfy_inbox skip) ---
+
+@test "T-NL-PNG-004: route_message dispatches ping: and returns 2 (skip ntfy_inbox)" {
+    run call_with_stderr route_message "ping:mbp:1772124024:hello" ""
+    # return 2 = handled, skip ntfy_inbox
+    [ "$status" -eq 2 ]
+
+    # Verify heartbeat file was created
+    [ -f "$MOCK_PROJECT/queue/heartbeat/mbp.yaml" ]
+}
+
+# ═══════════════════════════════════════════════════════════════
+# ntfy_inbox.yaml status update test
+# ═══════════════════════════════════════════════════════════════
+
+# --- T-NL-INBOX-001: append_ntfy_inbox "processed" → status:processed ---
+
+@test "T-NL-INBOX-001: append_ntfy_inbox writes status:processed when status arg provided" {
+    run call_with_stderr append_ntfy_inbox "msg_test_001" "2026-02-27T01:00:00+09:00" \
+        "cmd:test_001:hello" "processed"
+    [ "$status" -eq 0 ]
+
+    [ -f "$INBOX" ]
+    grep -q "status: processed" "$INBOX"
+    grep -q "msg_test_001" "$INBOX"
+}
+
+# --- T-NL-INBOX-002: append_ntfy_inbox デフォルト → status:pending ---
+
+@test "T-NL-INBOX-002: append_ntfy_inbox defaults to status:pending when no status arg" {
+    run call_with_stderr append_ntfy_inbox "msg_test_002" "2026-02-27T01:00:00+09:00" \
+        "unknown:data"
+    [ "$status" -eq 0 ]
+
+    grep -q "status: pending" "$INBOX"
+    grep -q "msg_test_002" "$INBOX"
 }

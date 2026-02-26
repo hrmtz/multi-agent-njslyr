@@ -1234,12 +1234,26 @@ fi
 # STEP 6.8: ntfy入力リスナー起動
 # ═══════════════════════════════════════════════════════════════════════════════
 # NTFY_TOPIC は起動時の settings.yaml 読み込みで取得済み（grep|awk|tr → 0 fork）
-if [ -n "$NTFY_TOPIC" ]; then
-    pkill -f "ntfy_listener.sh" 2>/dev/null || true
+# ntfy_listener起動: ryzenのみ（MBP側は別途対応）。PIDチェックで二重起動防止。
+if [ -n "$NTFY_TOPIC" ] && [[ "$MACHINE_ROLE" == "ryzen" ]]; then
     [ ! -f ./queue/ntfy_inbox.yaml ] && echo "inbox:" > ./queue/ntfy_inbox.yaml
-    nohup bash "$SCRIPT_DIR/scripts/ntfy_listener.sh" &>/dev/null &
-    disown
-    log_info "📱 ◆ntfyリスナー起動◆ ラオモトのスマホからのコトダマを受信する (topic: $NTFY_TOPIC)"
+    if pgrep -f "ntfy_listener.sh" > /dev/null 2>&1; then
+        log_info "📱 ntfyリスナー既に起動中。二重起動スキップ (topic: ${NTFY_TOPIC:0:8}...)"
+    else
+        nohup bash "$SCRIPT_DIR/scripts/ntfy_listener.sh" &>/dev/null &
+        disown
+        log_info "📱 ◆ntfyリスナー起動◆ ラオモトのスマホからのコトダマを受信する (topic: ${NTFY_TOPIC:0:8}...)"
+    fi
+    # ntfy_listener supervisor: crash時自動再起動（I-001対策）
+    if pgrep -f "ntfy_listener_supervisor.sh" > /dev/null 2>&1; then
+        log_info "📱 ntfy_listener supervisorは既に起動中。スキップ"
+    else
+        nohup bash "$SCRIPT_DIR/scripts/ntfy_listener_supervisor.sh" >> "$SCRIPT_DIR/logs/ntfy_listener.log" 2>&1 &
+        disown
+        log_info "📱 ntfy_listener supervisor起動 (クラッシュ時30秒以内に自動再起動)"
+    fi
+elif [ -n "$NTFY_TOPIC" ]; then
+    log_info "📱 MBP構成: ntfyリスナーはMBP側で起動。Ryzenスキップ"
 else
     log_info "📱 ntfy未設定。ラオモトのスマホ回線は未接続…ナムアミダブツ"
 fi
