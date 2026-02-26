@@ -39,6 +39,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 STATE_DIR="$PROJECT_ROOT/.state"
 
 # ─── 共有ライブラリ読み込み（njslyr.sh関数群を継承）───
+# shellcheck source=scripts/njslyr_lib.sh
 source "$SCRIPT_DIR/njslyr_lib.sh"
 
 # ─── A-1: suriken — エージェントにnudgeを送る ───
@@ -102,7 +103,7 @@ cmd_chop() {
     tmux send-keys -t "$pane_id" Enter 2>/dev/null
 
     # clear_last タイムスタンプ更新（UNIFIED-MED-009: B-1 graceピリオドとの連携インターフェース）
-    echo "$(date +%s)" > "$STATE_DIR/clear_last_${agent_id}"
+    date +%s > "$STATE_DIR/clear_last_${agent_id}"
 
     echo "[chop] $agent_id: /clear 送信完了。30秒後にリカバリー確認..."
     sleep 30
@@ -181,6 +182,7 @@ cmd_spawn_tengu() {
 
     # 元エージェントのタスクYAML status を suspended に変更（rollback用に元statusを保存）
     local orig_task_yaml orig_task_status
+    # shellcheck disable=SC2012  # ls -t needed for mtime sort; yaml filenames have no special chars
     orig_task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${orig_agent}"*.yaml 2>/dev/null | head -1)
     orig_task_status="idle"
     if [[ -n "$orig_task_yaml" && -f "$orig_task_yaml" ]]; then
@@ -203,9 +205,6 @@ cmd_spawn_tengu() {
     if ! tmux respawn-pane -k -t "$pane_id" \
         "claude --model claude-sonnet-4-6 --dangerously-skip-permissions" 2>/dev/null; then
         # エラーロールバック: STATEファイル削除 + bg_color復元 + タスクYAML status復元
-        local orig_bg_color
-        orig_bg_color=$(cat "$STATE_DIR/yakuzatengu_original_bg_color" 2>/dev/null || \
-            { [[ "$orig_model" =~ [Oo]pus ]] && echo "#1a002e" || echo "default"; })
         tmux select-pane -t "$pane_id" -P "bg=${orig_bg_color}" 2>/dev/null || true
         if [[ -n "${orig_task_yaml:-}" && -f "${orig_task_yaml:-}" ]]; then
             sedi "s|^ *status: suspended|  status: ${orig_task_status:-assigned}|" "$orig_task_yaml" 2>/dev/null || true
@@ -301,6 +300,7 @@ cmd_despawn_tengu() {
     # UNIFIED-MED-002: 元エージェントのタスクYAML status を suspended → assigned に復元
     if [[ -n "$orig_agent" ]]; then
         local orig_task_yaml
+        # shellcheck disable=SC2012  # ls -t needed for mtime sort; yaml filenames have no special chars
         orig_task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${orig_agent}"*.yaml 2>/dev/null | head -1)
         if [[ -n "$orig_task_yaml" && -f "$orig_task_yaml" ]]; then
             sedi "s|^ *status: suspended|  status: assigned|" "$orig_task_yaml" 2>/dev/null || true

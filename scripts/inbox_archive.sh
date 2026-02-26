@@ -102,7 +102,8 @@ try:
 
     # Determine messages to archive (read:true older than keep N)
     to_keep_read = read[-keep:] if keep > 0 else []
-    to_archive = read[:-keep] if keep > 0 and len(read) > keep else ([] if keep > 0 else read)
+    # read[:-keep] returns [] when len(read) <= keep (Python negative-index edge case)
+    to_archive = read[:-keep] if keep > 0 else read
 
     if not to_archive:
         print(f'[inbox_archive] Nothing to archive (read={len(read)}, keep={keep}).', file=sys.stderr)
@@ -143,6 +144,8 @@ except Exception as e:
     else
         attempt=$((attempt + 1))
         if [ $attempt -lt $max_attempts ]; then
+            # Exponential backoff: 0.1s * 2^attempt (attempt is post-increment)
+            # attempt=1 → 0.2s, attempt=2 → 0.4s, attempt=3 → 0.8s, attempt=4 → 1.6s
             backoff_delay=$(awk "BEGIN {print 0.1 * (2 ^ $attempt)}")
             echo "[inbox_archive] Lock timeout for $INBOX (attempt $((attempt + 1))/$max_attempts), retrying in ${backoff_delay}s..." >&2
             sleep "$backoff_delay"

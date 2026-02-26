@@ -36,6 +36,7 @@ sedi() {
 # - njslyr.shのstage3_slay()、agent_is_busy()等の関数が利用可能になる
 # - 既存テスト(test_njslyr_stages.bats)も同変数を使用しており整合性が高い
 # - njslyr.sh本体は変更しない（readのみ）
+# shellcheck source=/dev/null
 __NJSLYR_TESTING__=1 source "$SCRIPT_DIR/njslyr.sh" 2>/dev/null || {
     echo "[WARN] njslyr_lib.sh: njslyr.sh source failed. Check: $SCRIPT_DIR/njslyr.sh" >&2
 }

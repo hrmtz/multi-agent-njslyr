@@ -70,19 +70,19 @@ show_startup_banner() {
     echo -e "\033[1;31m◆◆◆ SHUTDOWN ◆◆◆\033[0m  \033[1;33m電脳空間切断開始\033[0m  \033[1;31m◆◆◆ SHUTDOWN ◆◆◆\033[0m"
     echo ""
     echo -e "\033[1;35m卍\033[0m \033[0;37mネオサイタマ電脳IRCコトダマ空間から切断中...\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[1;33m  ✗\033[0m \033[0;37m[1/5] #マッポーの世 チャネル離脱\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[1;33m  ✗\033[0m \033[0;37m[2/5] コトダマ空間ソケット解放中\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[0;31m  ✗\033[0m \033[0;37m[3/5] サイバーパンクプロトコル解除\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[0;31m  ✗\033[0m \033[0;37m[4/5] UNIXニューロン認証解除\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[1;31m  ✗\033[0m \033[0;37m[5/5] ニンジャソウル・リンク切断\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[1;31m  サヨナラ！\033[0m \033[1;37m切断処理を開始する。\033[0m"
-    sleep 0.5
+    sleep 0.2
     echo ""
 
     # タイトルバナー（yokubari.shと同一のASCIIアート、赤枠＋終了テーマ）
@@ -154,15 +154,15 @@ show_completion_banner() {
     # コトダマ空間切断完了シーケンス（yokubari.sh接続完了の対）
     # ═══════════════════════════════════════════════════════════════════════════
     echo -e "\033[1;35m卍\033[0m \033[0;37mコトダマ空間切断シーケンス実行中...\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[1;33m  ✗\033[0m \033[0;37m[1/4] ニンジャソウル・リンク解放完了\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[0;31m  ✗\033[0m \033[0;37m[2/4] エージェント監視ループ終了\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[0;31m  ✗\033[0m \033[0;37m[3/4] 電脳IRCソケット完全切断\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[1;31m  ✗\033[0m \033[0;37m[4/4] コトダマ空間からのログアウト完了\033[0m"
-    sleep 0.5
+    sleep 0.2
 
     echo ""
     echo -e "\033[1;31m  ╔═══════════════════════════════════════════════════════════════════════╗\033[0m"
@@ -369,12 +369,19 @@ get_inbox_unread_count() {
     grep -c '^ *read: false$' "$inbox" 2>/dev/null || true
 }
 
+# ─── Get latest task YAML for agent (dedup: replaces 5x ls -t|head -1) ───
+get_latest_task_yaml() {
+    local agent_id="$1"
+    # shellcheck disable=SC2012
+    ls -t "$PROJECT_ROOT/queue/tasks/${agent_id}"*.yaml 2>/dev/null | head -1
+}
+
 # ─── Check task YAML status ───
 get_task_status() {
     local agent_id="$1"
     # M1 fix: Use glob pattern to match _subtask_xxx.yaml files
     local task_yaml
-    task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${agent_id}"*.yaml 2>/dev/null | head -1)
+    task_yaml=$(get_latest_task_yaml "$agent_id")
 
     if [[ -z "$task_yaml" || ! -f "$task_yaml" ]]; then
         echo "idle"
@@ -429,7 +436,7 @@ agent_is_thinking() {
 is_long_running_task() {
     local agent_id="$1"
     local task_yaml
-    task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${agent_id}"*.yaml 2>/dev/null | head -1)
+    task_yaml=$(get_latest_task_yaml "$agent_id")
 
     [[ -n "$task_yaml" && -f "$task_yaml" ]] && grep -q '^ *long_running: *true' "$task_yaml"
 }
@@ -617,7 +624,7 @@ stage3_slay() {
 
     # Data preservation Step 3: タスクYAML状態更新
     local pre_slay_task_yaml
-    pre_slay_task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${agent_id}"*.yaml 2>/dev/null | head -1)
+    pre_slay_task_yaml=$(get_latest_task_yaml "$agent_id")
     local current_task_id="unknown"
     if [[ -n "$pre_slay_task_yaml" && -f "$pre_slay_task_yaml" ]]; then
         current_task_id=$(grep '^ *task_id: ' "$pre_slay_task_yaml" | head -1 | sed 's/.*task_id: *//;s/^"//;s/"$//' || echo "unknown")
@@ -891,7 +898,7 @@ spawn_yakuzatengu() {
 
     # S-3: 元yakuzaNタスクYAML statusをsuspendedに変更
     local task_yaml orig_task_status
-    task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${orig_agent}"*.yaml 2>/dev/null | head -1)
+    task_yaml=$(get_latest_task_yaml "$orig_agent")
     if [[ -n "$task_yaml" && -f "$task_yaml" ]]; then
         # BUG-T3 fix: 変更前のstatusを保存（rollback時に復元する）
         orig_task_status=$(grep '^ *status:' "$task_yaml" | head -1 | awk '{print $2}' | tr -d "'\"")
@@ -1137,7 +1144,7 @@ check_agent_idle_v2() {
 
     # Step1: タスクYAMLでstatus確認
     local task_yaml task_status
-    task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${agent_id}"*.yaml 2>/dev/null | head -1)
+    task_yaml=$(get_latest_task_yaml "$agent_id")
     if [[ -z "$task_yaml" ]]; then
         task_status="idle"
     else
@@ -1446,26 +1453,10 @@ main() {
 
     # Check each agent
     local agent_num=0
-    local agent_total
-    agent_total=$(echo "$agents" | grep -v '^$' | wc -l | tr -d ' ')
 
     while IFS= read -r agent_id; do
         [[ -z "$agent_id" ]] && continue
         agent_num=$((agent_num + 1))
-
-        # Special handling: darkninja is excluded
-        if [[ "$agent_id" == "darkninja" ]]; then
-            log "SKIP: darkninja（ラオモトのホンジン、粛清対象外）"
-            echo -e "  \033[1;35m  卍\033[0m \033[1;37m${agent_id}\033[0m \033[0;37m─────────\033[0m \033[1;35mラオモトのホンジン。粛清対象外。\033[0m"
-            continue
-        fi
-
-        # Special handling: gryakuza is limited to Stage 1 only
-        if [[ "$agent_id" == "gryakuza" ]]; then
-            log "INFO: ${agent_id} (monitor_context.sh priority, njslyr=Stage 1 only)"
-            # TODO: Implement gryakuza-specific logic (Stage 1 only)
-            # For Phase 2, we apply same logic but Stage 2/3 are skipped in check_agent
-        fi
 
         echo -ne "  \033[1;36m  ⚔\033[0m \033[1;37m${agent_id}\033[0m \033[0;37m─────────\033[0m "
         if check_agent "$agent_id"; then

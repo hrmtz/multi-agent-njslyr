@@ -17,7 +17,7 @@ CORRUPT_DIR="$SCRIPT_DIR/logs/ntfy_inbox_corrupt"
 # shellcheck source=../lib/ntfy_auth.sh
 source "$SCRIPT_DIR/lib/ntfy_auth.sh"
 
-if [ -z "$TOPIC" ]; then
+if [[ -z "$TOPIC" ]]; then
     echo "[ntfy_listener] ntfy_topic not configured in settings.yaml" >&2
     exit 1
 fi
@@ -26,23 +26,30 @@ fi
 ntfy_validate_topic "$TOPIC" || true
 
 # Initialize inbox if not exists
-if [ ! -f "$INBOX" ]; then
+if [[ ! -f "$INBOX" ]]; then
     echo "inbox:" > "$INBOX"
 fi
 
 # 認証引数を取得（設定がなければ空 = 後方互換）
 AUTH_ARGS=()
 while IFS= read -r line; do
-    [ -n "$line" ] && AUTH_ARGS+=("$line")
+    [[ -n "$line" ]] && AUTH_ARGS+=("$line")
 done < <(ntfy_get_auth_args "$SCRIPT_DIR/config/ntfy_auth.env")
 
-# JSON field extractor (python3 — jq not available)
-parse_json() {
-    python3 -c "import sys,json; print(json.load(sys.stdin).get('$1',''))" 2>/dev/null
-}
-
-parse_tags() {
-    python3 -c "import sys,json; print(','.join(json.load(sys.stdin).get('tags',[])))" 2>/dev/null
+# Parse all needed JSON fields in a single python3 invocation.
+# Output: <event><US><tags><US><message><US><id>  (US = ASCII unit separator 0x1f)
+parse_message_fields() {
+    python3 -c 'import sys, json
+try:
+    d = json.load(sys.stdin)
+    print("\x1f".join([
+        d.get("event", ""),
+        ",".join(d.get("tags", [])),
+        d.get("message", ""),
+        d.get("id", "")
+    ]))
+except Exception:
+    print("\x1f\x1f\x1f")' 2>/dev/null
 }
 
 append_ntfy_inbox() {
@@ -153,19 +160,18 @@ echo "[$(date)] ntfy listener started — topic: $TOPIC (auth: ${NTFY_TOKEN:+tok
 while true; do
     # Stream new messages (long-lived connection, blocks until message arrives)
     curl -s --no-buffer "${AUTH_ARGS[@]}" "https://ntfy.sh/$TOPIC/json" 2>/dev/null | while IFS= read -r line; do
+        # Parse all needed fields in a single python3 call
+        IFS=$'\x1f' read -r EVENT TAGS MSG MSG_ID <<< "$(printf '%s\n' "$line" | parse_message_fields)"
+
         # Skip keepalive pings and non-message events
-        EVENT=$(echo "$line" | parse_json event)
-        [ "$EVENT" != "message" ] && continue
+        [[ "$EVENT" != "message" ]] && continue
 
         # Skip outbound messages (sent by our own scripts/ntfy.sh)
-        TAGS=$(echo "$line" | parse_tags)
-        echo "$TAGS" | grep -q "outbound" && continue
+        [[ "$TAGS" == *outbound* ]] && continue
 
-        # Extract message content
-        MSG=$(echo "$line" | parse_json message)
-        [ -z "$MSG" ] && continue
+        # Skip empty messages
+        [[ -z "$MSG" ]] && continue
 
-        MSG_ID=$(echo "$line" | parse_json id)
         # %:z is GNU-only (+09:00). Use %z (+0900) and insert colon for portability.
         TIMESTAMP=$(date "+%Y-%m-%dT%H:%M:%S%z" | sed 's/\([+-][0-9][0-9]\)\([0-9][0-9]\)$/\1:\2/')
 

@@ -146,8 +146,8 @@ except Exception as e:
         # Lock timeout or error
         attempt=$((attempt + 1))
         if [ $attempt -lt $max_attempts ]; then
-            # Exponential backoff: 0.1s * 2^attempt
-            # attempt=0 → 0.1s, attempt=1 → 0.2s, attempt=2 → 0.4s, attempt=3 → 0.8s
+            # Exponential backoff: 0.1s * 2^attempt (attempt is post-increment)
+            # attempt=1 → 0.2s, attempt=2 → 0.4s, attempt=3 → 0.8s, attempt=4 → 1.6s
             backoff_delay=$(awk "BEGIN {print 0.1 * (2 ^ $attempt)}")
             echo "[inbox_write] Lock timeout for $INBOX (attempt $((attempt + 1))/$max_attempts), retrying in ${backoff_delay}s..." >&2
             sleep "$backoff_delay"

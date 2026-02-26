@@ -803,10 +803,9 @@ send_wakeup() {
     fi
 
     if timeout 5 tmux send-keys -t "$PANE_TARGET" "$nudge" 2>/dev/null; then
-        # Claude CLI: Escape to dismiss autocomplete before Enter
+        # Phase 1: text → Enter only (no Escape). Autocomplete may swallow Enter;
+        # Phase 2 escalation (send_wakeup_with_escape) handles that case.
         sleep 0.3
-        timeout 5 tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
-        sleep 0.1
         timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
         echo "[$(date)] Wake-up sent to $AGENT_ID (${unread_count} unread)" >&2
         return 0
@@ -947,7 +946,7 @@ for s in data.get('specials', []):
             if [ "$msg_type" = "clear_command" ]; then
                 clear_seen=1
                 # BUG-6 fix: Update shared clear lock on delivery
-                echo "$(date +%s)" > "${STATE_DIR}/clear_last_${AGENT_ID}"
+                date +%s > "${STATE_DIR}/clear_last_${AGENT_ID}"
             fi
             cmd=$(normalize_special_command "$msg_type" "$msg_content")
             [ -n "$cmd" ] && send_cli_command "$cmd"
@@ -1049,7 +1048,7 @@ for s in data.get('specials', []):
                     echo "[$(date)] ESCALATION Phase 3: Agent $AGENT_ID unresponsive for ${age}s. Sending /clear." >&2
                     send_cli_command "/clear"
                     # BUG-6 fix: Update shared clear lock on Phase 3 /clear
-                    echo "$(date +%s)" > "${STATE_DIR}/clear_last_${AGENT_ID}"
+                    date +%s > "${STATE_DIR}/clear_last_${AGENT_ID}"
                     LAST_CLEAR_TS=$now
                     FIRST_UNREAD_SEEN=0  # Reset — will re-detect on next cycle
                     NEW_CONTEXT_SENT=0

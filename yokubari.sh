@@ -19,15 +19,11 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
 fi
 
-# 言語設定を読み取り（デフォルト: ja）
+# 言語・シェル設定を読み取り
 LANG_SETTING="ja"
-if [ -f "./config/settings.yaml" ]; then
-    LANG_SETTING=$(grep "^language:" ./config/settings.yaml 2>/dev/null | awk '{print $2}' || echo "ja")
-fi
-
-# シェル設定を読み取り（デフォルト: bash）
 SHELL_SETTING="bash"
 if [ -f "./config/settings.yaml" ]; then
+    LANG_SETTING=$(grep "^language:" ./config/settings.yaml 2>/dev/null | awk '{print $2}' || echo "ja")
     SHELL_SETTING=$(grep "^shell:" ./config/settings.yaml 2>/dev/null | awk '{print $2}' || echo "bash")
 fi
 
@@ -356,6 +352,66 @@ detox_barikidorink() {
     tmux send-keys -t "$pane" "/clear" Enter
 }
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# エージェント起動ヘルパー（CLI Adapter対応・重複排除）
+# ───────────────────────────────────────────────────────────────────────────────
+# Usage: launch_agent <pane_target> <agent_id> <default_model> [extra_env]
+# ═══════════════════════════════════════════════════════════════════════════════
+launch_agent() {
+    local pane_target="$1"
+    local agent_id="$2"
+    local default_model="$3"
+    local extra_env="${4:-}"
+
+    local cli_type="claude"
+    local cli_cmd="claude --model ${default_model} --dangerously-skip-permissions"
+
+    if [ "$CLI_ADAPTER_LOADED" = true ]; then
+        cli_type=$(get_cli_type "$agent_id")
+        if [ "$cli_type" = "claude" ] && [ "$default_model" = "opus" ] && [ "$KESSEN_MODE" = true ]; then
+            cli_cmd="claude --model opus --dangerously-skip-permissions"
+        else
+            cli_cmd=$(build_cli_command "$agent_id")
+        fi
+    fi
+
+    local startup_prompt
+    startup_prompt=$(get_startup_prompt "$agent_id" 2>/dev/null) || true
+    if [[ -n "$startup_prompt" ]]; then
+        cli_cmd="$cli_cmd \"$startup_prompt\""
+    fi
+
+    tmux set-option -p -t "$pane_target" @agent_cli "$cli_type"
+    if [[ -n "$extra_env" ]]; then
+        tmux send-keys -t "$pane_target" "${extra_env} ${cli_cmd}"
+    else
+        tmux send-keys -t "$pane_target" "$cli_cmd"
+    fi
+    tmux send-keys -t "$pane_target" Enter
+}
+
+# inbox_watcher起動ヘルパー
+# Usage: launch_watcher <agent_id> <pane_target> [env_vars]
+launch_watcher() {
+    local agent_id="$1"
+    local pane_target="$2"
+    local env_vars="${3:-}"
+
+    local watcher_cli
+    watcher_cli=$(tmux show-options -p -t "$pane_target" -v @agent_cli 2>/dev/null || echo "claude")
+
+    if [[ -n "$env_vars" ]]; then
+        # shellcheck disable=SC2086  # Intentional word splitting for multiple env vars
+        nohup env $env_vars \
+            bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" "$agent_id" "$pane_target" "$watcher_cli" \
+            >> "$SCRIPT_DIR/logs/inbox_watcher_${agent_id}.log" 2>&1 &
+    else
+        nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" "$agent_id" "$pane_target" "$watcher_cli" \
+            >> "$SCRIPT_DIR/logs/inbox_watcher_${agent_id}.log" 2>&1 &
+    fi
+    disown
+}
+
 # バナー表示実行
 show_battle_cry
 
@@ -366,9 +422,17 @@ echo ""
 # STEP 1: 既存セッションクリーンアップ
 # ═══════════════════════════════════════════════════════════════════════════════
 log_info "🧹 既存セッションをサツバツ！と破壊する..."
-tmux kill-session -t multiagent 2>/dev/null && log_info "  └─ multiagent…サヨナラ！爆発四散！" || log_info "  └─ multiagent…存在セズ。ナムアミダブツ"
-tmux kill-session -t darkninja 2>/dev/null && log_info "  └─ darkninja…サヨナラ！爆発四散！" || log_info "  └─ darkninja…存在セズ。ナムアミダブツ"
-tmux kill-session -t shogun 2>/dev/null && log_info "  └─ shogun（旧名）…サヨナラ！爆発四散！" || true
+if tmux kill-session -t multiagent 2>/dev/null; then
+    log_info "  └─ multiagent…サヨナラ！爆発四散！"
+else
+    log_info "  └─ multiagent…存在セズ。ナムアミダブツ"
+fi
+if tmux kill-session -t darkninja 2>/dev/null; then
+    log_info "  └─ darkninja…サヨナラ！爆発四散！"
+else
+    log_info "  └─ darkninja…存在セズ。ナムアミダブツ"
+fi
+tmux kill-session -t shogun 2>/dev/null || true
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 1.5: 前回記録のバックアップ（--clean時のみ、内容がある場合）
@@ -422,7 +486,7 @@ if [ "$CLEAN_MODE" = true ]; then
 
     # ヤクザタスクファイルリセット
     for i in {1..7}; do
-        cat > ./queue/tasks/yakuza${i}.yaml << EOF
+        cat > "./queue/tasks/yakuza${i}.yaml" << EOF
 # ヤクザ${i}専用タスクファイル
 task:
   task_id: null
@@ -448,7 +512,7 @@ EOF
 
     # ヤクザレポートファイルリセット
     for i in {1..7}; do
-        cat > ./queue/reports/yakuza${i}_report.yaml << EOF
+        cat > "./queue/reports/yakuza${i}_report.yaml" << EOF
 worker_id: yakuza${i}
 task_id: null
 timestamp: ""
@@ -649,12 +713,6 @@ tmux split-window -v
 
 # ペインラベル設定（プロンプト用: モデル名なし）
 PANE_LABELS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
-# ペインタイトル設定（tmuxタイトル用: モデル名付き）
-if [ "$KESSEN_MODE" = true ]; then
-    PANE_TITLES=("Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus")
-else
-    PANE_TITLES=("Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus")
-fi
 # 色設定（gryakuza: 赤, yakuza: 青, soukaiya: 黄）
 PANE_COLORS=("red" "blue" "blue" "blue" "blue" "blue" "blue" "blue" "yellow")
 
@@ -732,11 +790,6 @@ else
     log_war "  ⚠️  @agent_id誤設定を${_verify_errors}件修正。要インシデント記録。"
 fi
 
-# グレーターヤクザ・ソウカイヤペインの背景色（ヤクザとの視覚的区別）
-# 注: グループセッションで背景色が引き継がれない問題があるため、コメントアウト（2026-02-14）
-# tmux select-pane -t "multiagent:agents.${PANE_BASE}" -P 'bg=#501515'          # グレーターヤクザ: 赤
-# tmux select-pane -t "multiagent:agents.$((PANE_BASE+8))" -P 'bg=#454510'      # ソウカイヤ: 金
-
 # pane-border-format でモデル名を常時表示
 tmux set-option -t multiagent -w pane-border-status top
 tmux set-option -t multiagent -w pane-border-format '#{?pane_active,#[reverse],}#[bold]#{@agent_id}#[default] (#{@model_name}) #{@current_task}'
@@ -777,115 +830,36 @@ if [ "$SETUP_ONLY" = false ]; then
     # 削減時間: 40-60秒 → 期待10秒以下
     # ═════════════════════════════════════════════════════════════
 
-    # ダークニンジャ: CLI Adapter経由でコマンド構築（バックグラウンド起動）
-    (
-        _darkninja_cli_type="claude"
-        _darkninja_cmd="claude --model opus --dangerously-skip-permissions"
-        if [ "$CLI_ADAPTER_LOADED" = true ]; then
-            _darkninja_cli_type=$(get_cli_type "darkninja")
-            _darkninja_cmd=$(build_cli_command "darkninja")
-        fi
-        tmux set-option -p -t "darkninja:main" @agent_cli "$_darkninja_cli_type"
-        if [ "$SHOGUN_NO_THINKING" = true ] && [ "$_darkninja_cli_type" = "claude" ]; then
-            tmux send-keys -t darkninja:main "MAX_THINKING_TOKENS=0 $_darkninja_cmd"
-            tmux send-keys -t darkninja:main Enter
-            log_info "  ◆召喚◆ ダークニンジャ（${_darkninja_cli_type} / thinking無効）…ニンジャソウル覚醒！イヤーッ！"
-        else
-            tmux send-keys -t darkninja:main "$_darkninja_cmd"
-            tmux send-keys -t darkninja:main Enter
-            log_info "  ◆召喚◆ ダークニンジャ（${_darkninja_cli_type}）…ニンジャソウル覚醒！イヤーッ！"
-        fi
-    ) &
+    # ダークニンジャ起動（バックグラウンド）
+    _darkninja_extra=""
+    if [ "$SHOGUN_NO_THINKING" = true ]; then
+        _darkninja_extra="MAX_THINKING_TOKENS=0"
+    fi
+    ( launch_agent "darkninja:main" "darkninja" "opus" "$_darkninja_extra" ) &
+    log_info "  ◆召喚◆ ダークニンジャ…ニンジャソウル覚醒！イヤーッ！"
 
-    # グレーターヤクザ（pane 0）: CLI Adapter経由でコマンド構築（デフォルト: Sonnet、バックグラウンド起動）
-    (
-        p=$((PANE_BASE + 0))
-        _gryakuza_cli_type="claude"
-        _gryakuza_cmd="claude --model sonnet --dangerously-skip-permissions"
-        if [ "$CLI_ADAPTER_LOADED" = true ]; then
-            _gryakuza_cli_type=$(get_cli_type "gryakuza")
-            _gryakuza_cmd=$(build_cli_command "gryakuza")
-        fi
-        # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
-        _startup_prompt=$(get_startup_prompt "gryakuza" 2>/dev/null)
-        if [[ -n "$_startup_prompt" ]]; then
-            _gryakuza_cmd="$_gryakuza_cmd \"$_startup_prompt\""
-        fi
-        tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_gryakuza_cli_type"
-        tmux send-keys -t "multiagent:agents.${p}" "$_gryakuza_cmd"
-        tmux send-keys -t "multiagent:agents.${p}" Enter
-        log_info "  ◆召喚◆ グレーターヤクザ（所属: ${GRYAKUZA_CORP}）…${_gryakuza_cli_type}でニンジャソウル覚醒！イヤーッ！"
-    ) &
+    # グレーターヤクザ起動（バックグラウンド）
+    ( launch_agent "multiagent:agents.$((PANE_BASE + 0))" "gryakuza" "sonnet" ) &
+    log_info "  ◆召喚◆ グレーターヤクザ（所属: ${GRYAKUZA_CORP}）…ニンジャソウル覚醒！イヤーッ！"
 
+    # クローンヤクザ1-7起動（バックグラウンド）
     if [ "$KESSEN_MODE" = true ]; then
-        # 決戦の陣: CLI Adapter経由（claudeはOpus強制、並列起動）
-        for i in {1..7}; do
-            (
-                p=$((PANE_BASE + i))
-                _yakuza_cli_type="claude"
-                _yakuza_cmd="claude --model opus --dangerously-skip-permissions"
-                if [ "$CLI_ADAPTER_LOADED" = true ]; then
-                    _yakuza_cli_type=$(get_cli_type "yakuza${i}")
-                    if [ "$_yakuza_cli_type" = "claude" ]; then
-                        _yakuza_cmd="claude --model opus --dangerously-skip-permissions"
-                    else
-                        _yakuza_cmd=$(build_cli_command "yakuza${i}")
-                    fi
-                fi
-                # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
-                _startup_prompt=$(get_startup_prompt "yakuza${i}" 2>/dev/null)
-                if [[ -n "$_startup_prompt" ]]; then
-                    _yakuza_cmd="$_yakuza_cmd \"$_startup_prompt\""
-                fi
-                tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_yakuza_cli_type"
-                tmux send-keys -t "multiagent:agents.${p}" "$_yakuza_cmd"
-                tmux send-keys -t "multiagent:agents.${p}" Enter
-            ) &
-        done
+        _yakuza_model="opus"
+    else
+        _yakuza_model="sonnet"
+    fi
+    for i in {1..7}; do
+        ( launch_agent "multiagent:agents.$((PANE_BASE + i))" "yakuza${i}" "$_yakuza_model" ) &
+    done
+    if [ "$KESSEN_MODE" = true ]; then
         log_info "  ◆召喚×7◆ クローンヤクザ1-7（ケッセンの陣）…全員Opus！サツバツ！ザッケンナコラー！"
     else
-        # 平時の陣: CLI Adapter経由（デフォルト: 全ヤクザ=Sonnet、並列起動）
-        for i in {1..7}; do
-            (
-                p=$((PANE_BASE + i))
-                _yakuza_cli_type="claude"
-                _yakuza_cmd="claude --model sonnet --dangerously-skip-permissions"
-                if [ "$CLI_ADAPTER_LOADED" = true ]; then
-                    _yakuza_cli_type=$(get_cli_type "yakuza${i}")
-                    _yakuza_cmd=$(build_cli_command "yakuza${i}")
-                fi
-                # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
-                _startup_prompt=$(get_startup_prompt "yakuza${i}" 2>/dev/null)
-                if [[ -n "$_startup_prompt" ]]; then
-                    _yakuza_cmd="$_yakuza_cmd \"$_startup_prompt\""
-                fi
-                tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_yakuza_cli_type"
-                tmux send-keys -t "multiagent:agents.${p}" "$_yakuza_cmd"
-                tmux send-keys -t "multiagent:agents.${p}" Enter
-            ) &
-        done
         log_info "  ◆召喚×7◆ クローンヤクザ1-7（ヘイジの陣）…ニンジャソウル覚醒！ザッケンナコラー！"
     fi
 
-    # ソウカイヤ（pane 8）: Opus Thinking — 戦略立案・設計判断専任（バックグラウンド起動）
-    (
-        p=$((PANE_BASE + 8))
-        _soukaiya_cli_type="claude"
-        _soukaiya_cmd="claude --model opus --dangerously-skip-permissions"
-        if [ "$CLI_ADAPTER_LOADED" = true ]; then
-            _soukaiya_cli_type=$(get_cli_type "soukaiya")
-            _soukaiya_cmd=$(build_cli_command "soukaiya")
-        fi
-        # Codex等の初期プロンプト付加（サジェストUI停止問題対策）
-        _startup_prompt=$(get_startup_prompt "soukaiya" 2>/dev/null)
-        if [[ -n "$_startup_prompt" ]]; then
-            _soukaiya_cmd="$_soukaiya_cmd \"$_startup_prompt\""
-        fi
-        tmux set-option -p -t "multiagent:agents.${p}" @agent_cli "$_soukaiya_cli_type"
-        tmux send-keys -t "multiagent:agents.${p}" "$_soukaiya_cmd"
-        tmux send-keys -t "multiagent:agents.${p}" Enter
-        log_info "  ◆召喚◆ ソウカイヤ（${_soukaiya_cli_type}）…戦略カイギ開始！ドーモ"
-    ) &
+    # ソウカイヤ起動（バックグラウンド）
+    ( launch_agent "multiagent:agents.$((PANE_BASE + 8))" "soukaiya" "opus" ) &
+    log_info "  ◆召喚◆ ソウカイヤ…戦略カイギ開始！ドーモ"
 
     # 全バックグラウンドジョブの完了を待機
     wait
@@ -997,35 +971,16 @@ NINJA_EOF
     pkill -f "fswatch.*queue/inbox" 2>/dev/null || true
     sleep 0.3  # 【Phase 1高速化: 1秒→0.3秒】
 
-    # ダークニンジャのwatcher（ntfy受信の自動起床に必要）
-    # 安全モード: phase2/phase3エスカレーションは無効、timeout周期処理も無効（event-drivenのみ）
-    _darkninja_watcher_cli=$(tmux show-options -p -t "darkninja:main" -v @agent_cli 2>/dev/null || echo "claude")
-    nohup env ASW_DISABLE_ESCALATION=1 ASW_PROCESS_TIMEOUT=0 ASW_DISABLE_NORMAL_NUDGE=0 \
-        bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" darkninja "darkninja:main" "$_darkninja_watcher_cli" \
-        >> "$SCRIPT_DIR/logs/inbox_watcher_darkninja.log" 2>&1 &
-    disown
+    # ダークニンジャのwatcher（安全モード: エスカレーション無効、event-drivenのみ）
+    launch_watcher "darkninja" "darkninja:main" \
+        "ASW_DISABLE_ESCALATION=1 ASW_PROCESS_TIMEOUT=0 ASW_DISABLE_NORMAL_NUDGE=0"
 
-    # グレーターヤクザのwatcher
-    _gryakuza_watcher_cli=$(tmux show-options -p -t "multiagent:agents.${PANE_BASE}" -v @agent_cli 2>/dev/null || echo "claude")
-    nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" gryakuza "multiagent:agents.${PANE_BASE}" "$_gryakuza_watcher_cli" \
-        >> "$SCRIPT_DIR/logs/inbox_watcher_gryakuza.log" 2>&1 &
-    disown
-
-    # ヤクザのwatcher
+    # グレーターヤクザ・ヤクザ・ソウカイヤのwatcher
+    launch_watcher "gryakuza" "multiagent:agents.${PANE_BASE}"
     for i in {1..7}; do
-        p=$((PANE_BASE + i))
-        _yakuza_watcher_cli=$(tmux show-options -p -t "multiagent:agents.${p}" -v @agent_cli 2>/dev/null || echo "claude")
-        nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" "yakuza${i}" "multiagent:agents.${p}" "$_yakuza_watcher_cli" \
-            >> "$SCRIPT_DIR/logs/inbox_watcher_yakuza${i}.log" 2>&1 &
-        disown
+        launch_watcher "yakuza${i}" "multiagent:agents.$((PANE_BASE + i))"
     done
-
-    # ソウカイヤのwatcher
-    p=$((PANE_BASE + 8))
-    _soukaiya_watcher_cli=$(tmux show-options -p -t "multiagent:agents.${p}" -v @agent_cli 2>/dev/null || echo "claude")
-    nohup bash "$SCRIPT_DIR/scripts/inbox_watcher.sh" "soukaiya" "multiagent:agents.${p}" "$_soukaiya_watcher_cli" \
-        >> "$SCRIPT_DIR/logs/inbox_watcher_soukaiya.log" 2>&1 &
-    disown
+    launch_watcher "soukaiya" "multiagent:agents.$((PANE_BASE + 8))"
 
     log_success "  └─ ◆実際完了◆ 10エージェント分のIRC監視起動完了！全チャンネル接続！ワザマエ！"
 

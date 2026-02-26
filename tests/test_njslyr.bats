@@ -376,23 +376,22 @@ EOF
 # =============================================================================
 
 @test "TC6: inbox_watcher_recently_cleared → skips if inbox_watcher sent /clear recently" {
-    # inbox_watcher state fileを作成（5分以内に/clear送信）
-    cat > "$TEST_METRICS_DIR/inbox_watcher_state_test_agent.yaml" << EOF
-LAST_CLEAR_TS: $(date +%s)
-EOF
+    # BUG-6 fix: Use correct path (STATE_DIR/clear_last_{agent_id}) and format (plain timestamp)
+    # Old test used METRICS_DIR with YAML format — mismatched with implementation.
 
     # njslyr.shの関数をsource
     export PROJECT_ROOT="$TEST_TMPDIR"
     source "$TEST_NJSLYR"
+
+    # inbox_watcher state fileを作成（5分以内に/clear送信）
+    date +%s > "$TEST_STATE_DIR/clear_last_test_agent"
 
     # inbox_watcher_recently_cleared関数をテスト
     run inbox_watcher_recently_cleared "test_agent"
     [ "$status" -eq 0 ]  # 5分以内→競合あり（成功）
 
     # 5分以上経過したケース
-    cat > "$TEST_METRICS_DIR/inbox_watcher_state_test_agent.yaml" << EOF
-LAST_CLEAR_TS: $(($(date +%s) - 400))
-EOF
+    echo "$(($(date +%s) - 400))" > "$TEST_STATE_DIR/clear_last_test_agent"
 
     run inbox_watcher_recently_cleared "test_agent"
     [ "$status" -ne 0 ]  # 5分以上経過→競合なし（失敗）
@@ -452,7 +451,7 @@ EOF
 # TC8: 演出確認（startup/completion banner）
 # =============================================================================
 
-@test "TC8: show_startup_banner → displays Wasshoi banner" {
+@test "TC8: show_startup_banner → displays SHUTDOWN banner" {
     # njslyr.shの関数をsource
     export PROJECT_ROOT="$TEST_TMPDIR"
     source "$TEST_NJSLYR"
@@ -461,9 +460,9 @@ EOF
     run show_startup_banner
     [ "$status" -eq 0 ]
 
-    # バナーに「Wasshoi」が含まれることを確認
-    [[ "$output" =~ "Wasshoi" ]]
-    [[ "$output" =~ "ニンジャスレイヤーがエントリーした" ]]
+    # バナーにSHUTDOWNテーマが含まれることを確認
+    [[ "$output" =~ "SHUTDOWN" ]]
+    [[ "$output" =~ "粛清デーモン起動" ]]
 }
 
 @test "TC8-2: show_completion_banner → displays completion message" {
@@ -475,9 +474,9 @@ EOF
     run show_completion_banner 2 5
     [ "$status" -eq 0 ]
 
-    # バナーに粛清数と健全数が含まれることを確認
-    [[ "$output" =~ "2体処理" ]]
-    [[ "$output" =~ "5体健全" ]]
+    # バナーに粛清数と健全数が含まれることを確認（爆発四散/健全 形式）
+    [[ "$output" =~ "爆発四散" ]]
+    [[ "$output" =~ "健全" ]]
     [[ "$output" =~ "ニンジャスレイヤーは闇に消えた" ]]
 }
 

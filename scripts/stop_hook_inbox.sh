@@ -28,7 +28,7 @@ INPUT=$(cat)
 # ─── Infinite loop prevention ───
 # When stop_hook_active=true, the agent is already continuing from a
 # previous Stop hook block. Allow it to stop this time to prevent loops.
-STOP_HOOK_ACTIVE=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('stop_hook_active', False))" 2>/dev/null || echo "False")
+STOP_HOOK_ACTIVE=$(python3 -c "import sys,json; print(json.load(sys.stdin).get('stop_hook_active', False))" <<< "$INPUT" 2>/dev/null || echo "False")
 if [ "$STOP_HOOK_ACTIVE" = "True" ]; then
     exit 0
 fi
@@ -67,7 +67,7 @@ if [ "$AGENT_ID" = "darkninja" ] || [ "$SESSION_NAME" = "darkninja" ] || [ "$ACT
     exit 0
 fi
 
-# If AGENT_ID is empty but we have an actual session, use session as fallback
+# AGENT_ID unknown (not darkninja but unidentifiable): can't locate inbox → approve
 if [ -z "$AGENT_ID" ]; then
     exit 0
 fi

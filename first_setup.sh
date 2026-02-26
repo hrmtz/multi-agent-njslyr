@@ -40,6 +40,27 @@ log_step() {
     echo -e "\n${CYAN}${BOLD}━━━ $1 ━━━${NC}\n"
 }
 
+# apt でパッケージをインストールし RESULTS/HAS_ERROR を更新する
+# 引数: <package> <display_name> <result_key>
+apt_install() {
+    local pkg="$1" display_name="$2" result_key="$3"
+    if command -v apt-get &> /dev/null; then
+        log_info "${display_name} をインストール中..."
+        if sudo apt-get install -y "$pkg" 2>/dev/null; then
+            log_success "${display_name} インストール完了"
+            RESULTS+=("${result_key}: インストール完了")
+        else
+            log_error "${display_name} のインストールに失敗しました"
+            RESULTS+=("${result_key}: インストール失敗")
+            HAS_ERROR=true
+        fi
+    else
+        log_error "apt-get が見つかりません。手動で ${display_name} をインストールしてください"
+        RESULTS+=("${result_key}: 未インストール (手動インストール必要)")
+        HAS_ERROR=true
+    fi
+}
+
 # スクリプトのディレクトリを取得
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -162,10 +183,12 @@ TMUX_MOUSE_SETTING="set -g mouse on"
 if [ -f "$TMUX_CONF" ] && grep -qF "$TMUX_MOUSE_SETTING" "$TMUX_CONF" 2>/dev/null; then
     log_info "tmux マウス設定は既に ~/.tmux.conf に存在します"
 else
-    log_info "~/.tmux.conf に '$TMUX_MOUSE_SETTING' を追加中..."
-    echo "" >> "$TMUX_CONF"
-    echo "# マウススクロール有効化 (added by first_setup.sh)" >> "$TMUX_CONF"
-    echo "$TMUX_MOUSE_SETTING" >> "$TMUX_CONF"
+    log_info "$HOME/.tmux.conf に '$TMUX_MOUSE_SETTING' を追加中..."
+    {
+        echo ""
+        echo "# マウススクロール有効化 (added by first_setup.sh)"
+        echo "$TMUX_MOUSE_SETTING"
+    } >> "$TMUX_CONF"
     log_success "tmux マウス設定を追加しました"
 fi
 
@@ -193,7 +216,7 @@ if command -v node &> /dev/null; then
     log_success "Node.js がインストール済みです ($NODE_VERSION)"
 
     # バージョンチェック（18以上推奨）
-    NODE_MAJOR=$(echo $NODE_VERSION | cut -d'.' -f1 | tr -d 'v')
+    NODE_MAJOR=$(echo "$NODE_VERSION" | cut -d'.' -f1 | tr -d 'v')
     if [ "$NODE_MAJOR" -lt 18 ]; then
         log_warn "Node.js 18以上を推奨します（現在: $NODE_VERSION）"
         RESULTS+=("Node.js: OK (v$NODE_MAJOR - 要アップグレード推奨)")
@@ -208,12 +231,14 @@ else
     export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
     if [ -s "$NVM_DIR/nvm.sh" ]; then
         log_info "nvm が既にインストール済みです。Node.js をセットアップ中..."
+        # shellcheck source=/dev/null
         \. "$NVM_DIR/nvm.sh"
     else
         # nvm 自動インストール
         log_info "nvm をインストール中..."
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
         export NVM_DIR="$HOME/.nvm"
+        # shellcheck source=/dev/null
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
     fi
 
@@ -292,21 +317,7 @@ if python3 -c "import yaml" 2>/dev/null; then
     RESULTS+=("PyYAML: OK")
 else
     log_warn "PyYAML がインストールされていません"
-    if command -v apt-get &> /dev/null; then
-        log_info "python3-yaml をインストール中..."
-        if sudo apt-get install -y python3-yaml 2>/dev/null; then
-            log_success "python3-yaml インストール完了"
-            RESULTS+=("PyYAML: インストール完了")
-        else
-            log_error "python3-yaml のインストールに失敗しました"
-            RESULTS+=("PyYAML: インストール失敗")
-            HAS_ERROR=true
-        fi
-    else
-        log_error "apt-get が見つかりません。手動で python3-yaml をインストールしてください"
-        RESULTS+=("PyYAML: 未インストール (手動インストール必要)")
-        HAS_ERROR=true
-    fi
+    apt_install "python3-yaml" "python3-yaml" "PyYAML"
 fi
 
 # --- inotify-tools (inotifywait) ---
@@ -315,21 +326,7 @@ if command -v inotifywait &> /dev/null; then
     RESULTS+=("inotify-tools: OK")
 else
     log_warn "inotify-tools がインストールされていません"
-    if command -v apt-get &> /dev/null; then
-        log_info "inotify-tools をインストール中..."
-        if sudo apt-get install -y inotify-tools 2>/dev/null; then
-            log_success "inotify-tools インストール完了"
-            RESULTS+=("inotify-tools: インストール完了")
-        else
-            log_error "inotify-tools のインストールに失敗しました"
-            RESULTS+=("inotify-tools: インストール失敗")
-            HAS_ERROR=true
-        fi
-    else
-        log_error "apt-get が見つかりません。手動で inotify-tools をインストールしてください"
-        RESULTS+=("inotify-tools: 未インストール (手動インストール必要)")
-        HAS_ERROR=true
-    fi
+    apt_install "inotify-tools" "inotify-tools" "inotify-tools"
 fi
 
 # ============================================================
@@ -350,7 +347,7 @@ if command -v claude &> /dev/null; then
     CLAUDE_VERSION=$(claude --version 2>&1)
     CLAUDE_PATH=$(which claude 2>/dev/null)
 
-    if [ $? -eq 0 ] && [ "$CLAUDE_VERSION" != "unknown" ] && [[ "$CLAUDE_VERSION" != *"not found"* ]]; then
+    if [ -n "$CLAUDE_PATH" ] && [ "$CLAUDE_VERSION" != "unknown" ] && [[ "$CLAUDE_VERSION" != *"not found"* ]]; then
         # 動作する claude が見つかった → npm版かネイティブ版かを判定
         if echo "$CLAUDE_PATH" | grep -qi "npm\|node_modules\|AppData"; then
             # npm版が動いている
@@ -365,7 +362,7 @@ if command -v claude &> /dev/null; then
             if [ ! -t 0 ]; then
                 REPLY="Y"
             else
-                read -p "  ネイティブ版をインストールしますか? [Y/n]: " REPLY
+                read -r -p "  ネイティブ版をインストールしますか? [Y/n]: " REPLY
             fi
             REPLY=${REPLY:-Y}
             if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -417,10 +414,12 @@ if [ "$NEED_CLAUDE_INSTALL" = true ]; then
 
     # .bashrc に永続化（重複追加を防止）
     if ! grep -q 'export PATH="\$HOME/.local/bin:\$PATH"' "$HOME/.bashrc" 2>/dev/null; then
-        echo '' >> "$HOME/.bashrc"
-        echo '# Claude Code CLI PATH (added by first_setup.sh)' >> "$HOME/.bashrc"
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
-        log_info "~/.local/bin を ~/.bashrc の PATH に追加しました"
+        {
+            echo ''
+            echo '# Claude Code CLI PATH (added by first_setup.sh)'
+            echo 'export PATH="$HOME/.local/bin:$PATH"'
+        } >> "$HOME/.bashrc"
+        log_info "$HOME/.local/bin を $HOME/.bashrc の PATH に追加しました"
     fi
 
     if command -v claude &> /dev/null; then
@@ -443,7 +442,7 @@ if [ "$NEED_CLAUDE_INSTALL" = true ]; then
         fi
     else
         log_error "インストールに失敗しました。パスを確認してください"
-        log_info "~/.local/bin がPATHに含まれているか確認してください"
+        log_info "$HOME/.local/bin がPATHに含まれているか確認してください"
         RESULTS+=("Claude Code CLI: インストール失敗")
         HAS_ERROR=true
     fi
@@ -722,9 +721,11 @@ if [ "$IS_WSL" = true ]; then
                     # [experimental] セクションの直後に追加
                     sedi '/\[experimental\]/a autoMemoryReclaim=gradual' "$WSLCONFIG_PATH"
                 else
-                    echo "" >> "$WSLCONFIG_PATH"
-                    echo "[experimental]" >> "$WSLCONFIG_PATH"
-                    echo "autoMemoryReclaim=gradual" >> "$WSLCONFIG_PATH"
+                    {
+                        echo ""
+                        echo "[experimental]"
+                        echo "autoMemoryReclaim=gradual"
+                    } >> "$WSLCONFIG_PATH"
                 fi
                 log_success ".wslconfig に autoMemoryReclaim=gradual を追加しました"
                 log_warn "反映には 'wsl --shutdown' 後の再起動が必要です"

@@ -27,9 +27,5 @@ if ! flock -w "$LOCK_TIMEOUT" 200; then
     exit 1
 fi
 
-# Call the Python implementation
-python3 "$(dirname "$0")/slim_yaml.py" "$@"
-exit_code=$?
-
-# Lock is automatically released when file descriptor is closed
-exit "$exit_code"
+# exec replaces shell with python3; fd 200 (lock) stays open until python3 exits
+exec python3 "$SCRIPT_DIR/slim_yaml.py" "$@"
