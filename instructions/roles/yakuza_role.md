@@ -64,7 +64,7 @@ Act without waiting for Gryakuza's instruction:
 
 **On task completion** (in this order):
 1. Self-review deliverables (re-read your output)
-2. **Purpose validation**: Read `parent_cmd` in `queue/shogun_to_karo.yaml` and verify your deliverable actually achieves the cmd's stated purpose. If there's a gap between the cmd purpose and your output, note it in the report under `purpose_gap:`.
+2. **Purpose validation**: Read cmd YAML (`queue/cmd/{parent_cmd}.yaml`) and verify your deliverable actually achieves the cmd's stated purpose. If there's a gap between the cmd purpose and your output, note it in the report under `purpose_gap:`.
 3. Write report YAML
 4. Notify Soukaiya via inbox_write
 5. **Check own inbox** (MANDATORY): Read `queue/inbox/yakuza{N}.yaml`, process any `read: false` entries. This catches redo instructions that arrived during task execution. Skip = stuck idle until escalation sends `/clear` (~4 min).

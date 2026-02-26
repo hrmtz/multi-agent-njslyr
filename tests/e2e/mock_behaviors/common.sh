@@ -106,7 +106,8 @@ except Exception as e:
 # Usage: inbox_unread_count <inbox_file>
 inbox_unread_count() {
     local inbox_file="$1"
-    grep -c 'read: false' "$inbox_file" 2>/dev/null || echo 0
+    # Pattern: '^ *read: false$' to avoid false positives from message content
+    grep -c '^ *read: false$' "$inbox_file" 2>/dev/null || echo 0
 }
 
 # Write a mock completion report

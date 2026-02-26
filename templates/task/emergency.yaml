@@ -1,0 +1,32 @@
+task:
+  task_id: "{{task_id}}"
+  parent_cmd: "{{parent_cmd}}"
+  bloom_level: "{{bloom_level}}"
+  description: |
+    **【P0緊急修正】{{title}}**
+
+    **緊急度**: BLOCKING
+
+    **背景**:
+    {{background}}
+
+    **問題**:
+    {{problem}}
+
+    **修正方針**:
+    {{fix_approach}}
+
+    **作業手順**:
+    {{steps}}
+
+    **Acceptance Criteria**:
+    {{acceptance_criteria}}
+
+    **Notes**:
+    - BLOCKING issue対応のため最優先
+    {{notes}}
+
+  target_path: "{{target_path}}"
+  status: assigned
+  timestamp: "{{timestamp}}"
+  priority: P0

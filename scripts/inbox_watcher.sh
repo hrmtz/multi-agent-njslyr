@@ -15,8 +15,8 @@
 # Fallback 2: rc=1処理（Claude Code atomic write = tmp+rename でinode変更時）
 #
 # エスカレーション（未読メッセージが放置されている場合）:
-#   0〜2分: 通常nudge（send-keys）。ただしWorking中はスキップ
-#   2〜4分: Escape×2 + nudge（カーソル位置バグ対策）
+#   0〜2分: 通常スリケン（send-keys）。ただしWorking中はスキップ
+#   2〜4分: Escape×2 + スリケン（カーソル位置バグ対策）
 #   4分〜 : /clear送信（5分に1回まで。強制リセット+YAML再読）
 # ═══════════════════════════════════════════════════════════════
 
@@ -42,6 +42,9 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
 
     INBOX="$SCRIPT_DIR/queue/inbox/${AGENT_ID}.yaml"
     LOCKFILE="${INBOX}.lock"
+    CACHE_DIR="$SCRIPT_DIR/queue/.cache"
+    STATE_DIR="$SCRIPT_DIR/.state"
+    mkdir -p "$CACHE_DIR" "$STATE_DIR"
 
     if [ -z "$AGENT_ID" ] || [ -z "$PANE_TARGET" ]; then
         echo "Usage: inbox_watcher.sh <agent_id> <pane_target> [cli_type]" >&2
@@ -94,7 +97,7 @@ NEW_CONTEXT_SENT=${NEW_CONTEXT_SENT:-0}
 # ─── Phase feature flags (cmd_107 Phase 1/2/3) ───
 # ASW_PHASE:
 #   1 = self-watch base (compatible)
-#   2 = disable normal nudge by default
+#   2 = disable normal スリケン by default
 #   3 = FINAL_ESCALATION_ONLY (send-keys is fallback only)
 ASW_PHASE=${ASW_PHASE:-1}
 ASW_DISABLE_NORMAL_NUDGE=${ASW_DISABLE_NORMAL_NUDGE:-$([ "${ASW_PHASE}" -ge 2 ] && echo 1 || echo 0)}
@@ -137,6 +140,55 @@ read_count: $READ_COUNT
 bytes_read: $READ_BYTES_TOTAL
 estimated_tokens: $ESTIMATED_TOKENS_TOTAL
 EOF
+
+    # P2-施策3: SLA monitoring — alert if unread_latency_sec > 1.5s
+    if [ "$unread_latency_sec" -gt 0 ] && awk "BEGIN {exit !($unread_latency_sec > 1.5)}"; then
+        check_latency_sla "$unread_latency_sec"
+    fi
+}
+
+# ─── Latency SLA monitoring (P2-施策3) ───
+# Alert to dashboard when unread_latency_sec exceeds 1.5s threshold.
+check_latency_sla() {
+    local latency_sec="$1"
+    local dashboard_file="${SCRIPT_DIR}/dashboard.md"
+    local lockfile="${dashboard_file}.lock"
+    local alert_msg="⚠️ **配信遅延SLA超過**: ${AGENT_ID} の未読メッセージ遅延が ${latency_sec}秒（閾値: 1.5秒）— inbox_watcher パフォーマンス劣化の可能性"
+
+    # Lock dashboard for atomic update (timeout 3s)
+    (
+        flock -w 3 200 || exit 1
+
+        # Check if dashboard exists and has 🚨ヨウタイオウ section
+        if [ ! -f "$dashboard_file" ]; then
+            echo "[inbox_watcher] WARNING: dashboard.md not found, skipping SLA alert" >&2
+            exit 0
+        fi
+
+        # Dedup: skip if same alert already exists (last 24h)
+        if grep -qF "${AGENT_ID} の未読メッセージ遅延が" "$dashboard_file" 2>/dev/null; then
+            # Alert already present — skip
+            exit 0
+        fi
+
+        # Find 🚨ヨウタイオウ section and append alert
+        if grep -qF '🚨ヨウタイオウ' "$dashboard_file"; then
+            # Insert alert after 🚨ヨウタイオウ header
+            awk -v alert="$alert_msg" '
+                /🚨ヨウタイオウ/ {
+                    print
+                    if (!inserted) {
+                        print ""
+                        print alert
+                        inserted = 1
+                    }
+                    next
+                }
+                { print }
+            ' "$dashboard_file" > "${dashboard_file}.tmp" && mv "${dashboard_file}.tmp" "$dashboard_file"
+            echo "[inbox_watcher] SLA alert written to dashboard: ${AGENT_ID} latency=${latency_sec}s" >&2
+        fi
+    ) 200>"$lockfile" 2>/dev/null
 }
 
 disable_normal_nudge() {
@@ -159,7 +211,7 @@ should_throttle_nudge() {
     if [ "${LAST_NUDGE_COUNT:-}" = "$unread_count" ] && [ "${LAST_NUDGE_TS:-0}" -gt 0 ]; then
         local age=$((now - LAST_NUDGE_TS))
         if [ "$age" -lt "${cooldown_sec}" ]; then
-            echo "[$(date)] [SKIP] Throttling nudge for $AGENT_ID: inbox${unread_count} (${age}s < ${cooldown_sec}s, cli=$effective_cli)" >&2
+            echo "[$(date)] [SKIP] Throttling スリケン for $AGENT_ID: inbox${unread_count} (${age}s < ${cooldown_sec}s, cli=$effective_cli)" >&2
             return 0
         fi
     fi
@@ -363,6 +415,49 @@ PY
     ) 200>"$LOCKFILE" 2>/dev/null
 }
 
+# ─── Resolve pane target dynamically via @agent_id ───
+# Fixes pane index drift when panes are added/removed.
+# Falls back to startup PANE_TARGET if @agent_id lookup fails.
+# 5-second TTL cache to avoid repeated tmux list-panes calls.
+_RESOLVE_CACHE_TARGET=""
+_RESOLVE_CACHE_TS=0
+
+resolve_pane_target() {
+    local now
+    now=$(date +%s)
+
+    # Cache hit: reuse if within TTL (5 seconds)
+    if [ -n "$_RESOLVE_CACHE_TARGET" ] && [ $(( now - _RESOLVE_CACHE_TS )) -lt 5 ]; then
+        PANE_TARGET="$_RESOLVE_CACHE_TARGET"
+        return 0
+    fi
+
+    # Darkninja uses a separate session — skip dynamic resolution
+    if [ "$AGENT_ID" = "darkninja" ]; then
+        _RESOLVE_CACHE_TARGET="$PANE_TARGET"
+        _RESOLVE_CACHE_TS=$now
+        return 0
+    fi
+
+    # Dynamic lookup: find pane by @agent_id
+    local resolved
+    resolved=$(tmux list-panes -a -F '#{@agent_id} #{pane_id}' 2>/dev/null \
+        | awk -v id="$AGENT_ID" '$1 == id {print $2; exit}')
+
+    if [ -n "$resolved" ]; then
+        PANE_TARGET="$resolved"
+        _RESOLVE_CACHE_TARGET="$resolved"
+        _RESOLVE_CACHE_TS=$now
+        return 0
+    fi
+
+    # Fallback: keep startup PANE_TARGET (may be stale but better than nothing)
+    echo "[$(date)] [WARN] resolve_pane_target: @agent_id=$AGENT_ID not found, using fallback $PANE_TARGET" >&2
+    _RESOLVE_CACHE_TARGET="$PANE_TARGET"
+    _RESOLVE_CACHE_TS=$now
+    return 0
+}
+
 # ─── Send CLI command via pty direct write ───
 # For /clear and /model only. These are CLI commands, not conversation messages.
 # CLI_TYPE別分岐: claude→そのまま, codex→/clear対応・/modelスキップ,
@@ -370,6 +465,7 @@ PY
 # 実行時にtmux paneの @agent_cli を再確認し、ドリフト時はpane値を優先する。
 send_cli_command() {
     local cmd="$1"
+    resolve_pane_target
     local effective_cli
     effective_cli=$(get_effective_cli_type)
 
@@ -425,15 +521,25 @@ send_cli_command() {
     esac
 
     echo "[$(date)] [SEND-KEYS] Sending CLI command to $AGENT_ID ($effective_cli): $actual_cmd" >&2
-    # Clear stale input first, then send command (text and Enter separated for Codex TUI)
+    # Clear stale input first, then send command
     # Codex CLI: C-c when idle causes CLI to exit — skip it
     if [[ "$effective_cli" != "codex" ]]; then
         timeout 5 tmux send-keys -t "$PANE_TARGET" C-c 2>/dev/null
         sleep 0.5
     fi
-    timeout 5 tmux send-keys -t "$PANE_TARGET" "$actual_cmd" 2>/dev/null
-    sleep 0.3
-    timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+    if [[ "$effective_cli" == "codex" ]]; then
+        # Codex TUI: text and Enter must be separated (TUI compatibility)
+        timeout 5 tmux send-keys -t "$PANE_TARGET" "$actual_cmd" 2>/dev/null
+        sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+    else
+        # Claude CLI: text → Escape (dismiss autocomplete) → Enter
+        timeout 5 tmux send-keys -t "$PANE_TARGET" "$actual_cmd" 2>/dev/null
+        sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
+        sleep 0.1
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+    fi
 
     # /clear needs extra wait time before follow-up
     if [[ "$actual_cmd" == "/clear" ]]; then
@@ -477,10 +583,20 @@ send_context_reset() {
         sleep 0.3
     fi
 
-    # Send the command (text and Enter separated for TUI compatibility)
-    timeout 5 tmux send-keys -t "$PANE_TARGET" "$reset_cmd" 2>/dev/null
-    sleep 0.3
-    timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+    # Send the command
+    if [[ "$effective_cli" == "codex" ]]; then
+        # Codex TUI: text and Enter must be separated
+        timeout 5 tmux send-keys -t "$PANE_TARGET" "$reset_cmd" 2>/dev/null
+        sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+    else
+        # Claude CLI: text → Escape (dismiss autocomplete) → Enter
+        timeout 5 tmux send-keys -t "$PANE_TARGET" "$reset_cmd" 2>/dev/null
+        sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
+        sleep 0.1
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+    fi
 
     # Poll until agent becomes idle (prompt ready) instead of fixed sleep.
     # Max 15s (3 attempts × 5s). If still busy after 15s, proceed anyway.
@@ -488,12 +604,12 @@ send_context_reset() {
     for attempt in 1 2 3; do
         sleep 5
         if ! agent_is_busy; then
-            echo "[$(date)] [CONTEXT-RESET] $AGENT_ID idle after ${attempt}×5s — ready for nudge" >&2
+            echo "[$(date)] [CONTEXT-RESET] $AGENT_ID idle after ${attempt}×5s — ready for スリケン" >&2
             return 0
         fi
         echo "[$(date)] [CONTEXT-RESET] $AGENT_ID still busy after ${attempt}×5s — retrying" >&2
     done
-    echo "[$(date)] [CONTEXT-RESET] $AGENT_ID still busy after 15s — proceeding with nudge anyway" >&2
+    echo "[$(date)] [CONTEXT-RESET] $AGENT_ID still busy after 15s — proceeding with スリケン anyway" >&2
 }
 
 # ─── Cross-platform file change wait ───
@@ -517,7 +633,7 @@ _wait_for_file_change() {
 
 # ─── Agent self-watch detection ───
 # Check if the agent has an active file-watch (inotifywait/fswatch) on its inbox.
-# If yes, the agent will self-wake — no nudge needed.
+# If yes, the agent will self-wake — スリケン不要.
 agent_has_self_watch() {
     # Codex/Copilot/Kimi CLIs cannot run self-watch. Only Claude Code agents can.
     local effective_cli
@@ -547,34 +663,75 @@ agent_has_self_watch() {
     return $found
 }
 
-# ─── Agent busy detection ───
+# ─── Agent busy detection (with cache, TTL 2s) ───
 # Check if the agent's CLI is currently processing (Working/thinking/etc).
-# Sending nudge during Working causes text to queue but Enter to be lost.
+# Working中のスリケン送信はテキストがキューに入るがEnterが消失する.
 # Returns 0 (true) if agent is busy, 1 if idle.
+# P2-施策2: Cache tmux capture-pane result (TTL 2s) to reduce API calls.
 agent_is_busy() {
+    resolve_pane_target
+    local cache_file="${CACHE_DIR}/inbox_watcher_busy_cache_${AGENT_ID}"
+    local cache_ttl_sec=2
+    local now
+    now=$(date +%s)
+
+    # Check cache validity
+    if [ -f "$cache_file" ]; then
+        local cache_mtime
+        # Platform-specific stat (macOS vs Linux)
+        if [[ "$_UNAME_S" == "Darwin" ]]; then
+            cache_mtime=$(/usr/bin/stat -f %m "$cache_file" 2>/dev/null || echo 0)
+        else
+            cache_mtime=$(stat -c %Y "$cache_file" 2>/dev/null || echo 0)
+        fi
+
+        local cache_age=$((now - cache_mtime))
+        if [ "$cache_age" -lt "$cache_ttl_sec" ]; then
+            # Cache hit — return cached value
+            local cached_result
+            cached_result=$(cat "$cache_file" 2>/dev/null || echo "1")
+            return "$cached_result"
+        fi
+    fi
+
+    # Cache miss or expired — run actual check
     local pane_tail
     # Only check the bottom 5 lines of the pane. Old busy markers ("esc to interrupt",
     # "Working") linger in scroll-back and cause false-busy if we scan too many lines.
-    pane_tail=$(timeout 2 tmux capture-pane -t "$PANE_TARGET" -p 2>/dev/null | tail -5)
+    # P1-1: timeout shortened from 2s to 1s for faster delivery (40% latency reduction)
+    pane_tail=$(timeout 1 tmux capture-pane -t "$PANE_TARGET" -p 2>/dev/null | tail -5)
+
+    # If timeout fails (rc=124), treat as idle (not busy) to avoid false-busy blocking スリケン
+    local rc=$?
+    if [ "$rc" -eq 124 ]; then
+        echo "1" > "$cache_file"  # cache: idle
+        return 1  # timeout → idle (proceed with スリケン)
+    fi
 
     # ── Idle check (takes priority) ──
     if echo "$pane_tail" | grep -qE '(\? for shortcuts|context left)'; then
+        echo "1" > "$cache_file"  # cache: idle
         return 1  # idle — Codex idle prompt
     fi
     if echo "$pane_tail" | grep -qE '^(❯|›)\s*$'; then
+        echo "1" > "$cache_file"  # cache: idle
         return 1  # idle — Claude Code or Codex bare prompt
     fi
 
     # ── Busy markers (bottom 5 lines only) ──
     if echo "$pane_tail" | grep -qiF 'esc to interrupt'; then
+        echo "0" > "$cache_file"  # cache: busy
         return 0  # busy
     fi
     if echo "$pane_tail" | grep -qiF 'background terminal running'; then
+        echo "0" > "$cache_file"  # cache: busy
         return 0  # busy
     fi
     if echo "$pane_tail" | grep -qiE '(Working|Thinking|Planning|Sending|task is in progress|Compacting conversation|thought for|思考中|考え中|計画中|送信中|処理中|実行中)'; then
+        echo "0" > "$cache_file"  # cache: busy
         return 0  # busy
     fi
+    echo "1" > "$cache_file"  # cache: idle
     return 1  # idle
 }
 
@@ -586,35 +743,36 @@ pane_is_active() {
     [ "$active" = "1" ]
 }
 
-# ─── Send wake-up nudge ───
+# ─── Send wake-up スリケン ───
 # Layered approach:
 #   1. If agent has active inotifywait self-watch → skip (agent wakes itself)
-#   2. If agent is busy (Working) → skip (nudge during Working loses Enter)
-#   3. tmux send-keys (短いnudgeのみ、timeout 5s)
+#   2. If agent is busy (Working) → skip (Working中のスリケンはEnter消失)
+#   3. tmux send-keys (短いスリケンのみ、timeout 5s)
 send_wakeup() {
     local unread_count="$1"
-    local nudge="inbox${unread_count}"
+    resolve_pane_target
+    local nudge="スリケン！inbox${unread_count}"
 
     if [ "${FINAL_ESCALATION_ONLY:-0}" = "1" ]; then
-        echo "[$(date)] [SKIP] FINAL_ESCALATION_ONLY=1, suppressing normal nudge for $AGENT_ID" >&2
+        echo "[$(date)] [SKIP] FINAL_ESCALATION_ONLY=1, suppressing normal スリケン for $AGENT_ID" >&2
         return 0
     fi
 
-    # 優先度1: Agent self-watch — nudge不要（エージェントが自分で気づく）
+    # 優先度1: Agent self-watch — スリケン不要（エージェントが自分で気づく）
     if agent_has_self_watch; then
-        echo "[$(date)] [SKIP] Agent $AGENT_ID has active self-watch, no nudge needed" >&2
+        echo "[$(date)] [SKIP] Agent $AGENT_ID has active self-watch, スリケン不要" >&2
         return 0
     fi
 
-    # 優先度2: Agent busy — nudge送信するとEnterが消失するためスキップ
-    # Claude Code agents: Stop hook handles delivery, no nudge needed at all.
+    # 優先度2: Agent busy — スリケン送信するとEnterが消失するためスキップ
+    # Claude Code agents: Stop hook handles delivery, スリケン不要 at all.
     if agent_is_busy; then
         local busy_cli_wakeup
         busy_cli_wakeup=$(get_effective_cli_type)
         if [[ "$busy_cli_wakeup" == "claude" ]]; then
-            echo "[$(date)] [SKIP] Agent $AGENT_ID is busy (claude) — Stop hook will deliver, no nudge" >&2
+            echo "[$(date)] [SKIP] Agent $AGENT_ID is busy (claude) — Stop hook will deliver, スリケン不要" >&2
         else
-            echo "[$(date)] [SKIP] Agent $AGENT_ID is busy ($busy_cli_wakeup), deferring nudge" >&2
+            echo "[$(date)] [SKIP] Agent $AGENT_ID is busy ($busy_cli_wakeup), deferring スリケン" >&2
         fi
         return 0
     fi
@@ -623,16 +781,13 @@ send_wakeup() {
         return 0
     fi
 
-    # Darkninja: if the pane is focused, never inject keys (it can clobber the Lord's input).
-    # Instead, show a tmux message. If not focused, we can safely send the normal nudge.
-    if [ "$AGENT_ID" = "darkninja" ] && pane_is_active; then
-        echo "[$(date)] [DISPLAY] darkninja pane is active — showing nudge: inbox${unread_count}" >&2
-        timeout 2 tmux display-message -t "$PANE_TARGET" -d 5000 "inbox${unread_count}" 2>/dev/null || true
-        return 0
-    fi
+    # Darkninja: send normal スリケン like other agents.
+    # ラオモトが入力中にテキストが混入するリスクはあるが、
+    # display-message（5秒で消える）ではダークニンジャが起きない問題の方が深刻。
+    # C-u（入力クリア）はpane_is_active時にスキップされるため、ラオモトの入力は保護される。
 
     # 優先度3: tmux send-keys（テキストとEnterを分離 — Codex TUI対策）
-    echo "[$(date)] [SEND-KEYS] Sending nudge to $PANE_TARGET for $AGENT_ID" >&2
+    echo "[$(date)] [SEND-KEYS] Sending スリケン to $PANE_TARGET for $AGENT_ID" >&2
 
     # Codex suggestion UI dismissal: typing any character dismisses the autocomplete
     # suggestion prompt (› Implement {feature} etc.) that traps idle agents.
@@ -647,7 +802,10 @@ send_wakeup() {
     fi
 
     if timeout 5 tmux send-keys -t "$PANE_TARGET" "$nudge" 2>/dev/null; then
+        # Claude CLI: Escape to dismiss autocomplete before Enter
         sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
+        sleep 0.1
         timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
         echo "[$(date)] Wake-up sent to $AGENT_ID (${unread_count} unread)" >&2
         return 0
@@ -657,41 +815,42 @@ send_wakeup() {
     return 1
 }
 
-# ─── Send wake-up nudge with Escape prefix ───
-# Phase 2 escalation: send Escape×2 + C-c to clear stuck input, then nudge.
+# ─── Send wake-up スリケン with Escape prefix ───
+# Phase 2 escalation: send Escape×2 + C-c to clear stuck input, then スリケン.
 # Addresses the "echo last tool call" cursor position bug and stale input.
 send_wakeup_with_escape() {
     local unread_count="$1"
-    local nudge="inbox${unread_count}"
+    resolve_pane_target
+    local nudge="スリケン！inbox${unread_count}"
     local effective_cli
     effective_cli=$(get_effective_cli_type)
     local c_ctrl_state="skipped"
 
     # Safety: never send Escape escalation to darkninja. It can wipe the Lord's input.
     if [ "$AGENT_ID" = "darkninja" ]; then
-        echo "[$(date)] [SKIP] darkninja: suppressing Escape escalation; sending plain nudge" >&2
+        echo "[$(date)] [SKIP] darkninja: suppressing Escape escalation; sending plain スリケン" >&2
         send_wakeup "$unread_count"
         return 0
     fi
 
     # Codex CLI: ESC は「中断」になりやすく、人間操作中の事故も多い。
-    # Phase 2 の Escape エスカレーションは無効化し、通常 nudge のみに落とす。
+    # Phase 2 の Escape エスカレーションは無効化し、通常スリケンのみに落とす。
     if [[ "$effective_cli" == "codex" ]]; then
-        echo "[$(date)] [SKIP] codex: suppressing Escape escalation for $AGENT_ID; sending plain nudge" >&2
+        echo "[$(date)] [SKIP] codex: suppressing Escape escalation for $AGENT_ID; sending plain スリケン" >&2
         send_wakeup "$unread_count"
         return 0
     fi
 
     # Claude Code: Stop hookがturn終了時にinbox未読を検出→自動処理する。
-    # Escape送信は処理中のturnを中断させるため有害。Phase 2は通常nudgeに落とす。
+    # Escape送信は処理中のturnを中断させるため有害。Phase 2は通常スリケンに落とす。
     if [[ "$effective_cli" == "claude" ]]; then
-        echo "[$(date)] [SKIP] claude: suppressing Escape escalation for $AGENT_ID (Stop hook handles delivery); sending plain nudge" >&2
+        echo "[$(date)] [SKIP] claude: suppressing Escape escalation for $AGENT_ID (Stop hook handles delivery); sending plain スリケン" >&2
         send_wakeup "$unread_count"
         return 0
     fi
 
     if [ "${FINAL_ESCALATION_ONLY:-0}" = "1" ]; then
-        echo "[$(date)] [SKIP] FINAL_ESCALATION_ONLY=1, suppressing phase2 nudge for $AGENT_ID" >&2
+        echo "[$(date)] [SKIP] FINAL_ESCALATION_ONLY=1, suppressing phase2 スリケン for $AGENT_ID" >&2
         return 0
     fi
 
@@ -701,11 +860,11 @@ send_wakeup_with_escape() {
 
     # Phase 2 still skips if agent is busy — Escape during Working would interrupt
     if agent_is_busy; then
-        echo "[$(date)] [SKIP] Agent $AGENT_ID is busy (Working), deferring Phase 2 nudge" >&2
+        echo "[$(date)] [SKIP] Agent $AGENT_ID is busy (Working), deferring Phase 2 スリケン" >&2
         return 0
     fi
 
-    echo "[$(date)] [SEND-KEYS] ESCALATION Phase 2: Escape×2 + nudge for $AGENT_ID (cli=$effective_cli)" >&2
+    echo "[$(date)] [SEND-KEYS] ESCALATION Phase 2: Escape×2 + スリケン for $AGENT_ID (cli=$effective_cli)" >&2
     # Escape×2 to exit any mode
     timeout 5 tmux send-keys -t "$PANE_TARGET" Escape Escape 2>/dev/null
     sleep 0.5
@@ -717,12 +876,14 @@ send_wakeup_with_escape() {
     fi
     if timeout 5 tmux send-keys -t "$PANE_TARGET" "$nudge" 2>/dev/null; then
         sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
+        sleep 0.1
         timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
-        echo "[$(date)] Escape+nudge sent to $AGENT_ID (${unread_count} unread, cli=$effective_cli, C-c=$c_ctrl_state)" >&2
+        echo "[$(date)] Escape+スリケン sent to $AGENT_ID (${unread_count} unread, cli=$effective_cli, C-c=$c_ctrl_state)" >&2
         return 0
     fi
 
-    echo "[$(date)] WARNING: send-keys failed for Escape+nudge ($AGENT_ID)" >&2
+    echo "[$(date)] WARNING: send-keys failed for Escape+スリケン ($AGENT_ID)" >&2
     return 1
 }
 
@@ -737,8 +898,10 @@ process_unread() {
     local fast_count
     fast_count=$(echo "$fast_info" | python3 -c "import sys,json; print(json.load(sys.stdin).get('count',0))" 2>/dev/null)
 
-    if no_idle_full_read "$trigger" && [ "$fast_count" -eq 0 ] 2>/dev/null; then
-        # no_idle_full_read guard: unread=0 and timeout path → no full inbox read
+    # P1-2: fast-path expansion — skip full read when unread=0, regardless of trigger type
+    # (previously limited to timeout trigger only; now applies to event trigger as well)
+    if [ "$fast_count" -eq 0 ] 2>/dev/null; then
+        # unread=0 → no full inbox read needed (saves ~30ms YAML parsing)
         if [ "$FIRST_UNREAD_SEEN" -ne 0 ]; then
             echo "[$(date)] All messages read for $AGENT_ID — escalation reset (fast-path)" >&2
         fi
@@ -782,6 +945,8 @@ for s in data.get('specials', []):
             [ -n "$msg_type" ] || continue
             if [ "$msg_type" = "clear_command" ]; then
                 clear_seen=1
+                # BUG-6 fix: Update shared clear lock on delivery
+                echo "$(date +%s)" > "${STATE_DIR}/clear_last_${AGENT_ID}"
             fi
             cmd=$(normalize_special_command "$msg_type" "$msg_content")
             [ -n "$cmd" ] && send_cli_command "$cmd"
@@ -819,8 +984,8 @@ for s in data.get('specials', []):
             busy_cli=$(get_effective_cli_type)
             if [[ "$busy_cli" == "claude" ]]; then
                 # Claude Code: Stop hook will catch unread messages when the agent's
-                # turn ends. No nudge needed at all — just log and skip completely.
-                # Don't reset FIRST_UNREAD_SEEN so idle-nudge works if hook misses.
+                # turn ends. スリケン不要 at all — just log and skip completely.
+                # Don't reset FIRST_UNREAD_SEEN so idle-スリケン works if hook misses.
                 echo "[$(date)] $normal_count unread for $AGENT_ID but agent is busy (claude) — Stop hook will deliver" >&2
             else
                 # Codex/Copilot/Kimi: No Stop hook. Pause escalation timer while busy.
@@ -848,7 +1013,7 @@ for s in data.get('specials', []):
         if [ "${ASW_DISABLE_ESCALATION:-0}" = "1" ]; then
             echo "[$(date)] $normal_count unread for $AGENT_ID (escalation disabled)" >&2
             if disable_normal_nudge; then
-                echo "[$(date)] [SKIP] disable_normal_nudge=1, no normal nudge for $AGENT_ID" >&2
+                echo "[$(date)] [SKIP] disable_normal_nudge=1, no normal スリケン for $AGENT_ID" >&2
             else
                 send_wakeup "$normal_count"
             fi
@@ -858,7 +1023,7 @@ for s in data.get('specials', []):
         local age=$((now - FIRST_UNREAD_SEEN))
 
         if [ "$age" -lt "$ESCALATE_PHASE1" ]; then
-            # Phase 1 (0-2 min): Standard nudge
+            # Phase 1 (0-2 min): Standard スリケン
             echo "[$(date)] $normal_count unread for $AGENT_ID (${age}s)" >&2
             if disable_normal_nudge; then
                 echo "[$(date)] [SKIP] disable_normal_nudge=1, deferring to escalation-only path" >&2
@@ -866,8 +1031,8 @@ for s in data.get('specials', []):
                 send_wakeup "$normal_count"
             fi
         elif [ "$age" -lt "$ESCALATE_PHASE2" ]; then
-            # Phase 2 (2-4 min): Escape + nudge
-            echo "[$(date)] $normal_count unread for $AGENT_ID (${age}s — escalating: Escape+nudge)" >&2
+            # Phase 2 (2-4 min): Escape + スリケン
+            echo "[$(date)] $normal_count unread for $AGENT_ID (${age}s — escalating: Escape+スリケン)" >&2
             send_wakeup_with_escape "$normal_count"
         else
             # Phase 3 (4+ min): /clear (throttled to once per 5 min)
@@ -882,13 +1047,15 @@ for s in data.get('specials', []):
                 else
                     echo "[$(date)] ESCALATION Phase 3: Agent $AGENT_ID unresponsive for ${age}s. Sending /clear." >&2
                     send_cli_command "/clear"
+                    # BUG-6 fix: Update shared clear lock on Phase 3 /clear
+                    echo "$(date +%s)" > "${STATE_DIR}/clear_last_${AGENT_ID}"
                     LAST_CLEAR_TS=$now
                     FIRST_UNREAD_SEEN=0  # Reset — will re-detect on next cycle
                     NEW_CONTEXT_SENT=0
                 fi
             else
-                # Cooldown active — fall back to Escape+nudge
-                echo "[$(date)] $normal_count unread for $AGENT_ID (${age}s — /clear cooldown, using Escape+nudge)" >&2
+                # Cooldown active — fall back to Escape+スリケン
+                echo "[$(date)] $normal_count unread for $AGENT_ID (${age}s — /clear cooldown, using Escape+スリケン)" >&2
                 send_wakeup_with_escape "$normal_count"
             fi
         fi
@@ -928,6 +1095,12 @@ process_unread_once
 INOTIFY_TIMEOUT="${INOTIFY_TIMEOUT:-30}"
 
 while true; do
+    # Orphan watcher check: paneが消失していたら自己終了（despawn_tengu後のゾンビwatcher防止）
+    if ! tmux list-panes -a -F '#{@agent_id}' | grep -qx "$AGENT_ID"; then
+        echo "[inbox_watcher] pane for $AGENT_ID not found. Exiting orphan watcher." >&2
+        exit 0
+    fi
+
     # Block until file is modified OR timeout (safety net for WSL2 / fswatch)
     # set +e: file-watch returns 2 on timeout, which would kill script under set -e
     set +e

@@ -1,0 +1,48 @@
+task:
+  task_id: "{{task_id}}"
+  parent_cmd: "{{parent_cmd}}"
+  bloom_level: "{{bloom_level}}"
+  description: |
+    **Reel再生成: {{project}} — {{title}}**
+
+    **背景**:
+    {{background}}
+
+    **修正内容**:
+    {{修正内容}}
+
+    **対象プロジェクト**:
+    - プロジェクト名: {{project}}
+    - Reel生成スクリプト: {{reel_script_path}}
+    - 出力先: {{output_path}}
+
+    **作業手順**:
+    1. プロジェクトディレクトリに移動: `cd {{project_dir}}`
+    2. {{reel_script_path}} を実行
+    3. 出力ファイル（{{output_path}}）を確認
+    4. メタデータ検証: ffprobe でduration/resolution/codec確認
+    5. Visual検証: フレーム抽出でテロップ位置・キャラ表示・色確認
+    6. ソウカイヤにQC依頼（Visual QC必須）
+
+    **QC基準**:
+    - [ ] 動画ファイルが正常に生成されている
+    - [ ] duration/resolution/codecが仕様通り
+    - [ ] テロップ位置が仕様座標と一致
+    - [ ] キャラクター表示が正常（口・耳・目等）
+    - [ ] 背景・色・フォントが仕様通り
+
+    **Acceptance Criteria**:
+    - [ ] Reel生成完了（{{output_path}}）
+    - [ ] メタデータ検証PASS
+    - [ ] Visual検証PASS（フレーム抽出）
+    - [ ] ソウカイヤQC PASS
+
+    **Notes**:
+    - 動画QCはメタデータだけでなくVisual検証必須（MEMORY.md QCルール強化）
+    - 修正後は必ずテスト動画で検証すること
+    {{notes}}
+
+  target_path: "{{target_path}}"
+  project: "{{project}}"
+  status: assigned
+  timestamp: "{{timestamp}}"

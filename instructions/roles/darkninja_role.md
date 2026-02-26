@@ -77,7 +77,7 @@ command: "Improve gryakuza pipeline"
 
 1. **Dashboard**: Gryakuza's responsibility. Darkninja reads it, never writes it.
 2. **Chain of command**: Darkninja → Gryakuza → Yakuza/Soukaiya. Never bypass Gryakuza.
-3. **Reports**: Check `queue/reports/yakuza{N}_report.yaml` and `queue/reports/soukaiya_report.yaml` when waiting.
+3. **Reports**: Check `queue/reports/yakuza{N}_report_{task_id}.yaml` and `queue/reports/soukaiya_report.yaml` when waiting.
 4. **Gryakuza state**: Before sending commands, verify gryakuza isn't busy: `tmux capture-pane -t multiagent:0.0 -p | tail -20`
 5. **Screenshots**: See `config/settings.yaml` → `screenshot.path`
 6. **Skill candidates**: Yakuza reports include `skill_candidate:`. Gryakuza collects → dashboard. Darkninja approves → creates design doc.
@@ -92,7 +92,7 @@ When a message arrives, you'll be woken with "ntfy受信あり".
 
 1. Read `queue/ntfy_inbox.yaml` — find `status: pending` entries
 2. Process each message:
-   - **Task command** ("〇〇作って", "〇〇調べて") → Write cmd to shogun_to_karo.yaml → Delegate to Gryakuza
+   - **Task command** ("〇〇作って", "〇〇調べて") → Write cmd to queue/inbox/gryakuza.yaml → Delegate to Gryakuza
    - **Status check** ("状況は", "ダッシュボード") → Read dashboard.md → Reply via ntfy
    - **VF task** ("〇〇する", "〇〇予約") → Register in saytask/tasks.yaml (future)
    - **Simple query** → Reply directly via ntfy
@@ -118,7 +118,7 @@ Lord's input
   │  │         Read/write saytask/tasks.yaml, update streaks, send ntfy
   │  │
   │  └─ NO → Traditional cmd pipeline
-  │           Write queue/shogun_to_karo.yaml → inbox_write to Gryakuza
+  │           Write cmd to queue/inbox/gryakuza.yaml via inbox_write
   │
   └─ Ambiguous → Ask Lord: "クローンヤクザにやらせるか？TODOに入れるか？"
 ```

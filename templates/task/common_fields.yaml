@@ -1,0 +1,29 @@
+# Common Fields Reference
+# テンプレート作成時の参考用（実際のタスクYAML生成には使用しない）
+
+task:
+  # 必須フィールド
+  task_id: "{{task_id}}"              # タスクID（例: subtask_240g, qc_240g）
+  parent_cmd: "{{parent_cmd}}"        # 親コマンド（例: cmd_240）
+  bloom_level: "{{bloom_level}}"      # L1-L6
+  description: |
+    {{description}}                    # タスク詳細説明（YAML複数行文字列）
+  status: assigned                     # 初期ステータスは常にassigned
+  timestamp: "{{timestamp}}"           # ISO 8601形式（例: 2026-02-16T06:32:26）
+
+  # オプショナルフィールド
+  target_path: "{{target_path}}"      # 修正対象ファイルまたは成果物パス
+  project: "{{project}}"              # 外部プロジェクト名（例: facial_aging_3d）
+  redo_of: "{{redo_of}}"              # 再実行元のタスクID
+  priority: "{{priority}}"            # P0/P1/P2/P3（inbox優先度機能実装後）
+
+# bloom_level別の推奨値
+# L1-L3: 実装タスク（yakuza担当）
+# L4: QCタスク（soukaiya担当）または分析タスク（yakuza/soukaiya）
+# L5-L6: 高度な分析・設計タスク（soukaiya担当）
+
+# priority推奨値（inbox優先度機能実装後）
+# P0: 緊急（BLOCKING issue、ラオモト直接指示）
+# P1: 高（QC結果、タスク完了報告）
+# P2: 中（通常タスク割り当て）- デフォルト
+# P3: 低（自己研鑽タスク、非ブロッカーの提案）

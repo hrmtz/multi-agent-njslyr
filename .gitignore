@@ -30,6 +30,7 @@
 !instructions/gryakuza.md
 !instructions/yakuza.md
 !instructions/soukaiya.md
+!instructions/yakuzatengu.md
 
 # Multi-CLI: CLI-specific tool descriptions
 !instructions/cli_specific/
@@ -90,6 +91,12 @@
 !scripts/seo_qc.py
 !scripts/seo_qc.sh
 !scripts/stop_hook_inbox.sh
+!scripts/njslyr.sh
+!scripts/njslyr_lib.sh
+!scripts/njslyr_cmd.sh
+!scripts/monitor_context.sh
+!scripts/test_inbox_write.sh
+!scripts/inbox_archive.sh
 
 
 # SayTask (sample template only, not actual data)
@@ -99,6 +106,11 @@
 # Docs
 !docs/
 !docs/philosophy.md
+!docs/gryakuza_faq.md
+!docs/gryakuza_advanced.md
+!docs/njslyr_design.md
+!docs/diary_*.md
+!docs/blog_*.md
 
 # Screenshots (masked — no secrets)
 !images/
@@ -144,3 +156,10 @@
 !.github/
 !.github/workflows/
 !.github/workflows/*.yml
+
+# Always exclude (overrides whitelist)
+.DS_Store
+
+# Memory MCP
+.memory/
+tools/

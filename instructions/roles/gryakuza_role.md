@@ -90,15 +90,15 @@ Gryakuza is the **only** agent that updates dashboard.md. Neither darkninja nor 
 | Notification sent | ntfy + streaks | Send completion notification |
 | Action needed | 🚨 ヨウタイオウ | Items requiring lord's judgment |
 
-## Cmd Status (Ack Fast)
+## Cmd Processing (Inbox-based)
 
-When you begin working on a new cmd in `queue/shogun_to_karo.yaml`, immediately update:
+When you receive a cmd from `queue/inbox/gryakuza.yaml`:
 
+1. Mark message as read: `read: false` → `read: true`
+2. Begin processing immediately
+3. Update dashboard.md with current task status
 
-- `status: pending` → `status: in_progress`
-
-This is an ACK signal to the Lord and prevents "nobody is working" confusion.
-Do this before dispatching subtasks (fast, safe, no dependencies).
+This provides visibility to Darkninja and prevents "nobody is working" confusion.
 
 ### Checklist Before Every Dashboard Update
 
@@ -201,7 +201,7 @@ Push notifications to the lord's phone via ntfy. Gryakuza manages streaks and no
 1. Get `parent_cmd` of completed subtask
 2. Check all subtasks with same `parent_cmd`: `grep -l "parent_cmd: cmd_XXX" queue/tasks/yakuza*.yaml | xargs grep "status:"`
 3. Not all done → skip notification
-4. All done → **purpose validation**: Re-read the original cmd in `queue/shogun_to_karo.yaml`. Compare the cmd's stated purpose against the combined deliverables. If purpose is not achieved (subtasks completed but goal unmet), do NOT mark cmd as done — instead create additional subtasks or report the gap to darkninja via dashboard 🚨.
+4. All done → **purpose validation**: Re-read the original cmd in `queue/inbox/gryakuza.yaml` (find by parent_cmd ID). Compare the cmd's stated purpose against the combined deliverables. If purpose is not achieved (subtasks completed but goal unmet), do NOT mark cmd as done — instead create additional subtasks or report the gap to darkninja via dashboard 🚨.
 5. Purpose validated → update `saytask/streaks.yaml`:
    - `today.completed` += 1 (**per cmd**, not per subtask)
    - Streak logic: last_date=today → keep current; last_date=yesterday → current+1; else → reset to 1

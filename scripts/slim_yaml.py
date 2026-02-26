@@ -3,14 +3,16 @@
 YAML Slimming Utility
 
 Removes completed/archived items from YAML queue files to maintain performance.
-- For Karo: Archives done/cancelled commands from shogun_to_karo.yaml
 - For all agents: Archives read: true messages from inbox files
+- Archives completed task YAMLs (7+ days old)
+- Archives old report YAMLs (7+ days old)
 """
 
 import sys
 import yaml
+import shutil
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def load_yaml(filepath):
@@ -41,55 +43,100 @@ def get_timestamp():
     return datetime.now().strftime('%Y%m%d%H%M%S')
 
 
-def slim_shogun_to_karo():
-    """Archive done/cancelled commands from shogun_to_karo.yaml."""
+def parse_timestamp(ts_str):
+    """Parse ISO timestamp string to datetime object."""
+    if not ts_str:
+        return None
+    try:
+        # Handle various ISO formats
+        for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%S%z', '%Y-%m-%d %H:%M:%S']:
+            try:
+                return datetime.strptime(ts_str.split('+')[0].split('.')[0], fmt)
+            except ValueError:
+                continue
+        return None
+    except Exception:
+        return None
+
+
+def is_old_enough(timestamp_str, days=7):
+    """Check if timestamp is older than specified days."""
+    ts = parse_timestamp(timestamp_str)
+    if not ts:
+        return False
+    cutoff = datetime.now() - timedelta(days=days)
+    return ts < cutoff
+
+
+def slim_tasks(agent_id):
+    """Archive completed task YAMLs that are 7+ days old."""
     queue_dir = Path(__file__).resolve().parent.parent / 'queue'
-    archive_dir = queue_dir / 'archive'
-    shogun_file = queue_dir / 'shogun_to_karo.yaml'
+    archive_dir = queue_dir / 'archive' / 'tasks'
+    archive_dir.mkdir(parents=True, exist_ok=True)
 
-    if not shogun_file.exists():
-        print(f"Warning: {shogun_file} not found", file=sys.stderr)
+    tasks_dir = queue_dir / 'tasks'
+    if not tasks_dir.exists():
         return True
 
-    data = load_yaml(shogun_file)
-    if not data or 'queue' not in data:
+    archived_count = 0
+
+    # Process yakuza{N}.yaml task files
+    for task_file in tasks_dir.glob('yakuza*.yaml'):
+        data = load_yaml(task_file)
+        if not data or 'task' not in data:
+            continue
+
+        task = data['task']
+        status = task.get('status', '')
+        timestamp = task.get('timestamp', '')
+
+        # Archive if completed AND 7+ days old
+        if status == 'completed' and is_old_enough(timestamp, days=7):
+            archive_file = archive_dir / f'{task_file.stem}_{get_timestamp()}.yaml'
+            try:
+                shutil.move(str(task_file), str(archive_file))
+                archived_count += 1
+                print(f"Archived task: {task_file.name} -> {archive_file.name}", file=sys.stderr)
+            except Exception as e:
+                print(f"Error archiving {task_file}: {e}", file=sys.stderr)
+
+    if archived_count > 0:
+        print(f"Archived {archived_count} completed task(s)", file=sys.stderr)
+    return True
+
+
+def slim_reports():
+    """Archive report YAMLs that are 7+ days old."""
+    queue_dir = Path(__file__).resolve().parent.parent / 'queue'
+    archive_dir = queue_dir / 'archive' / 'reports'
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    reports_dir = queue_dir / 'reports'
+    if not reports_dir.exists():
         return True
 
-    queue = data.get('queue', [])
-    if not isinstance(queue, list):
-        print("Error: queue is not a list", file=sys.stderr)
-        return False
+    archived_count = 0
 
-    # Separate active and archived commands
-    active = []
-    archived = []
+    # Process all report YAML files
+    for report_file in reports_dir.glob('*.yaml'):
+        data = load_yaml(report_file)
+        if not data:
+            continue
 
-    for cmd in queue:
-        status = cmd.get('status', 'unknown')
-        if status in ['done', 'cancelled']:
-            archived.append(cmd)
-        else:
-            active.append(cmd)
+        timestamp = data.get('timestamp', '')
 
-    # If nothing to archive, return success without writing
-    if not archived:
-        return True
+        # Archive if 7+ days old
+        if is_old_enough(timestamp, days=7):
+            archive_file = archive_dir / f'{report_file.stem}_{get_timestamp()}.yaml'
+            try:
+                shutil.move(str(report_file), str(archive_file))
+                archived_count += 1
+                print(f"Archived report: {report_file.name} -> {archive_file.name}", file=sys.stderr)
+            except Exception as e:
+                print(f"Error archiving {report_file}: {e}", file=sys.stderr)
 
-    # Write archived commands to timestamped file
-    archive_timestamp = get_timestamp()
-    archive_file = archive_dir / f'shogun_to_karo_{archive_timestamp}.yaml'
-
-    archive_data = {'queue': archived}
-    if not save_yaml(archive_file, archive_data):
-        return False
-
-    # Update main file with active commands only
-    data['queue'] = active
-    if not save_yaml(shogun_file, data):
-        print(f"Error: Failed to update {shogun_file}, but archive was created", file=sys.stderr)
-        return False
-
-    print(f"Archived {len(archived)} commands to {archive_file.name}", file=sys.stderr)
+    if archived_count > 0:
+        print(f"Archived {archived_count} report(s)", file=sys.stderr)
     return True
 
 
@@ -154,17 +201,23 @@ def main():
 
     agent_id = sys.argv[1]
 
-    # Ensure archive directory exists
+    # Ensure archive directories exist
     archive_dir = Path(__file__).resolve().parent.parent / 'queue' / 'archive'
     archive_dir.mkdir(parents=True, exist_ok=True)
+    (archive_dir / 'tasks').mkdir(parents=True, exist_ok=True)
+    (archive_dir / 'reports').mkdir(parents=True, exist_ok=True)
 
-    # Process shogun_to_karo if this is Karo
-    if agent_id == 'karo':
-        if not slim_shogun_to_karo():
+    # Process inbox
+    if not slim_inbox(agent_id):
+        sys.exit(1)
+
+    # Process tasks (for yakuza agents only)
+    if agent_id.startswith('yakuza'):
+        if not slim_tasks(agent_id):
             sys.exit(1)
 
-    # Process inbox for all agents
-    if not slim_inbox(agent_id):
+    # Process reports (run once for any agent)
+    if not slim_reports():
         sys.exit(1)
 
     sys.exit(0)

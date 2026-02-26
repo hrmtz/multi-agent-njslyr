@@ -1,0 +1,51 @@
+task:
+  task_id: "{{task_id}}"
+  parent_cmd: "{{parent_cmd}}"
+  bloom_level: "{{bloom_level}}"
+  description: |
+    **テスト実行: {{title}}**
+
+    **背景**:
+    {{background}}
+
+    **テスト対象**:
+    {{test_target}}
+
+    **テストスクリプト**:
+    {{test_script_path}}
+
+    **作業手順**:
+    1. **Preflight check**（CLAUDE.md Test Rules）:
+       - 依存ツール確認（python3, bash, ffprobe等）
+       - 前提条件確認（エージェント稼働状態、テストデータ存在等）
+       - 満たせない場合は実行せず報告
+    2. テストスクリプト実行: `{{test_command}}`
+    3. 実行結果をキャプチャ（stdout/stderr）
+    4. テスト結果サマリー確認（PASS/FAIL/SKIP件数）
+    5. SKIP件数が1以上なら「テスト未完了」扱い
+    6. ソウカイヤに報告YAML提出
+
+    **テスト項目**:
+    {{test_items}}
+
+    **PASS基準**:
+    - 全テストケースPASS（SKIP=0必須）
+    - エラー出力なし
+    - 期待される結果と一致
+
+    **Acceptance Criteria**:
+    - [ ] Preflight check完了（依存ツール・前提条件確認）
+    - [ ] テスト実行完了（{{test_script_path}}）
+    - [ ] 全テストケースPASS（SKIP=0）
+    - [ ] テスト結果報告YAML作成
+    - [ ] ソウカイヤQC PASS
+
+    **Notes**:
+    - **SKIP = FAIL**: テスト報告でSKIP数が1以上なら「テスト未完了」扱い（CLAUDE.md Test Rules）
+    - Preflight checkで前提条件を満たせない場合、実行せずに報告
+    - テスト失敗時は、エラー詳細を報告YAMLに記載
+    {{notes}}
+
+  target_path: "{{target_path}}"
+  status: assigned
+  timestamp: "{{timestamp}}"

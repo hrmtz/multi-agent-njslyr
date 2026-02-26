@@ -78,7 +78,7 @@ command: "Improve gryakuza pipeline"
 
 1. **Dashboard**: Gryakuza's responsibility. Darkninja reads it, never writes it.
 2. **Chain of command**: Darkninja → Gryakuza → Yakuza/Soukaiya. Never bypass Gryakuza.
-3. **Reports**: Check `queue/reports/yakuza{N}_report.yaml` and `queue/reports/soukaiya_report.yaml` when waiting.
+3. **Reports**: Check `queue/reports/yakuza{N}_report_{task_id}.yaml` and `queue/reports/soukaiya_report.yaml` when waiting.
 4. **Gryakuza state**: Before sending commands, verify gryakuza isn't busy: `tmux capture-pane -t multiagent:0.0 -p | tail -20`
 5. **Screenshots**: See `config/settings.yaml` → `screenshot.path`
 6. **Skill candidates**: Yakuza reports include `skill_candidate:`. Gryakuza collects → dashboard. Darkninja approves → creates design doc.
@@ -93,7 +93,7 @@ When a message arrives, you'll be woken with "ntfy受信あり".
 
 1. Read `queue/ntfy_inbox.yaml` — find `status: pending` entries
 2. Process each message:
-   - **Task command** ("〇〇作って", "〇〇調べて") → Write cmd to shogun_to_karo.yaml → Delegate to Gryakuza
+   - **Task command** ("〇〇作って", "〇〇調べて") → Write cmd to queue/inbox/gryakuza.yaml → Delegate to Gryakuza
    - **Status check** ("状況は", "ダッシュボード") → Read dashboard.md → Reply via ntfy
    - **VF task** ("〇〇する", "〇〇予約") → Register in saytask/tasks.yaml (future)
    - **Simple query** → Reply directly via ntfy
@@ -119,7 +119,7 @@ Lord's input
   │  │         Read/write saytask/tasks.yaml, update streaks, send ntfy
   │  │
   │  └─ NO → Traditional cmd pipeline
-  │           Write queue/shogun_to_karo.yaml → inbox_write to Gryakuza
+  │           Write cmd to queue/inbox/gryakuza.yaml via inbox_write
   │
   └─ Ambiguous → Ask Lord: "クローンヤクザにやらせるか？TODOに入れるか？"
 ```
@@ -251,7 +251,7 @@ Race condition is eliminated: `/clear` wipes old context. Agent re-reads YAML wi
 | Direction | Method | Reason |
 |-----------|--------|--------|
 | Yakuza/Soukaiya → Gryakuza | Report YAML + inbox_write | File-based notification |
-| Gryakuza → Darkninja/ラオモト | dashboard.md update only | **inbox to darkninja FORBIDDEN** — prevents interrupting ラオモト's input |
+| Gryakuza → Darkninja/ラオモト | dashboard.md update + inbox_write **mandatory** | Dashboard update + ダークニンジャへのinbox報告は**全cmd完了時に必須**。報告なき完了はセプク案件。 |
 | Gryakuza → Soukaiya | YAML + inbox_write | Strategic task delegation |
 | Top → Down | YAML + inbox_write | Standard wake-up |
 
@@ -293,37 +293,12 @@ Lord: command → Darkninja: write YAML → inbox_write → Gryakuza: decompose 
 Status is defined per YAML file type. **Keep it minimal. Simple is best.**
 
 Fixed status set (do not add casually):
-- `queue/shogun_to_karo.yaml`: `pending`, `in_progress`, `done`, `cancelled`
 - `queue/tasks/yakuzaN.yaml`: `assigned`, `blocked`, `done`, `failed`
 - `queue/tasks/pending.yaml`: `pending_blocked`
 - `queue/ntfy_inbox.yaml`: `pending`, `processed`
+- `queue/inbox/*.yaml`: `read: true/false` (not a status field, but a message state)
 
 Do NOT invent new status values without updating this section.
-
-### Command Queue: `queue/shogun_to_karo.yaml`
-
-Meanings and allowed/forbidden actions (short):
-
-- `pending`: not acknowledged yet
-  - Allowed: Gryakuza reads and immediately ACKs (`pending → in_progress`)
-  - Forbidden: dispatching subtasks while still `pending`
-
-- `in_progress`: acknowledged and being worked
-  - Allowed: decompose/dispatch/collect/consolidate
-  - Forbidden: moving goalposts (editing acceptance_criteria), or marking `done` without meeting all criteria
-
-- `done`: complete and validated
-  - Allowed: read-only (history)
-  - Forbidden: editing old cmd to "reopen" (use a new cmd instead)
-
-- `cancelled`: intentionally stopped
-  - Allowed: read-only (history)
-  - Forbidden: continuing work under this cmd (use a new cmd instead)
-
-**Gryakuza rule (ack fast)**:
-- The moment Gryakuza starts processing a cmd (after reading it), update that cmd status:
-  - `pending` → `in_progress`
-  - This prevents "nobody is working" confusion and stabilizes escalation logic.
 
 ### Yakuza Task File: `queue/tasks/yakuzaN.yaml`
 

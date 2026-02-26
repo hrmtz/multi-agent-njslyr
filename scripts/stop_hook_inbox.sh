@@ -35,17 +35,40 @@ fi
 
 # ─── Identify agent ───
 AGENT_ID=""
+SESSION_NAME=""
 if [ -n "${TMUX_PANE:-}" ]; then
     AGENT_ID=$(tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}' 2>/dev/null || true)
+    SESSION_NAME=$(tmux display-message -t "$TMUX_PANE" -p '#{session_name}' 2>/dev/null || true)
+fi
+
+# TMUX_PANE inheritance bug workaround: TMUX_PANE may point to a different
+# session's pane if darkninja was launched from within a multiagent pane.
+# Reliably detect current session via $TMUX env var (session_id field),
+# since tmux display-message -p without -t fails when no client is attached.
+ACTUAL_SESSION=""
+if [ -n "${TMUX:-}" ]; then
+    # $TMUX format: socket_path,server_pid,session_id_num
+    SESSION_NUM=$(echo "$TMUX" | awk -F',' '{print $NF}')
+    # tmux session_id format is "$N" (dollar sign + number)
+    ACTUAL_SESSION=$(tmux list-sessions -F '#{session_id} #{session_name}' 2>/dev/null \
+        | grep "^\\\$${SESSION_NUM} " | awk '{print $2}' || true)
 fi
 
 # If we can't identify the agent, approve (exit 0 with no output = approve)
-if [ -z "$AGENT_ID" ]; then
+if [ -z "$AGENT_ID" ] && [ -z "$ACTUAL_SESSION" ]; then
     exit 0
 fi
 
 # ─── Darkninja: always approve (human-controlled) ───
-if [ "$AGENT_ID" = "darkninja" ]; then
+# Triple-check: agent_id, session from TMUX_PANE, and actual current session.
+# Handles TMUX_PANE inheritance bug where darkninja session inherits TMUX_PANE
+# pointing to another agent's pane (e.g. yakuza4 → SESSION_NAME="multiagent").
+if [ "$AGENT_ID" = "darkninja" ] || [ "$SESSION_NAME" = "darkninja" ] || [ "$ACTUAL_SESSION" = "darkninja" ]; then
+    exit 0
+fi
+
+# If AGENT_ID is empty but we have an actual session, use session as fallback
+if [ -z "$AGENT_ID" ]; then
     exit 0
 fi
 
@@ -57,7 +80,8 @@ if [ ! -f "$INBOX" ]; then
 fi
 
 # Count unread messages using grep (fast, no python dependency)
-UNREAD_COUNT=$(grep -c 'read: false' "$INBOX" 2>/dev/null || true)
+# Pattern: '^ *read: false$' to avoid false positives from message content
+UNREAD_COUNT=$(grep -c '^ *read: false$' "$INBOX" 2>/dev/null || true)
 
 if [ "${UNREAD_COUNT:-0}" -eq 0 ]; then
     exit 0
