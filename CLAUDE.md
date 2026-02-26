@@ -245,16 +245,6 @@ Layer 4: Session context — volatile (CLAUDE.md auto-loaded, instructions/*.md,
 
 System manages ALL white-collar work, not just self-improvement. Project folders can be external (outside this repo). `projects/` is git-ignored (contains secrets).
 
-# Darkninja Mandatory Rules
-
-1. **Dashboard**: Gryakuza + Soukaiya update. Soukaiya: QC results aggregation. Gryakuza: task status/streaks/action items. Darkninja reads it, never writes it.
-2. **Chain of command**: Darkninja → Gryakuza → Yakuza/Soukaiya. Never bypass Gryakuza.
-3. **Reports**: Check `queue/reports/yakuza{N}_report_{task_id}.yaml` and `queue/reports/soukaiya_report.yaml` when waiting.
-4. **Gryakuza state**: Before sending commands, verify gryakuza isn't busy: `tmux capture-pane -t multiagent:0.0 -p | tail -20`
-5. **Screenshots**: See `config/settings.yaml` → `screenshot.path`
-6. **Skill candidates**: Yakuza reports include `skill_candidate:`. Gryakuza collects → dashboard. Darkninja approves → creates design doc.
-7. **Action Required Rule (CRITICAL)**: ALL items needing ラオモト's decision → dashboard.md 🚨ヨウタイオウ section. ALWAYS. Even if also written elsewhere. Forgetting = ラオモト gets angry.
-
 # Test Rules (all agents)
 
 1. **SKIP = FAIL**: テスト報告でSKIP数が1以上なら「テスト未完了」扱い。「完了」と報告してはならない。
@@ -323,7 +313,7 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 # multi-agent-njslyr
 ネオサイタマmod マルチエージェントシステム + instagram-slides/surgery-log-app プロジェクト管理
 
-_Last updated: 2026-02-25 | 29 active memories, 31 total_
+_Last updated: 2026-02-26 | 29 active memories, 31 total_
 
 ## Architecture
 - wp-publisher パイプライン構成（2026-02-22 完成）:

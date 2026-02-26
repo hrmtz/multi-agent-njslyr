@@ -533,8 +533,12 @@ send_cli_command() {
         sleep 0.3
         timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
     else
-        # Claude CLI: send text+Enter together to prevent autocomplete interception
-        timeout 5 tmux send-keys -t "$PANE_TARGET" "$actual_cmd" Enter 2>/dev/null
+        # Claude CLI: text → Escape (dismiss autocomplete) → Enter
+        timeout 5 tmux send-keys -t "$PANE_TARGET" "$actual_cmd" 2>/dev/null
+        sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
+        sleep 0.1
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
     fi
 
     # /clear needs extra wait time before follow-up
@@ -586,8 +590,12 @@ send_context_reset() {
         sleep 0.3
         timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
     else
-        # Claude CLI: send text+Enter together to prevent autocomplete interception
-        timeout 5 tmux send-keys -t "$PANE_TARGET" "$reset_cmd" Enter 2>/dev/null
+        # Claude CLI: text → Escape (dismiss autocomplete) → Enter
+        timeout 5 tmux send-keys -t "$PANE_TARGET" "$reset_cmd" 2>/dev/null
+        sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
+        sleep 0.1
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
     fi
 
     # Poll until agent becomes idle (prompt ready) instead of fixed sleep.
@@ -794,13 +802,10 @@ send_wakeup() {
     fi
 
     if timeout 5 tmux send-keys -t "$PANE_TARGET" "$nudge" 2>/dev/null; then
-        # P1-3: CLI-specific send-keys delay optimization
-        # claude: 0.1s (tested stable), codex: 0.3s (TUI requires longer gap)
-        local delay_sec=0.3
-        if [[ "$effective_cli_for_nudge" == "claude" ]]; then
-            delay_sec=0.1
-        fi
-        sleep "$delay_sec"
+        # Claude CLI: Escape to dismiss autocomplete before Enter
+        sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
+        sleep 0.1
         timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
         echo "[$(date)] Wake-up sent to $AGENT_ID (${unread_count} unread)" >&2
         return 0
@@ -871,6 +876,8 @@ send_wakeup_with_escape() {
     fi
     if timeout 5 tmux send-keys -t "$PANE_TARGET" "$nudge" 2>/dev/null; then
         sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
+        sleep 0.1
         timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
         echo "[$(date)] Escape+スリケン sent to $AGENT_ID (${unread_count} unread, cli=$effective_cli, C-c=$c_ctrl_state)" >&2
         return 0
