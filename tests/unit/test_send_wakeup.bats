@@ -300,8 +300,8 @@ MOCK
     [ "$status" -eq 0 ]
     echo "$output" | grep -q "PHASE1_NUDGE"
     grep -q "send-keys.*inbox2" "$MOCK_LOG"
-    # No Escape-based nudge
-    ! grep -q "send-keys.*Escape" "$MOCK_LOG"
+    # Phase 1 now sends Escape to dismiss autocomplete before Enter
+    grep -q "send-keys.*Escape" "$MOCK_LOG"
 }
 
 # --- T-ESC-003: unread 2-4min → Escape+nudge ---

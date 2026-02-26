@@ -107,10 +107,11 @@ except Exception as e:
 " 2>/dev/null || echo "inbox未読${UNREAD_COUNT}件あり")
 
 # ─── Block the stop — feed inbox info back to agent ───
-python3 -c "
-import json
+# Pass SUMMARY via env var to avoid shell injection into Python string literals
+HOOK_SUMMARY="$SUMMARY" python3 -c "
+import json, os
 count = $UNREAD_COUNT
-summary = '''$SUMMARY'''
+summary = os.environ.get('HOOK_SUMMARY', '')
 reason = f'inbox未読{count}件あり。queue/inbox/${AGENT_ID}.yamlを読んで処理せよ。内容: {summary}'
 print(json.dumps({'decision': 'block', 'reason': reason}))
 " 2>/dev/null || echo "{\"decision\":\"block\",\"reason\":\"inbox未読${UNREAD_COUNT}件あり。queue/inbox/${AGENT_ID}.yamlを読んで処理せよ。\"}"

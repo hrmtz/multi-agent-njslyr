@@ -72,7 +72,8 @@ check_cooldown() {
 
     if [[ -f "$cooldown_file" ]]; then
         local last
-        last=$(cat "$cooldown_file")
+        last=$(cat "$cooldown_file" 2>/dev/null || echo "0")
+        [[ "$last" =~ ^[0-9]+$ ]] || last=0  # 空/非数値なら0扱い（cooldown済みと同義）
         local elapsed=$((now - last))
         if [[ $elapsed -lt $COOLDOWN ]]; then
             return 1  # Still in cooldown

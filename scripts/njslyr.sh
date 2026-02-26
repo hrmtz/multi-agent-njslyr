@@ -253,7 +253,7 @@ update_dashboard() {
                     next
                 }
                 {print}
-            ' "$DASHBOARD" > "$temp_file" && mv "$temp_file" "$DASHBOARD"
+            ' "$DASHBOARD" > "$temp_file" && mv "$temp_file" "$DASHBOARD" || rm -f "$temp_file"
         else
             {
                 echo ""
@@ -291,12 +291,20 @@ inject_barikidorink() {
     if [ "$current_model" = "Opus" ]; then
         echo "[barikidorink] ${agent_id:-$pane} already Opus, skipping model switch" >&2
     else
-        tmux send-keys -t "$pane" "/model opus" Enter
+        tmux send-keys -t "$pane" "/model opus"
+        sleep 0.3
+        tmux send-keys -t "$pane" Escape
+        sleep 0.1
+        tmux send-keys -t "$pane" Enter
         sleep 0.5
         tmux set-option -p -t "$pane" @model_name "Opus"
         tmux select-pane -t "$pane" -P 'bg=#1a002e'
         sleep 0.3
-        tmux send-keys -t "$pane" "/clear" Enter
+        tmux send-keys -t "$pane" "/clear"
+        sleep 0.3
+        tmux send-keys -t "$pane" Escape
+        sleep 0.1
+        tmux send-keys -t "$pane" Enter
         sleep 5
     fi
 
@@ -309,19 +317,31 @@ inject_barikidorink() {
         local unread_count
         unread_count=$(grep -c 'read: false' "$_project_root/queue/inbox/${agent_id}.yaml" 2>/dev/null || echo "0")
         if [ "$unread_count" -gt 0 ]; then
-            tmux send-keys -t "$pane" "inbox${unread_count}" Enter
+            tmux send-keys -t "$pane" "inbox${unread_count}"
+            sleep 0.3
+            tmux send-keys -t "$pane" Escape
+            sleep 0.1
+            tmux send-keys -t "$pane" Enter
         fi
     fi
 }
 
 detox_barikidorink() {
     local pane=$1
-    tmux send-keys -t "$pane" "/model sonnet" Enter
+    tmux send-keys -t "$pane" "/model sonnet"
+    sleep 0.3
+    tmux send-keys -t "$pane" Escape
+    sleep 0.1
+    tmux send-keys -t "$pane" Enter
     sleep 0.5
     tmux set-option -p -t "$pane" @model_name "Sonnet"
     tmux select-pane -t "$pane" -P 'bg=default'
     sleep 0.3
-    tmux send-keys -t "$pane" "/clear" Enter
+    tmux send-keys -t "$pane" "/clear"
+    sleep 0.3
+    tmux send-keys -t "$pane" Escape
+    sleep 0.1
+    tmux send-keys -t "$pane" Enter
 }
 
 # ─── Validate @agent_id assignments (2026-02-18 恒久対策) ───
@@ -390,8 +410,8 @@ get_task_status() {
 
     # Extract status field from YAML (simple grep approach)
     local status
-    status=$(grep '^ *status: ' "$task_yaml" | head -1 | sed 's/.*status: *//;s/ *$//' || echo "idle")
-    echo "$status"
+    status=$(grep '^ *status: ' "$task_yaml" | head -1 | sed 's/.*status: *//;s/ *$//' || true)
+    echo "${status:-idle}"
 }
 
 # ─── Get pane target for agent ───
@@ -740,7 +760,7 @@ check_cooldown() {
     [[ ! -f "$cooldown_file" ]] && return 0  # No cooldown active
 
     local last_ts
-    last_ts=$(cat "$cooldown_file")
+    last_ts=$(cat "$cooldown_file" 2>/dev/null); last_ts="${last_ts:-0}"
 
     local now
     now=$(date +%s)
@@ -816,7 +836,7 @@ should_spawn_yakuzatengu() {
         [[ ! "$yid" =~ ^yakuza[0-9]+$ ]] && continue
         local idle_file="$STATE_DIR/njslyr_${yid}_idle_start"
         [[ ! -f "$idle_file" ]] && continue
-        local idle_start; idle_start=$(cat "$idle_file")
+        local idle_start; idle_start=$(cat "$idle_file" 2>/dev/null); idle_start="${idle_start:-0}"
         local idle_elapsed=$((now - idle_start))
         [[ $idle_elapsed -ge 300 ]] && idle_count=$(( idle_count + 1 ))
     done < <(get_monitored_agents)
@@ -846,7 +866,7 @@ spawn_yakuzatengu() {
         [[ ! "$yid" =~ ^yakuza[0-9]+$ ]] && continue
         local idle_file="$STATE_DIR/njslyr_${yid}_idle_start"
         if [[ -f "$idle_file" ]]; then
-            local idle_start; idle_start=$(cat "$idle_file")
+            local idle_start; idle_start=$(cat "$idle_file" 2>/dev/null); idle_start="${idle_start:-0}"
             local idle_elapsed=$((now - idle_start))
             if [[ $idle_elapsed -gt $max_idle ]]; then
                 max_idle=$idle_elapsed
@@ -1296,7 +1316,7 @@ check_agent() {
     local stage1_ts_file="$STATE_DIR/njslyr_${agent_id}_stage1_last"
     if [[ -f "$stage1_ts_file" ]]; then
         local stage1_ts
-        stage1_ts=$(cat "$stage1_ts_file")
+        stage1_ts=$(cat "$stage1_ts_file" 2>/dev/null); stage1_ts="${stage1_ts:-0}"
         local now
         now=$(date +%s)
         local elapsed=$((now - stage1_ts))
@@ -1332,7 +1352,7 @@ check_agent() {
     local stage2_ts_file="$STATE_DIR/njslyr_${agent_id}_stage2_last"
     if [[ -f "$stage2_ts_file" ]]; then
         local stage2_ts
-        stage2_ts=$(cat "$stage2_ts_file")
+        stage2_ts=$(cat "$stage2_ts_file" 2>/dev/null); stage2_ts="${stage2_ts:-0}"
         local now
         now=$(date +%s)
         local elapsed=$((now - stage2_ts))

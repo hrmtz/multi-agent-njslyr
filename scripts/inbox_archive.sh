@@ -20,6 +20,10 @@ KEEP=5
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --keep)
+            if [ -z "${2:-}" ]; then
+                echo "ERROR: --keep requires a value" >&2
+                exit 1
+            fi
             KEEP="$2"
             shift 2
             ;;

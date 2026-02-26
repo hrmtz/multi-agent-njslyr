@@ -14,6 +14,30 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# 並行起動防止（flock）
+# ═══════════════════════════════════════════════════════════════════════════════
+LOCKFILE="$SCRIPT_DIR/.yokubari.lock"
+exec 9>"$LOCKFILE"
+if ! flock -n 9; then
+    echo "グワーッ！yokubari.sh は既に実行中！二重起動はケジメ案件！" >&2
+    exit 1
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# trap/cleanup: 中断時のリソース解放
+# ═══════════════════════════════════════════════════════════════════════════════
+_cleanup() {
+    local exit_code=$?
+    # ロックファイル解放（fd 9 はプロセス終了時に自動クローズ）
+    rm -f "$LOCKFILE"
+    # バックグラウンドジョブがあれば待機（中断シグナルで残らないように）
+    jobs -p 2>/dev/null | xargs -r kill 2>/dev/null || true
+    wait 2>/dev/null || true
+    exit "$exit_code"
+}
+trap _cleanup EXIT INT TERM
+
 # macOS (Darwin): GNU coreutils via Homebrew gnubin
 if [[ "$(uname -s)" == "Darwin" ]]; then
     export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
@@ -23,9 +47,12 @@ fi
 LANG_SETTING="ja"
 SHELL_SETTING="bash"
 if [ -f "./config/settings.yaml" ]; then
-    LANG_SETTING=$(grep "^language:" ./config/settings.yaml 2>/dev/null | awk '{print $2}' || echo "ja")
-    SHELL_SETTING=$(grep "^shell:" ./config/settings.yaml 2>/dev/null | awk '{print $2}' || echo "bash")
+    LANG_SETTING=$(grep "^language:" ./config/settings.yaml 2>/dev/null | awk '{print $2}' || true)
+    SHELL_SETTING=$(grep "^shell:" ./config/settings.yaml 2>/dev/null | awk '{print $2}' || true)
 fi
+# 空文字列ガード: grep無マッチ時にawkが空を返すケースに対応
+LANG_SETTING="${LANG_SETTING:-ja}"
+SHELL_SETTING="${SHELL_SETTING:-bash}"
 
 # CLI Adapter読み込み（Multi-CLI Support）
 if [ -f "$SCRIPT_DIR/lib/cli_adapter.sh" ]; then
@@ -69,7 +96,7 @@ log_success() {
 }
 
 log_war() {
-    echo -e "\033[1;31m【カラテ】\033[0m $1"
+    echo -e "\033[1;31m【カラテ】\033[0m $1" >&2
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -144,7 +171,7 @@ while [[ $# -gt 0 ]]; do
                 SHELL_OVERRIDE="$2"
                 shift 2
             else
-                echo "グワーッ！ -shell オプションには bash または zsh を指定せよ"
+                echo "グワーッ！ -shell オプションには bash または zsh を指定せよ" >&2
                 exit 1
             fi
             ;;
@@ -201,8 +228,8 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         *)
-            echo "アイエエエ！不明なオプション: $1"
-            echo "./yokubari.sh -h でヘルプを表示せよ"
+            echo "アイエエエ！不明なオプション: $1" >&2
+            echo "./yokubari.sh -h でヘルプを表示せよ" >&2
             exit 1
             ;;
     esac
@@ -213,7 +240,7 @@ if [ -n "$SHELL_OVERRIDE" ]; then
     if [[ "$SHELL_OVERRIDE" == "bash" || "$SHELL_OVERRIDE" == "zsh" ]]; then
         SHELL_SETTING="$SHELL_OVERRIDE"
     else
-        echo "グワーッ！ -shell には bash か zsh を指定せよ（指定値: $SHELL_OVERRIDE）。ケジメ案件！"
+        echo "グワーッ！ -shell には bash か zsh を指定せよ（指定値: $SHELL_OVERRIDE）。ケジメ案件！" >&2
         exit 1
     fi
 fi
@@ -319,12 +346,20 @@ inject_barikidorink() {
     if [ "$current_model" = "Opus" ]; then
         echo "[barikidorink] ${agent_id:-$pane} already Opus, skipping model switch" >&2
     else
-        tmux send-keys -t "$pane" "/model opus" Enter
+        tmux send-keys -t "$pane" "/model opus"
+        sleep 0.3
+        tmux send-keys -t "$pane" Escape
+        sleep 0.1
+        tmux send-keys -t "$pane" Enter
         sleep 0.5
         tmux set-option -p -t "$pane" @model_name "Opus"
         tmux select-pane -t "$pane" -P 'bg=#1a002e'
         sleep 0.3
-        tmux send-keys -t "$pane" "/clear" Enter
+        tmux send-keys -t "$pane" "/clear"
+        sleep 0.3
+        tmux send-keys -t "$pane" Escape
+        sleep 0.1
+        tmux send-keys -t "$pane" Enter
         sleep 5
     fi
 
@@ -337,19 +372,31 @@ inject_barikidorink() {
         local unread_count
         unread_count=$(grep -c 'read: false' "$_project_root/queue/inbox/${agent_id}.yaml" 2>/dev/null || echo "0")
         if [ "$unread_count" -gt 0 ]; then
-            tmux send-keys -t "$pane" "inbox${unread_count}" Enter
+            tmux send-keys -t "$pane" "inbox${unread_count}"
+            sleep 0.3
+            tmux send-keys -t "$pane" Escape
+            sleep 0.1
+            tmux send-keys -t "$pane" Enter
         fi
     fi
 }
 
 detox_barikidorink() {
     local pane=$1
-    tmux send-keys -t "$pane" "/model sonnet" Enter
+    tmux send-keys -t "$pane" "/model sonnet"
+    sleep 0.3
+    tmux send-keys -t "$pane" Escape
+    sleep 0.1
+    tmux send-keys -t "$pane" Enter
     sleep 0.5
     tmux set-option -p -t "$pane" @model_name "Sonnet"
     tmux select-pane -t "$pane" -P 'bg=default'
     sleep 0.3
-    tmux send-keys -t "$pane" "/clear" Enter
+    tmux send-keys -t "$pane" "/clear"
+    sleep 0.3
+    tmux send-keys -t "$pane" Escape
+    sleep 0.1
+    tmux send-keys -t "$pane" Enter
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -619,15 +666,15 @@ echo ""
 # STEP 4: tmux の存在確認
 # ═══════════════════════════════════════════════════════════════════════════════
 if ! command -v tmux &> /dev/null; then
-    echo ""
-    echo "  ╔════════════════════════════════════════════════════════╗"
-    echo "  ║  アイエエエ！tmuxが存在しない！ナムアミダブツ！       ║"
-    echo "  ║  [ERROR] tmux not found!                              ║"
-    echo "  ╠════════════════════════════════════════════════════════╣"
-    echo "  ║  カラテが足りていない。まずfirst_setup.shを実行せよ:  ║"
-    echo "  ║     ./first_setup.sh                                  ║"
-    echo "  ╚════════════════════════════════════════════════════════╝"
-    echo ""
+    echo "" >&2
+    echo "  ╔════════════════════════════════════════════════════════╗" >&2
+    echo "  ║  アイエエエ！tmuxが存在しない！ナムアミダブツ！       ║" >&2
+    echo "  ║  [ERROR] tmux not found!                              ║" >&2
+    echo "  ╠════════════════════════════════════════════════════════╣" >&2
+    echo "  ║  カラテが足りていない。まずfirst_setup.shを実行せよ:  ║" >&2
+    echo "  ║     ./first_setup.sh                                  ║" >&2
+    echo "  ╚════════════════════════════════════════════════════════╝" >&2
+    echo "" >&2
     exit 1
 fi
 
@@ -638,9 +685,8 @@ log_war "👑 ラオモトのホンジンをコンストラクト中...イヤー
 
 # darkninja セッションがなければ作る（-s 時もここで必ず darkninja が存在するようにする）
 # window 0 のみ作成し -n main で名前付け（第二 window にするとアタッチ時に空ペインが開くため 1 window に限定）
-if ! tmux has-session -t darkninja 2>/dev/null; then
-    tmux new-session -d -s darkninja -n main
-fi
+# TOCTOU防止: has-session → new-session の間の競合を回避し、直接作成を試みる
+tmux new-session -d -s darkninja -n main 2>/dev/null || true
 
 # スマホ等の小画面クライアント対策: aggressive-resize + latest
 # css関数がスマホ用に専用ウィンドウを作るので、PCのウィンドウに干渉しない
@@ -666,15 +712,15 @@ log_war "⚔️ グレーターヤクザ・ヤクザ・ソウカイヤをジェ�
 
 # 最初のペイン作成
 if ! tmux new-session -d -s multiagent -n "agents" 2>/dev/null; then
-    echo ""
-    echo "  ╔════════════════════════════════════════════════════════════╗"
-    echo "  ║  グワーッ！multiagentセッション生成に失敗！              ║"
-    echo "  ║  アイエエエ！既存セッションのゴーストが残留している！    ║"
-    echo "  ╠════════════════════════════════════════════════════════════╣"
-    echo "  ║  ジョウキョウ確認:  tmux ls                              ║"
-    echo "  ║  爆発四散させる:   tmux kill-session -t multiagent       ║"
-    echo "  ╚════════════════════════════════════════════════════════════╝"
-    echo ""
+    echo "" >&2
+    echo "  ╔════════════════════════════════════════════════════════════╗" >&2
+    echo "  ║  グワーッ！multiagentセッション生成に失敗！              ║" >&2
+    echo "  ║  アイエエエ！既存セッションのゴーストが残留している！    ║" >&2
+    echo "  ╠════════════════════════════════════════════════════════════╣" >&2
+    echo "  ║  ジョウキョウ確認:  tmux ls                              ║" >&2
+    echo "  ║  爆発四散させる:   tmux kill-session -t multiagent       ║" >&2
+    echo "  ╚════════════════════════════════════════════════════════════╝" >&2
+    echo "" >&2
     exit 1
 fi
 
@@ -816,9 +862,9 @@ if [ "$SETUP_ONLY" = false ]; then
         fi
     else
         if ! command -v claude &> /dev/null; then
-            log_info "アイエエエ！claudeコマンドが存在しない！カラテが足りていない！"
-            echo "  first_setup.shを実行してカラテを補充せよ:"
-            echo "    ./first_setup.sh"
+            log_war "アイエエエ！claudeコマンドが存在しない！カラテが足りていない！"
+            echo "  first_setup.shを実行してカラテを補充せよ:" >&2
+            echo "    ./first_setup.sh" >&2
             exit 1
         fi
     fi
@@ -965,10 +1011,10 @@ NINJA_EOF
         [ -f "$SCRIPT_DIR/queue/inbox/${agent}.yaml" ] || echo "messages:" > "$SCRIPT_DIR/queue/inbox/${agent}.yaml"
     done
 
-    # 既存のwatcherと孤児inotifywaitをkill
-    pkill -f "inbox_watcher.sh" 2>/dev/null || true
-    pkill -f "inotifywait.*queue/inbox" 2>/dev/null || true
-    pkill -f "fswatch.*queue/inbox" 2>/dev/null || true
+    # 既存のwatcherと孤児inotifywaitをkill（プロジェクト固有パターンで誤kill防止）
+    pkill -f "${SCRIPT_DIR}/scripts/inbox_watcher.sh" 2>/dev/null || true
+    pkill -f "inotifywait.*${SCRIPT_DIR}/queue/inbox" 2>/dev/null || true
+    pkill -f "fswatch.*${SCRIPT_DIR}/queue/inbox" 2>/dev/null || true
     sleep 0.3  # 【Phase 1高速化: 1秒→0.3秒】
 
     # ダークニンジャのwatcher（安全モード: エスカレーション無効、event-drivenのみ）

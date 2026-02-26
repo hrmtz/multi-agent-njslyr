@@ -99,6 +99,13 @@ scan_all_agents() {
         | grep -v '^$' | sort -u)
 }
 
+# Graceful shutdown: log and exit cleanly on SIGTERM/SIGINT
+cleanup() {
+    echo "[watcher_supervisor] shutting down (signal received)" >&2
+    exit 0
+}
+trap cleanup SIGTERM SIGINT
+
 while true; do
     # UNIFIED-HIGH-008: rescan_watchers signal
     # spawn_tengu() / despawn_tengu() touch this file to trigger immediate rescanning.

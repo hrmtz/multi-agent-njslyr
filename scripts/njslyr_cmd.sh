@@ -37,6 +37,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 STATE_DIR="$PROJECT_ROOT/.state"
+mkdir -p "$STATE_DIR"
 
 # ─── 共有ライブラリ読み込み（njslyr.sh関数群を継承）───
 # shellcheck source=scripts/njslyr_lib.sh
@@ -61,9 +62,10 @@ cmd_suriken() {
     fi
 
     # メッセージがある場合はinbox_write（from="njslyr"固定）
+    # inbox_write失敗でnudge送信を中断しないよう || true（nudgeが主目的）
     if [[ -n "$message" ]]; then
         bash "$SCRIPT_DIR/inbox_write.sh" \
-            "$agent_id" "$message" "$type" "njslyr" "" "$priority"
+            "$agent_id" "$message" "$type" "njslyr" "" "$priority" || true
     fi
 
     # unread数を確認してnudgeテキストを生成

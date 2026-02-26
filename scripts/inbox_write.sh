@@ -85,8 +85,10 @@ while [ $attempt -lt $max_attempts ]; do
         flock -w 5 200 || exit 1
 
         # Add message via python3 (unified YAML handling)
+        # Pass user-controlled strings via env vars to avoid shell injection
+        INBOX_CONTENT="$CONTENT" INBOX_TASK_YAML="$TASK_YAML_PATH" \
         python3 -c "
-import yaml, sys
+import yaml, sys, os
 
 try:
     # Load existing inbox
@@ -99,19 +101,20 @@ try:
     if not data.get('messages'):
         data['messages'] = []
 
-    # Add new message
+    # Add new message (content/task_yaml via env vars — safe from shell injection)
     new_msg = {
         'id': '$MSG_ID',
         'from': '$FROM',
         'timestamp': '$TIMESTAMP',
         'type': '$TYPE',
         'priority': '$PRIORITY',
-        'content': '''$CONTENT''',
+        'content': os.environ['INBOX_CONTENT'],
         'read': False
     }
     # Add task_yaml_path if provided (for task_assigned messages)
-    if '$TASK_YAML_PATH':
-        new_msg['task_yaml_path'] = '$TASK_YAML_PATH'
+    task_yaml = os.environ.get('INBOX_TASK_YAML', '')
+    if task_yaml:
+        new_msg['task_yaml_path'] = task_yaml
     data['messages'].append(new_msg)
 
     # Overflow protection: keep max 50 messages

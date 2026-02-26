@@ -63,6 +63,10 @@ apt_install() {
 
 # スクリプトのディレクトリを取得
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -z "$SCRIPT_DIR" ]; then
+    echo "[ERROR] スクリプトのディレクトリを特定できませんでした" >&2
+    exit 1
+fi
 cd "$SCRIPT_DIR"
 
 # クロスプラットフォーム sed -i (BSD vs GNU)
@@ -77,6 +81,19 @@ sedi() {
 # 結果追跡用変数
 RESULTS=()
 HAS_ERROR=false
+
+# 同時実行防止 + 中断時クリーンアップ
+LOCK_FILE="$SCRIPT_DIR/.first_setup.lock"
+if ! mkdir "$LOCK_FILE" 2>/dev/null; then
+    log_error "first_setup.sh は既に実行中です"
+    echo "        完了後も表示される場合: rm -rf '$LOCK_FILE'"
+    exit 1
+fi
+cleanup() {
+    rm -rf "$LOCK_FILE" 2>/dev/null
+}
+trap cleanup EXIT
+trap 'echo ""; log_error "セットアップが中断されました"; exit 130' INT TERM
 
 echo ""
 echo "  ╔══════════════════════════════════════════════════════════════╗"
@@ -217,7 +234,7 @@ if command -v node &> /dev/null; then
 
     # バージョンチェック（18以上推奨）
     NODE_MAJOR=$(echo "$NODE_VERSION" | cut -d'.' -f1 | tr -d 'v')
-    if [ "$NODE_MAJOR" -lt 18 ]; then
+    if [[ "$NODE_MAJOR" =~ ^[0-9]+$ ]] && [ "$NODE_MAJOR" -lt 18 ]; then
         log_warn "Node.js 18以上を推奨します（現在: $NODE_VERSION）"
         RESULTS+=("Node.js: OK (v$NODE_MAJOR - 要アップグレード推奨)")
     else

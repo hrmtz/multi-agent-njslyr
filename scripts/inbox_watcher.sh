@@ -52,13 +52,27 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
         exit 1
     fi
 
-    # Initialize inbox if not exists
+    # Initialize inbox if not exists (atomic: write to tmp then rename to avoid TOCTOU)
     if [ ! -f "$INBOX" ]; then
         mkdir -p "$(dirname "$INBOX")"
-        echo "messages: []" > "$INBOX"
+        _init_tmp="${INBOX}.init.$$"
+        echo "messages: []" > "$_init_tmp"
+        # mv -n: no-clobber — if another process created the file first, keep theirs
+        mv -n "$_init_tmp" "$INBOX" 2>/dev/null || rm -f "$_init_tmp"
     fi
 
     echo "[$(date)] inbox_watcher started — agent: $AGENT_ID, pane: $PANE_TARGET, cli: $CLI_TYPE" >&2
+
+    # ─── Graceful shutdown trap ───
+    # Daemon process must log exit and clean up cache files.
+    _inbox_watcher_cleanup() {
+        local exit_code=$?
+        echo "[$(date)] inbox_watcher stopping — agent: $AGENT_ID (exit_code=$exit_code)" >&2
+        # Clean up busy-detection cache (stale cache causes false-busy on restart)
+        rm -f "${CACHE_DIR}/inbox_watcher_busy_cache_${AGENT_ID}" 2>/dev/null
+        exit "$exit_code"
+    }
+    trap _inbox_watcher_cleanup EXIT INT TERM
 
     # Ensure file-watch tool is available (fswatch on macOS, inotifywait on Linux)
     if [[ "$_UNAME_S" == "Darwin" ]]; then
@@ -428,7 +442,7 @@ resolve_pane_target() {
     now=$(date +%s)
 
     # Cache hit: reuse if within TTL (5 seconds)
-    if [ -n "$_RESOLVE_CACHE_TARGET" ] && [ $(( now - _RESOLVE_CACHE_TS )) -lt 5 ]; then
+    if [ -n "$_RESOLVE_CACHE_TARGET" ] && [ "$(( now - _RESOLVE_CACHE_TS ))" -lt 5 ]; then
         PANE_TARGET="$_RESOLVE_CACHE_TARGET"
         return 0
     fi
@@ -688,10 +702,13 @@ agent_is_busy() {
 
         local cache_age=$((now - cache_mtime))
         if [ "$cache_age" -lt "$cache_ttl_sec" ]; then
-            # Cache hit — return cached value
+            # Cache hit — return cached value (validate: must be 0 or 1)
             local cached_result
             cached_result=$(cat "$cache_file" 2>/dev/null || echo "1")
-            return "$cached_result"
+            case "$cached_result" in
+                0|1) return "$cached_result" ;;
+                *) ;; # corrupted cache — fall through to actual check
+            esac
         fi
     fi
 
@@ -803,9 +820,12 @@ send_wakeup() {
     fi
 
     if timeout 5 tmux send-keys -t "$PANE_TARGET" "$nudge" 2>/dev/null; then
-        # Phase 1: text → Enter only (no Escape). Autocomplete may swallow Enter;
-        # Phase 2 escalation (send_wakeup_with_escape) handles that case.
+        # Phase 1: text → Escape (dismiss autocomplete) → Enter.
+        # Claude CLI autocomplete can swallow Enter if sent immediately after text.
+        # Escape dismisses the autocomplete popup before Enter is processed.
         sleep 0.3
+        timeout 5 tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
+        sleep 0.1
         timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
         echo "[$(date)] Wake-up sent to $AGENT_ID (${unread_count} unread)" >&2
         return 0
@@ -897,6 +917,7 @@ process_unread() {
     fast_info=$(get_unread_count_fast)
     local fast_count
     fast_count=$(echo "$fast_info" | python3 -c "import sys,json; print(json.load(sys.stdin).get('count',0))" 2>/dev/null)
+    fast_count="${fast_count:-0}"
 
     # P1-2: fast-path expansion — skip full read when unread=0, regardless of trigger type
     # (previously limited to timeout trigger only; now applies to event trigger as well)
@@ -967,10 +988,12 @@ for s in data.get('specials', []):
     # Send wake-up nudge for normal messages (with escalation)
     local normal_count
     normal_count=$(echo "$info" | python3 -c "import sys,json; print(json.load(sys.stdin).get('count',0))" 2>/dev/null)
+    normal_count="${normal_count:-0}"
 
     # Check if unread messages include task_assigned (for context reset)
     local has_task_assigned
     has_task_assigned=$(echo "$info" | python3 -c "import sys,json; print(1 if json.load(sys.stdin).get('has_task_assigned') else 0)" 2>/dev/null)
+    has_task_assigned="${has_task_assigned:-0}"
 
     if [ "$normal_count" -gt 0 ] 2>/dev/null; then
         local now
@@ -1096,7 +1119,8 @@ INOTIFY_TIMEOUT="${INOTIFY_TIMEOUT:-30}"
 
 while true; do
     # Orphan watcher check: paneが消失していたら自己終了（despawn_tengu後のゾンビwatcher防止）
-    if ! tmux list-panes -a -F '#{@agent_id}' | grep -qx "$AGENT_ID"; then
+    # timeout prevents hang if tmux server is unresponsive
+    if ! timeout 5 tmux list-panes -a -F '#{@agent_id}' 2>/dev/null | grep -qx "$AGENT_ID"; then
         echo "[inbox_watcher] pane for $AGENT_ID not found. Exiting orphan watcher." >&2
         exit 0
     fi

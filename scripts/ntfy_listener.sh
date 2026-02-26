@@ -138,7 +138,7 @@ PY
 
     # Cross-platform file locking: flock (Linux) or mkdir fallback (macOS)
     if command -v flock &>/dev/null; then
-        ( flock -w 5 200 || exit 1; _run_locked ) 200>"$LOCKFILE"
+        ( flock -w 5 200 || { echo "[ntfy_listener] lock timeout: ntfy_inbox busy for 5s" >&2; exit 1; }; _run_locked ) 200>"$LOCKFILE"
     else
         local lock_dir="${LOCKFILE}.d"
         local retries=10
@@ -154,6 +154,13 @@ PY
         rmdir "$lock_dir" 2>/dev/null
     fi
 }
+
+# Graceful shutdown: log and exit cleanly on SIGTERM/SIGINT
+cleanup() {
+    echo "[$(date)] [ntfy_listener] shutting down (signal received)" >&2
+    exit 0
+}
+trap cleanup SIGTERM SIGINT
 
 echo "[$(date)] ntfy listener started — topic: $TOPIC (auth: ${NTFY_TOKEN:+token}${NTFY_USER:+basic}${NTFY_TOKEN:-${NTFY_USER:-none}})" >&2
 
