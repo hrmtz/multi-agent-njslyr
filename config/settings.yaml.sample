@@ -18,6 +18,9 @@ machine:
   peer_host: mbp.ts        # Tailscale hostname of peer machine
   peer_project_root: /Users/yourname/project/multi-agent-njslyr
 
+# ntfy notification topic (required for cross-machine heartbeat)
+# ntfy_topic: "your-secret-topic-name"
+
 # Logging
 logging:
   level: info  # debug | info | warn | error

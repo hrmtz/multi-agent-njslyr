@@ -5,11 +5,13 @@ updated: "2026-02-07"
 description: "Kimi K2 CLI + tmux multi-agent parallel dev platform with ninja slayer cyberpunk hierarchy"
 
 hierarchy: "ラオモト (human) → Darkninja → Gryakuza → Yakuza 1-7 / Soukaiya"
+monitoring: "Master Tortoise (Ryzen) + Master Crane (MBP) → report to Gryakuza"
 communication: "YAML files + inbox mailbox system (event-driven, NO polling)"
 
 tmux_sessions:
   darkninja: { pane_0: darkninja }
   multiagent: { pane_0: gryakuza, pane_1-7: yakuza1-7, pane_8: soukaiya }
+  monitors: { pane_0: master_tortoise (ryzen) / master_crane (mbp) }
 
 files:
   config: config/projects.yaml          # Project list (summary)

@@ -67,6 +67,15 @@ if [ -f "./config/settings.yaml" ]; then
 fi
 MACHINE_ROLE="${MACHINE_ROLE:-ryzen}"
 
+# マシンロール依存の早期定義（CLEAN_MODEブロックで使用されるため、STEP 5より前に必要）
+if [[ "$MACHINE_ROLE" == "mbp" ]]; then
+    YAKUZA_MAX=3
+    MONITOR_AGENT="master_crane"
+else
+    YAKUZA_MAX=7
+    MONITOR_AGENT="master_tortoise"
+fi
+
 # CLI Adapter読み込み（Multi-CLI Support）
 if [ -f "$SCRIPT_DIR/lib/cli_adapter.sh" ]; then
     source "$SCRIPT_DIR/lib/cli_adapter.sh"
