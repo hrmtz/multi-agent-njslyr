@@ -9,7 +9,7 @@ Run Claude Code, OpenAI Codex, GitHub Copilot, and Kimi Code in parallel — orc
 [![GitHub Stars](https://img.shields.io/github/stars/hrmtz/multi-agent-njslyr?style=social)](https://github.com/hrmtz/multi-agent-njslyr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![v4.0 Infra Overhaul](https://img.shields.io/badge/v4.0-Infra_Overhaul-ff6600?style=flat-square)](https://github.com/hrmtz/multi-agent-njslyr)
-[![BATS 46/46](https://img.shields.io/badge/BATS-46%2F46_PASS-brightgreen?style=flat-square)]()
+[![BATS 264/264](https://img.shields.io/badge/BATS-264%2F264_PASS-brightgreen?style=flat-square)]()
 
 [English](README.md) | [Japanese](README_ja.md)
 
@@ -303,7 +303,7 @@ multi-agent-njslyr/
 │   ├── tengu-spawn/           # Yakuza Tengu lifecycle
 │   └── skill-creator/         # Meta: create new skills
 │
-├── tests/                     # BATS test suite (46 tests)
+├── tests/                     # BATS test suite (264 tests)
 ├── config/                    # Settings, projects, auth
 ├── CLAUDE.md                  # Auto-loaded by Claude Code
 ├── AGENTS.md                  # Auto-loaded by GitHub Copilot
@@ -376,6 +376,15 @@ mcp__memory__read_graph()
 ---
 
 ## Changelog
+
+### v4.1 — Quality & Performance Overhaul
+
+- **WSL2/macOS cross-platform** (cmd_270) — 42 files audited, 16 fixes: `sedi()` portable sed, `HOMEBREW_PREFIX` dynamic resolution, `flock` PATH/fallback for macOS, `date` format compatibility, `md5sum`/`md5` fallback
+- **Full refactoring** (cmd_271) — Dead code removal, function extraction (`get_latest_task_yaml()`, `launch_agent()`, `launch_watcher()`, `apt_install()`), sleep optimization 4.0→1.4s, ShellCheck zero across all 13 scripts
+- **Defensive programming** (cmd_272 R1) — 31 fixes: empty-value guards, trap/cleanup, TOCTOU race conditions, shell injection defense, flock improvements. Autocomplete interception fix (text→Escape→Enter pattern, 11 locations)
+- **Performance optimization** (cmd_272 R2) — 100+ fork/subshell eliminated per cycle: `inbox_watcher.sh` 85% fork reduction (~70→~10/cycle), python3 fully eliminated from hot paths, `cat`→`$(<file)`, pipe consolidation (grep|awk|sed→single awk), dirname→parameter expansion, settings.yaml single-read cache
+- **4 known bugs fixed** — TC6 (metrics path), TC8 (shutdown theme), TC8-2 (explosion format), T-ESC-002 (Phase1 Escape)
+- **264 BATS tests** (up from 46) — unit 260 + integration 4, zero skip, zero regression
 
 ### v4.0 — Infrastructure Overhaul
 
