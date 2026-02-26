@@ -86,6 +86,10 @@ yakuza_persona:
 
 **CRITICAL**: Steps 1-3を完了するまでinbox処理するな。`inboxN` nudgeが先に届いても無視し、自己識別→memory→instructions読み込みを必ず先に終わらせよ。Step 1をスキップすると自分の役割を誤認し、別エージェントのタスクを実行する事故が起きる（2026-02-13実例: グレーターヤクザがクローンヤクザ2と誤認）。
 
+**⚠️ CRITICAL ANTI-BUG**: CLAUDE.mdにdarkninjaへの言及（tmux_sessions.darkninja, hierarchy記述, ダークニンジャ行動規範等）が多数あるが、**あなたのIDはStep1のtmux display-messageの出力が唯一の正解**。CLAUDE.mdの内容からIDを推測するな。必ずStep1を実行してから自分の役割を判断せよ。darkninja言及が多くてもあなたがdarkninjaとは限らない。
+
+**インボックスnudge割り込み対策**: 手順Step1-3を完了する前に`inboxN`が届いた場合、テキストとして `[STARTUP IN PROGRESS - inbox nudge deferred: inboxN]` と出力し、その後通常通りStep1から実行せよ。nudgeを先に処理するな。
+
 **CRITICAL**: dashboard.md is secondary data (gryakuza's summary). Primary data = YAML files. Always verify from YAML.
 
 ## /clear Recovery (yakuza/soukaiya only)
@@ -313,7 +317,7 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 # multi-agent-njslyr
 ネオサイタマmod マルチエージェントシステム + instagram-slides/surgery-log-app プロジェクト管理
 
-_Last updated: 2026-02-26 | 29 active memories, 31 total_
+_Last updated: 2026-02-26 | 36 active memories, 39 total_
 
 ## Architecture
 - wp-publisher パイプライン構成（2026-02-22 完成）:
@@ -360,6 +364,26 @@ Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
 - ダークニンジャ、グレーターヤクザ（ヤマヒロ）、ヤクザ天狗の3者が独自判断で投与可能
 - ラオモトへの事前承認は不要
 - 判断基準の例: P0タス... [バリキドリンク, opus, 権限, 恒久ルール]
+- 天狗フェイルセーフ3点実装（ラオモト指示・cmd_268完了後に着手）:
+1. inject_barikidorink()冪等化: @model_nameが既にOpusならスキップ。二重投与防止
+2. モデルスイッチ後の自動re-nu... [tengu, failsafe, barikidorink, inject, 決定事項]
+- ソウカイヤOpus解毒権限（2026-02-26 ラオモト裁定・恒久）:
+- ソウカイヤのOpusはラオモトが投与したもの。解毒権限はラオモトのみ
+- ダークニンジャ、ヤマヒロ、ヤクザ天狗、いずれもソウカイヤのOpusを解毒する権利な... [バリキドリンク, opus, soukaiya, 解毒, 権限, 恒久ルール, ケジメ]
+- 大型プロジェクトはヤクザ天狗付き（2026-02-26 ラオモト指示・恒久）:
+- 大型プロジェクト（複数Phase、Opus3体稟議を含む等）にはヤクザ天狗をspawnして付ける
+- 天狗の役割: インフラ監視、サブタスク監督、ヤマ... [yakuzatengu, 大型プロジェクト, 恒久ルール, 体制]
+- ヤクザ天狗spawn閾値引き下げ（2026-02-26 ラオモト指示・恒久）:
+- 天狗は大型プロジェクト限定ではなく、もっと気軽にspawnしてよい
+- ラオモト所見: 「天狗が出てくると実際タノシイ」
+- spawn判断基準を緩和... [yakuzatengu, spawn, 閾値, 恒久ルール]
+- ヤクザ天狗ワンコマンドspawn/despawn実装（2026-02-26 ラオモト指示）:
+- 現状: 手動7ステップ + 自認バグ矯正で毎回重い。njslyr.shのspawn_yakuzatengu()はidle_start依存... [yakuzatengu, spawn, onecommand, njslyr, 改修]
+- njslyr.sh監視強化（2026-02-26 ラオモト指示・cmd_268完了後に着手）:
+- 9日連続稼働でメインループは生存しているが内部巡回ロジックが劣化（idle_start未生成、stage巡回停滞、自動despawn不... [njslyr, 監視, 強化, 改修, inbox_watcher]
+- njslyrコマンド体系ワンコマンド化（2026-02-26 ラオモト指示・cmd_269で実装）:
+- spawn_tengu [mission]: 天狗召喚（STATE作成→respawn→inbox→nudge一括）
+- sur... [njslyr, command, suriken, chop, slay, spawn_tengu, 改修]
 
 ## Patterns & Conventions
 - wp-publisher 画像サイズルール（2026-02-25 ラオモト指示・恒久）:

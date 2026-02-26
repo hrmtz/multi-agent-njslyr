@@ -248,16 +248,43 @@ notify_darkninja() {
 
 # ─── バリキドリンク投与・解除ヘルパー関数 ───
 # Usage:
-#   inject_barikidorink "multiagent:0.1"   # yakuza1にOpus投与
-#   detox_barikidorink "multiagent:0.1"    # yakuza1をSonnetに復帰
+#   inject_barikidorink "multiagent:0.1"                              # yakuza1にOpus投与
+#   inject_barikidorink "multiagent:0.1" "queue/tasks/yakuza1.yaml"   # 投与 + タスク割り当て
+#   detox_barikidorink "multiagent:0.1"                               # yakuza1をSonnetに復帰
 inject_barikidorink() {
     local pane=$1
-    tmux send-keys -t "$pane" "/model opus" Enter
-    sleep 0.5
-    tmux set-option -p -t "$pane" @model_name "Opus"
-    tmux select-pane -t "$pane" -P 'bg=#1a002e'
-    sleep 0.3
-    tmux send-keys -t "$pane" "/clear" Enter
+    local task_yaml="${2:-}"
+    local _project_root="${PROJECT_ROOT:-$SCRIPT_DIR}"
+    local agent_id
+    agent_id=$(tmux show-options -pv -t "$pane" @agent_id 2>/dev/null || echo "")
+
+    # Idempotency: skip model switch if already Opus
+    local current_model
+    current_model=$(tmux show-options -pv -t "$pane" @model_name 2>/dev/null || echo "")
+    if [ "$current_model" = "Opus" ]; then
+        echo "[barikidorink] ${agent_id:-$pane} already Opus, skipping model switch" >&2
+    else
+        tmux send-keys -t "$pane" "/model opus" Enter
+        sleep 0.5
+        tmux set-option -p -t "$pane" @model_name "Opus"
+        tmux select-pane -t "$pane" -P 'bg=#1a002e'
+        sleep 0.3
+        tmux send-keys -t "$pane" "/clear" Enter
+        sleep 5
+    fi
+
+    # Task assignment via inbox_write (inbox_watcher handles nudge automatically)
+    if [ -n "$task_yaml" ] && [ -n "$agent_id" ]; then
+        bash "$_project_root/scripts/inbox_write.sh" "$agent_id" \
+            "タスクYAMLを読んで作業開始せよ。" task_assigned "yakuzatengu" "$task_yaml" "P0"
+    elif [ "$current_model" != "Opus" ] && [ -n "$agent_id" ]; then
+        # Re-nudge: no task_yaml given, manually check inbox unread and send nudge
+        local unread_count
+        unread_count=$(grep -c 'read: false' "$_project_root/queue/inbox/${agent_id}.yaml" 2>/dev/null || echo "0")
+        if [ "$unread_count" -gt 0 ]; then
+            tmux send-keys -t "$pane" "inbox${unread_count}" Enter
+        fi
+    fi
 }
 
 detox_barikidorink() {
