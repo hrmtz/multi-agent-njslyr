@@ -38,6 +38,18 @@ PEER_PROJECT_ROOT=$(awk '/^  peer_project_root:/ {print $2; exit}' "$SETTINGS")
 
 MACHINE_ROLE="${MACHINE_ROLE:-ryzen}"
 
+# ─── Input validation (SEC-001) ──────────────────────────────
+# Validate settings.yaml-derived values to prevent shell injection / path traversal
+
+if [[ -z "$PEER_HOST" ]] || [[ ! "$PEER_HOST" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+    echo "$LOG_TAG ERROR: Invalid PEER_HOST: '$PEER_HOST'" >&2
+    exit 1
+fi
+if [[ -z "$PEER_PROJECT_ROOT" ]] || [[ ! "$PEER_PROJECT_ROOT" =~ ^/[a-zA-Z0-9/_.-]+$ ]] || [[ "$PEER_PROJECT_ROOT" == *..* ]]; then
+    echo "$LOG_TAG ERROR: Invalid PEER_PROJECT_ROOT: '$PEER_PROJECT_ROOT'" >&2
+    exit 1
+fi
+
 # ─── Cleanup trap for temp files ─────────────────────────────
 # Track all temp files created during execution; clean on EXIT
 _CROSS_SYNC_TMPFILES=()
@@ -47,15 +59,6 @@ _cross_sync_cleanup() {
     done
 }
 trap _cross_sync_cleanup EXIT
-
-if [[ -z "$PEER_HOST" ]]; then
-    echo "$LOG_TAG ERROR: peer_host not configured in settings.yaml" >&2
-    exit 1
-fi
-if [[ -z "$PEER_PROJECT_ROOT" ]]; then
-    echo "$LOG_TAG ERROR: peer_project_root not configured in settings.yaml" >&2
-    exit 1
-fi
 
 # ─── Subcommand validation ────────────────────────────────────
 

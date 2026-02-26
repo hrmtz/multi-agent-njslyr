@@ -275,10 +275,26 @@ handle_heartbeat() {
     local host epoch agents load ctx_summary
     IFS=':' read -r host epoch agents load ctx_summary <<< "$payload"
 
-    # Input validation: host must be alphanumeric/underscore/hyphen only (path traversal防止)
+    # Input validation: all fields strictly validated (YAML injection防止)
     if [[ ! "$host" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
         echo "[$(date)] [ntfy_listener] WARNING: invalid heartbeat host: ${host:0:50}" >&2
         return 1
+    fi
+    if [[ ! "$epoch" =~ ^[0-9]+$ ]]; then
+        echo "[$(date)] [ntfy_listener] WARNING: invalid heartbeat epoch: ${epoch:0:30}" >&2
+        return 1
+    fi
+    if [[ ! "$agents" =~ ^[0-9]+$ ]]; then
+        echo "[$(date)] [ntfy_listener] WARNING: invalid heartbeat agents: ${agents:0:30}" >&2
+        return 1
+    fi
+    if [[ ! "$load" =~ ^[0-9.]+$ ]]; then
+        echo "[$(date)] [ntfy_listener] WARNING: invalid heartbeat load: ${load:0:30}" >&2
+        return 1
+    fi
+    if [[ ! "$ctx_summary" =~ ^(ok|warn|critical)$ ]]; then
+        echo "[$(date)] [ntfy_listener] WARNING: invalid heartbeat ctx_summary '${ctx_summary:0:30}', sanitizing to unknown" >&2
+        ctx_summary="unknown"
     fi
 
     echo "[$(date)] [ntfy_listener] heartbeat: host=$host agents=$agents load=$load ctx=$ctx_summary" >&2
