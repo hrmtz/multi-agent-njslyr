@@ -49,7 +49,7 @@ start_watcher_if_missing() {
         return 0
     fi
 
-    cli=$(tmux show-options -p -t "$pane" -v @agent_cli 2>/dev/null || echo "codex")
+    cli=$(tmux show-options -p -t "$pane" -v @agent_cli 2>/dev/null || echo "claude")
     nohup bash scripts/inbox_watcher.sh "$agent" "$pane" "$cli" >> "$log_file" 2>&1 &
 }
 
@@ -103,9 +103,13 @@ while true; do
     # spawn_tengu() / despawn_tengu() touch this file to trigger immediate rescanning.
     # macOS has no inotifywait, so we use polling (checked once per loop iteration).
     if [[ -f "$RESCAN_FILE" ]]; then
-        rm -f "$RESCAN_FILE"
+        # LOW-002: mv方式（アトミック操作）でrm後・scan前の新シグナル消失を防止
+        # mv失敗（同時実行等）はtrueで無視。その場合次ループで再検知される
+        mv "$RESCAN_FILE" "${RESCAN_FILE}.processing" 2>/dev/null || true
         echo "[watcher_supervisor] rescan_watchers signal detected. Running immediate scan."
         scan_all_agents
+        sleep 5
+        continue  # LOW-001: rescan後は通常スキャンをスキップ（2重スキャン防止）
     fi
 
     scan_all_agents

@@ -1505,3 +1505,192 @@ EOF
     # @agent_idがyakuza1に復元されているはず
     grep -q 'set-option.*@agent_id.*yakuza1' "$TEST_TMPDIR/tmux_calls.log"
 }
+
+# =============================================================================
+# BUG-IDLE-1〜4: check_agent_idle_v2() — idle判定ロジック
+# =============================================================================
+
+@test "BUG-IDLE-1: check_agent_idle_v2 does not idle during grace period" {
+    # モックtmuxをPATHに追加（get_pane_targetがtest_agentペインを返さないようにする）
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # clear_last = 現在時刻（grace期間内: 60秒前）
+    echo "$(($(date +%s) - 60))" > "$TEST_STATE_DIR/clear_last_test_agent"
+
+    # タスクYAML: status=idle
+    cat > "$TEST_TASKS_DIR/test_agent.yaml" << 'EOF'
+task:
+  task_id: idle_test_001
+  status: idle
+EOF
+
+    # inbox: unreadなし
+    echo "messages: []" > "$TEST_INBOX_DIR/test_agent.yaml"
+
+    # check_agent_idle_v2は1（not idle）を返すはず（grace期間内）
+    run check_agent_idle_v2 "test_agent"
+    [ "$status" -eq 1 ]
+}
+
+@test "BUG-IDLE-2: check_agent_idle_v2 returns idle after grace period with task status idle" {
+    # モックtmuxをPATHに追加
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # clear_last = 1000秒前（grace期間180秒を超過）
+    echo "$(($(date +%s) - 1000))" > "$TEST_STATE_DIR/clear_last_test_agent"
+
+    # タスクYAML: status=idle
+    cat > "$TEST_TASKS_DIR/test_agent.yaml" << 'EOF'
+task:
+  task_id: idle_test_002
+  status: idle
+EOF
+
+    # inbox: unreadなし
+    echo "messages: []" > "$TEST_INBOX_DIR/test_agent.yaml"
+
+    # check_agent_idle_v2は0（idle）を返すはず
+    run check_agent_idle_v2 "test_agent"
+    [ "$status" -eq 0 ]
+}
+
+@test "BUG-IDLE-3: check_agent_idle_v2 does not idle when inbox has unread messages" {
+    # モックtmuxをPATHに追加
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # clear_last = 1000秒前（grace期間超過）
+    echo "$(($(date +%s) - 1000))" > "$TEST_STATE_DIR/clear_last_test_agent"
+
+    # タスクYAML: status=idle
+    cat > "$TEST_TASKS_DIR/test_agent.yaml" << 'EOF'
+task:
+  task_id: idle_test_003
+  status: idle
+EOF
+
+    # inbox: 'read: false' のメッセージあり（has_inbox_unread()がtrueを返す）
+    cat > "$TEST_INBOX_DIR/test_agent.yaml" << 'EOF'
+messages:
+- content: test message
+  from: gryakuza
+  id: msg_test_001
+  priority: P2
+  read: false
+  timestamp: '2026-02-26T10:00:00'
+  type: task_assigned
+EOF
+
+    # check_agent_idle_v2は1（not idle）を返すはず（inbox unreadあり）
+    run check_agent_idle_v2 "test_agent"
+    [ "$status" -eq 1 ]
+}
+
+@test "BUG-IDLE-4: check_agent_idle_v2 does not idle when task status is assigned" {
+    # モックtmuxをPATHに追加
+    export PATH="$MOCK_TMUX_DIR:$PATH"
+
+    # clear_last = 1000秒前（grace期間超過）
+    echo "$(($(date +%s) - 1000))" > "$TEST_STATE_DIR/clear_last_test_agent"
+
+    # タスクYAML: status=assigned（作業中）
+    cat > "$TEST_TASKS_DIR/test_agent.yaml" << 'EOF'
+task:
+  task_id: idle_test_004
+  status: assigned
+EOF
+
+    # inbox: unreadなし
+    echo "messages: []" > "$TEST_INBOX_DIR/test_agent.yaml"
+
+    # check_agent_idle_v2は1（not idle）を返すはず（task_status≠idle）
+    run check_agent_idle_v2 "test_agent"
+    [ "$status" -eq 1 ]
+}
+
+# =============================================================================
+# BUG-STALE-1〜2: check_stale_state() — staleタイムスタンプファイル削除
+# =============================================================================
+
+@test "BUG-STALE-1: check_stale_state deletes stale stage_last file" {
+    # stage1_lastに2時間前のタイムスタンプを設定（STALE_THRESHOLD=3600秒を超過）
+    echo "$(($(date +%s) - 7200))" > "$TEST_STATE_DIR/njslyr_test_agent_stage1_last"
+
+    # check_stale_stateを実行（ファイル削除が行われる）
+    run check_stale_state "test_agent"
+    [ "$status" -eq 0 ]
+
+    # staleなstage1_lastが削除されているはず
+    [ ! -f "$TEST_STATE_DIR/njslyr_test_agent_stage1_last" ]
+}
+
+@test "BUG-STALE-2: check_stale_state keeps fresh stage_last file" {
+    # stage1_lastに10分前のタイムスタンプを設定（STALE_THRESHOLD=3600秒以内）
+    echo "$(($(date +%s) - 600))" > "$TEST_STATE_DIR/njslyr_test_agent_stage1_last"
+
+    # check_stale_stateを実行
+    run check_stale_state "test_agent"
+    [ "$status" -eq 0 ]
+
+    # 新しいstage1_lastは削除されずに残っているはず
+    [ -f "$TEST_STATE_DIR/njslyr_test_agent_stage1_last" ]
+}
+
+# =============================================================================
+# TC-B4-1: check_long_running_refresh — REFRESH_INTERVAL経過後にidle_startが削除される
+# =============================================================================
+
+@test "TC-B4-1: check_long_running_refresh deletes idle_start after REFRESH_INTERVAL" {
+    # Setup: njslyr_last_refresh = epoch 0（遠い過去 → elapsed >> REFRESH_INTERVAL=14400）
+    echo "0" > "$TEST_STATE_DIR/njslyr_last_refresh"
+
+    # idle_startファイルを作成し、mtimeを31分前に設定（find -mmin +30 の対象にする）
+    local idle_file="$TEST_STATE_DIR/njslyr_test_agent_idle_start"
+    touch "$idle_file"
+    local past_epoch=$(( $(date +%s) - 1860 ))  # 31分前
+    local past_time
+    past_time=$(date -j -f '%s' "$past_epoch" '+%Y%m%d%H%M.%S' 2>/dev/null \
+        || date -d "@$past_epoch" '+%Y%m%d%H%M.%S' 2>/dev/null)
+    [ -n "$past_time" ] && touch -t "$past_time" "$idle_file"
+
+    # check_long_running_refresh実行
+    run check_long_running_refresh
+    [ "$status" -eq 0 ]
+
+    # idle_startファイルが削除されているはず（>30分経過かつREFRESH_INTERVAL超過）
+    [ ! -f "$idle_file" ]
+
+    # njslyr_last_refreshが現在時刻で更新されているはず
+    local new_refresh
+    new_refresh=$(cat "$TEST_STATE_DIR/njslyr_last_refresh")
+    [[ "$new_refresh" =~ ^[0-9]+$ ]]
+    local now
+    now=$(date +%s)
+    [ "$new_refresh" -gt "$((now - 5))" ]
+}
+
+# =============================================================================
+# TC-B4-2: check_long_running_refresh — REFRESH_INTERVAL未経過時はリフレッシュしない
+# =============================================================================
+
+@test "TC-B4-2: check_long_running_refresh does not refresh when REFRESH_INTERVAL not elapsed" {
+    # Setup: njslyr_last_refresh = 現在時刻（elapsed ≈ 0 << REFRESH_INTERVAL=14400）
+    local now
+    now=$(date +%s)
+    echo "$now" > "$TEST_STATE_DIR/njslyr_last_refresh"
+
+    # idle_startファイルを作成（リフレッシュが走らないので削除されないはず）
+    local idle_file="$TEST_STATE_DIR/njslyr_test_agent_idle_start"
+    touch "$idle_file"
+
+    # check_long_running_refresh実行
+    run check_long_running_refresh
+    [ "$status" -eq 0 ]
+
+    # idle_startファイルが残っているはず（REFRESH_INTERVAL未経過 → リフレッシュなし）
+    [ -f "$idle_file" ]
+
+    # njslyr_last_refreshが更新されていないはず（セットした値のまま）
+    local current_refresh
+    current_refresh=$(cat "$TEST_STATE_DIR/njslyr_last_refresh")
+    [ "$current_refresh" -eq "$now" ]
+}

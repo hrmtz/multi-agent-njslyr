@@ -9,6 +9,11 @@
 
 set -euo pipefail
 
+# macOS (Darwin): GNU coreutils via Homebrew gnubin
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
+fi
+
 # ─── Configuration ───
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$SCRIPT_DIR")}"
@@ -34,6 +39,12 @@ STALE_THRESHOLD=3600       # 1 hour: stale state file age threshold (B-2 check_s
 # interfere with normal operation cycles (15-min interval * 16 = 4h), but short enough
 # to prevent STATE_DIR accumulation in multi-day continuous runs.
 REFRESH_INTERVAL=14400     # 4 hours: long-running refresh interval (B-4)
+
+# Assertion: STALE_THRESHOLD must be >= STAGE3_COOLDOWN * 2 (UNIFIED-MED-006)
+(( STALE_THRESHOLD >= STAGE3_COOLDOWN * 2 )) || {
+    echo "ERROR: STALE_THRESHOLD($STALE_THRESHOLD) < STAGE3_COOLDOWN*2($((STAGE3_COOLDOWN*2)))" >&2
+    exit 1
+}
 
 # ─── Session mode (default: once) ───
 # "once" = single execution (for cron/tmux timer)
@@ -480,9 +491,11 @@ check_restart_loop() {
     count=$(grep 'count:' "$restart_file" 2>/dev/null | sed 's/.*: *//' || echo "0")
     last_restart=$(grep 'last_restart:' "$restart_file" 2>/dev/null | sed 's/.*: *"//;s/".*//' || echo "1970-01-01T00:00:00")
 
-    # Convert timestamp to epoch
+    # Convert timestamp to epoch (macOS native date: -j flag; GNU date: -d flag)
     local last_restart_epoch
-    last_restart_epoch=$(date -j -f '%Y-%m-%dT%H:%M:%S' "$last_restart" '+%s' 2>/dev/null || echo "0")
+    last_restart_epoch=$(date -j -f '%Y-%m-%dT%H:%M:%S' "$last_restart" '+%s' 2>/dev/null \
+        || date -d "$last_restart" '+%s' 2>/dev/null \
+        || echo "0")
 
     local now
     now=$(date +%s)
@@ -1062,7 +1075,7 @@ despawn_yakuzatengu() {
 check_long_running_refresh() {
     local now last_refresh elapsed
     now=$(date +%s)
-    last_refresh=$(cat "$STATE_DIR/njslyr_last_refresh" 2>/dev/null || echo "0")
+    last_refresh=$(cat "$STATE_DIR/njslyr_last_refresh" 2>/dev/null); last_refresh="${last_refresh:-0}"
     elapsed=$(( now - last_refresh ))
 
     if [[ $elapsed -ge $REFRESH_INTERVAL ]]; then
@@ -1088,7 +1101,7 @@ check_stale_state() {
                       "$STATE_DIR/njslyr_${agent_id}_stage2_last" \
                       "$STATE_DIR/njslyr_${agent_id}_stage3_last"; do
         [[ ! -f "$state_file" ]] && continue
-        ts=$(cat "$state_file" 2>/dev/null || echo "0")
+        ts=$(cat "$state_file" 2>/dev/null); ts="${ts:-0}"
         age=$(( now - ts ))
         if [[ $age -gt $STALE_THRESHOLD ]]; then
             log "WARN: stale state file detected: $state_file (age: ${age}s). Removing."
@@ -1107,7 +1120,7 @@ check_agent_idle_v2() {
     # Step0: graceピリオドチェック（/clear直後180秒間はidle扱いしない）
     # clear_last_${agent_id} は A-2 chop() が echo "$(date +%s)" で更新する
     local clear_last grace_elapsed
-    clear_last=$(cat "$STATE_DIR/clear_last_${agent_id}" 2>/dev/null || echo 0)
+    clear_last=$(cat "$STATE_DIR/clear_last_${agent_id}" 2>/dev/null); clear_last="${clear_last:-0}"
     grace_elapsed=$(( $(date +%s) - clear_last ))
     if [[ $grace_elapsed -lt 180 ]]; then
         return 1  # grace period: /clear直後はidle扱いしない

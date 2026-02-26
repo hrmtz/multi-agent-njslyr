@@ -332,7 +332,7 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 # multi-agent-njslyr
 ネオサイタマmod マルチエージェントシステム + instagram-slides/surgery-log-app プロジェクト管理
 
-_Last updated: 2026-02-26 | 39 active memories, 42 total_
+_Last updated: 2026-02-26 | 40 active memories, 43 total_
 
 ## Architecture
 - wp-publisher パイプライン構成（2026-02-22 完成）:
@@ -461,6 +461,8 @@ Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
 - @agent_id誤設定バグ再発（2026-02-21）:
 - %95(yakuza3)が再びdarkninjaに誤設定されていた
 - 2026-02-18のケジメ案件と同じバグ。前回commit 8badf57でvalidate_a... [gotcha, tmux, agent_id, incident, priority]
+- バリキドリンク解毒は必ずdetox_barikidorink()を使え（2026-02-26 ケジメ案件）:
+- 手動 `tmux send-keys "/model sonnet"` は禁止。njslyr.shの `detox_ba... [バリキドリンク, detox, 解毒, njslyr, ケジメ, 恒久ルール]
 
 ## Current Progress
 - cmd_269 njslyrインフラ改修 進捗（2026-02-26 15:30時点）:

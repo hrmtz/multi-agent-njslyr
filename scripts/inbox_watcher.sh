@@ -1095,6 +1095,12 @@ process_unread_once
 INOTIFY_TIMEOUT="${INOTIFY_TIMEOUT:-30}"
 
 while true; do
+    # Orphan watcher check: paneが消失していたら自己終了（despawn_tengu後のゾンビwatcher防止）
+    if ! tmux list-panes -a -F '#{@agent_id}' | grep -qx "$AGENT_ID"; then
+        echo "[inbox_watcher] pane for $AGENT_ID not found. Exiting orphan watcher." >&2
+        exit 0
+    fi
+
     # Block until file is modified OR timeout (safety net for WSL2 / fswatch)
     # set +e: file-watch returns 2 on timeout, which would kill script under set -e
     set +e

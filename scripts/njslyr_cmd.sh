@@ -117,6 +117,7 @@ cmd_chop() {
             break
         fi
         # unreadなし → agent_is_busy()で確認してから再チェック
+        # pane_id (%XX形式) vs get_pane_target() のN形式。機能的問題なし。
         if agent_is_busy "$pane_id"; then
             break  # 作業中ならOK
         fi
@@ -190,6 +191,11 @@ cmd_spawn_tengu() {
     # remain-on-exit設定（恒久ルール: respawn-pane前に必須）
     tmux set-option -p -t "$pane_id" remain-on-exit on 2>/dev/null || true
 
+    # UNIFIED-MED-003: 元bg_colorを保存（rollback + despawn時に参照）
+    local orig_bg_color
+    orig_bg_color=$(tmux show-options -pv -t "$pane_id" background 2>/dev/null || echo "default")
+    echo "$orig_bg_color" > "$STATE_DIR/yakuzatengu_original_bg_color"
+
     # bg_color設定（ヤクザ天狗カラー: ダークピンク #3a0025）
     tmux select-pane -t "$pane_id" -P "bg=#3a0025" 2>/dev/null || true
 
@@ -198,16 +204,18 @@ cmd_spawn_tengu() {
         "claude --model claude-sonnet-4-6 --dangerously-skip-permissions" 2>/dev/null; then
         # エラーロールバック: STATEファイル削除 + bg_color復元 + タスクYAML status復元
         local orig_bg_color
-        orig_bg_color=$([[ "$orig_model" =~ [Oo]pus ]] && echo "#1a002e" || echo "default")
+        orig_bg_color=$(cat "$STATE_DIR/yakuzatengu_original_bg_color" 2>/dev/null || \
+            { [[ "$orig_model" =~ [Oo]pus ]] && echo "#1a002e" || echo "default"; })
         tmux select-pane -t "$pane_id" -P "bg=${orig_bg_color}" 2>/dev/null || true
         if [[ -n "${orig_task_yaml:-}" && -f "${orig_task_yaml:-}" ]]; then
-            sed -i '' "s/^ *status: suspended/  status: ${orig_task_status:-assigned}/" "$orig_task_yaml" 2>/dev/null || true
+            sed -i '' "s|^ *status: suspended|  status: ${orig_task_status:-assigned}|" "$orig_task_yaml" 2>/dev/null || true
         fi
         rm -f "$STATE_DIR/yakuzatengu_active" \
               "$STATE_DIR/yakuzatengu_original_agent_id" \
               "$STATE_DIR/yakuzatengu_original_pane" \
               "$STATE_DIR/yakuzatengu_original_model" \
-              "$STATE_DIR/yakuzatengu_spawn_time"
+              "$STATE_DIR/yakuzatengu_spawn_time" \
+              "$STATE_DIR/yakuzatengu_original_bg_color"
         echo "ERROR: spawn_tengu: respawn-pane失敗。ロールバック完了。" >&2
         return 1
     fi
@@ -256,9 +264,11 @@ cmd_despawn_tengu() {
     # モデルとbg_colorを決定
     local model bg_color
     case "$orig_model" in
-        Opus|opus|OPUS) model="claude-opus-4-6"; bg_color="#1a002e" ;;
-        *)              model="claude-sonnet-4-6"; bg_color="default" ;;
+        Opus|opus|OPUS) model="claude-opus-4-6" ;;
+        *)              model="claude-sonnet-4-6" ;;
     esac
+    bg_color=$(cat "$STATE_DIR/yakuzatengu_original_bg_color" 2>/dev/null || \
+        { [[ "$orig_model" =~ [Oo]pus ]] && echo "#1a002e" || echo "default"; })
 
     echo "[despawn_tengu] yakuzatengu → ${orig_agent}(model:${model}): $reason"
 
@@ -278,14 +288,25 @@ cmd_despawn_tengu() {
     tmux set-option -p -t "$orig_pane" @model_name "$orig_model"  2>/dev/null || true
     tmux select-pane  -t "$orig_pane" -P "bg=${bg_color}"         2>/dev/null || true
 
-    # STATEクリーンアップ（7件）
+    # STATEクリーンアップ（8件）
     rm -f "$STATE_DIR/yakuzatengu_active" \
           "$STATE_DIR/yakuzatengu_original_agent_id" \
           "$STATE_DIR/yakuzatengu_original_pane" \
           "$STATE_DIR/yakuzatengu_original_model" \
           "$STATE_DIR/yakuzatengu_spawn_time" \
           "$STATE_DIR/yakuzatengu_done" \
-          "$STATE_DIR/yakuzatengu_despawn_pending"
+          "$STATE_DIR/yakuzatengu_despawn_pending" \
+          "$STATE_DIR/yakuzatengu_original_bg_color"
+
+    # UNIFIED-MED-002: 元エージェントのタスクYAML status を suspended → assigned に復元
+    if [[ -n "$orig_agent" ]]; then
+        local orig_task_yaml
+        orig_task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${orig_agent}"*.yaml 2>/dev/null | head -1)
+        if [[ -n "$orig_task_yaml" && -f "$orig_task_yaml" ]]; then
+            sed -i '' "s|^ *status: suspended|  status: assigned|" "$orig_task_yaml" 2>/dev/null || true
+            echo "[despawn_tengu] Restored task status: $orig_task_yaml"
+        fi
+    fi
 
     # watcher_supervisor に即時再スキャン要求（orphan watcher対処）
     touch "$STATE_DIR/rescan_watchers"
@@ -296,6 +317,48 @@ cmd_despawn_tengu() {
         task_assigned njslyr_cmd "" P0 2>/dev/null || true
 
     echo "[despawn_tengu] ◆ヤクザ天狗帰還◆ yakuzatengu → ${orig_agent}。任務完了。"
+}
+
+# ─── A-6: detox — バリキドリンク解毒（Opus→Sonnet復帰）───
+# njslyr.sh detox_barikidorink() 相当のワンコマンド版
+# 引数: agent_id (必須)
+cmd_detox() {
+    local agent_id="${1:?ERROR: detox requires agent_id}"
+
+    local pane_id
+    pane_id=$(resolve_pane_by_agent_id "$agent_id")
+
+    [[ -z "$pane_id" ]] && { echo "ERROR: detox: pane not found for $agent_id" >&2; return 1; }
+
+    # 現在のモデル確認
+    local current_model current_bg
+    current_model=$(tmux show-options -pv -t "$pane_id" @model_name 2>/dev/null || echo "unknown")
+    current_bg=$(tmux show-options -pv -t "$pane_id" background 2>/dev/null || echo "unknown")
+
+    # @model_nameがSonnetでもbg色がdefaultでなければ修正が必要
+    if [[ "$current_model" == "Sonnet" && "$current_bg" == "default" ]]; then
+        echo "[detox] $agent_id ($pane_id): already Sonnet + bg=default. skip."
+        return 0
+    fi
+
+    echo "[detox] $agent_id ($pane_id): $current_model (bg=$current_bg) → Sonnet (bg=default)"
+
+    # モデルがSonnetでなければ /model sonnet 送信
+    if [[ "$current_model" != "Sonnet" ]]; then
+        # /model sonnet 送信（オートコンプリート回避: text→Escape→Enter）
+        tmux send-keys -t "$pane_id" "/model sonnet" 2>/dev/null
+        sleep 0.3
+        tmux send-keys -t "$pane_id" Escape 2>/dev/null
+        sleep 0.1
+        tmux send-keys -t "$pane_id" Enter 2>/dev/null
+        sleep 0.5
+    fi
+
+    # @model_name / bg_color は常に更新（部分的な解毒状態を修復）
+    tmux set-option -p -t "$pane_id" @model_name "Sonnet" 2>/dev/null || true
+    tmux select-pane -t "$pane_id" -P "bg=default" 2>/dev/null || true
+
+    echo "[detox] $agent_id: detox complete (Sonnet, bg=default)"
 }
 
 # ─── usage ───
@@ -322,6 +385,10 @@ Subcommands:
   despawn_tengu [reason]
       Despawn yakuzatengu and restore original agent.
 
+  detox <agent_id>
+      Detox barikidorink (Opus → Sonnet). Sends /model sonnet,
+      updates @model_name and bg_color. Skips if already Sonnet.
+
 Examples:
   bash scripts/njslyr_cmd.sh suriken yakuza3
   bash scripts/njslyr_cmd.sh suriken gryakuza "タスク確認せよ" system_notice P1
@@ -329,6 +396,7 @@ Examples:
   bash scripts/njslyr_cmd.sh slay yakuza2 "コンテキスト枯渇"
   bash scripts/njslyr_cmd.sh spawn_tengu yakuza7 "cmd_999 インフラ監視"
   bash scripts/njslyr_cmd.sh despawn_tengu
+  bash scripts/njslyr_cmd.sh detox yakuza3
 EOF
 }
 
@@ -355,6 +423,10 @@ main() {
         despawn_tengu)
             shift
             cmd_despawn_tengu "$@"
+            ;;
+        detox)
+            shift
+            cmd_detox "$@"
             ;;
         help|--help|-h|"")
             usage
