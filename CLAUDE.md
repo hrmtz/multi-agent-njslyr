@@ -80,6 +80,8 @@ yakuza_persona:
    - yakuza → `instructions/yakuza.md`
    - yakuzatengu → `instructions/yakuzatengu.md`
    - soukaiya → `instructions/soukaiya.md`
+   - master_tortoise → `instructions/master_tortoise.md`
+   - master_crane → `instructions/master_crane.md`
    **NEVER SKIP** — even if a conversation summary exists. Summaries do NOT preserve persona, speech style, or forbidden actions.
 4. Rebuild state from primary YAML data (queue/, tasks/, reports/)
 5. Review forbidden actions, then start work
@@ -259,6 +261,26 @@ Layer 2: Project files   — persistent per-project (config/, projects/, context
 Layer 3: YAML Queue      — persistent task data (queue/ — authoritative source of truth)
 Layer 4: Session context — volatile (CLAUDE.md auto-loaded, instructions/*.md, lost on /clear)
 ```
+
+# Cross-Machine Operation (cmd_274)
+
+## Machine Roles
+
+- **Ryzen WSL (tortoise)**: Primary. Full agent fleet (darkninja + gryakuza + yakuza1-7 + soukaiya + master_tortoise)
+- **MBP (crane)**: Secondary. Lightweight fleet (darkninja + gryakuza + yakuza1-3 + soukaiya + master_crane)
+- **Exclusive operation**: Only one machine is active at a time. See `queue/active_machine.yaml`.
+- **Machine config**: `config/settings.yaml` → `machine.role` (ryzen | mbp)
+
+## Monitoring Agents (crane/tortoise)
+
+- **master_tortoise**: CLIエージェント(Sonnet)。予防監視（未来視）。コンテキスト溢れ予測、応答パターン分析。
+- **master_crane**: CLIエージェント(Sonnet)。事後分析（過去視）。障害原因特定、再発防止策、パターンDB蓄積。
+- Both: 60秒サイクルでハートビート交換（ntfy `{base_topic}-heartbeat` トピック）。コード編集・タスク分配・エージェント停止は禁止。
+
+## Handover Protocol
+
+排他稼働切り替えはラオモトの明示的ntfyコマンド `handover:{target_machine}` で実行。自動handoverは禁止。
+handover時: gryakuzaがcheckpoint → git push → rsync → active_machine.yaml更新。
 
 # Project Management
 

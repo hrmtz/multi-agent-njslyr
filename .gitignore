@@ -31,6 +31,8 @@
 !instructions/yakuza.md
 !instructions/soukaiya.md
 !instructions/yakuzatengu.md
+!instructions/master_crane.md
+!instructions/master_tortoise.md
 
 # Multi-CLI: CLI-specific tool descriptions
 !instructions/cli_specific/
@@ -69,6 +71,7 @@
 # Config (sample files only, no secrets)
 !config/
 !config/ntfy_auth.env.sample
+!config/settings.yaml.sample
 
 # Templates
 !templates/
@@ -97,6 +100,7 @@
 !scripts/monitor_context.sh
 !scripts/test_inbox_write.sh
 !scripts/inbox_archive.sh
+!scripts/cross_sync.sh
 
 
 # SayTask (sample template only, not actual data)

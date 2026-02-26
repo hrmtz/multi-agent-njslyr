@@ -85,6 +85,9 @@ CLI_TYPE="claude"
 INBOX="$TEST_INBOX_DIR/test_agent.yaml"
 LOCKFILE="\${INBOX}.lock"
 SCRIPT_DIR="$PROJECT_ROOT"
+CACHE_DIR="$TEST_TMPDIR/.cache"
+STATE_DIR="$TEST_TMPDIR/.state"
+mkdir -p "\$CACHE_DIR" "\$STATE_DIR"
 
 # Mock external commands (defined before sourcing so they override real commands)
 tmux() {
@@ -608,12 +611,12 @@ MOCK
         CLI_TYPE="codex"
         cat > "$INBOX" << "YAML"
 messages:
-  - id: msg_clear
-    from: gryakuza
-    timestamp: "2026-02-10T14:00:00+09:00"
-    type: clear_command
-    content: redo
-    read: false
+- id: msg_clear
+  from: gryakuza
+  timestamp: "2026-02-10T14:00:00+09:00"
+  type: clear_command
+  content: redo
+  read: false
 YAML
         process_unread event
         python3 - << "PY" "$INBOX"
@@ -655,12 +658,12 @@ PY
         source "'"$TEST_HARNESS"'"
         cat > "$INBOX" << "YAML"
 messages:
-  - id: msg_auto_existing
-    from: inbox_watcher
-    timestamp: "2026-02-10T14:00:00+09:00"
-    type: task_assigned
-    content: "[auto-recovery] existing hint"
-    read: false
+- id: msg_auto_existing
+  from: inbox_watcher
+  timestamp: "2026-02-10T14:00:00+09:00"
+  type: task_assigned
+  content: "[auto-recovery] existing hint"
+  read: false
 YAML
         r1=$(enqueue_recovery_task_assigned)
         r2=$(enqueue_recovery_task_assigned)
@@ -748,6 +751,9 @@ CLI_TYPE="claude"
 INBOX="$TEST_INBOX_DIR/test_agent.yaml"
 LOCKFILE="\${INBOX}.lock"
 SCRIPT_DIR="$PROJECT_ROOT"
+CACHE_DIR="$TEST_TMPDIR/.cache"
+STATE_DIR="$TEST_TMPDIR/.state"
+mkdir -p "\$CACHE_DIR" "\$STATE_DIR"
 
 tmux() {
     echo "tmux \$*" >> "$MOCK_LOG"

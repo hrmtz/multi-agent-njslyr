@@ -349,8 +349,12 @@ detox_barikidorink() {
 # 検知した場合はダッシュボードへ警告を記録してダークニンジャに通知する。
 validate_agent_ids() {
     local suspicious_panes
-    suspicious_panes=$(tmux list-panes -t multiagent:agents -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
-        awk '$2 == "darkninja" {print $1}' || true)
+    suspicious_panes=$(
+        {
+            tmux list-panes -t multiagent:agents -F '#{pane_index} #{@agent_id}' 2>/dev/null
+            tmux list-panes -t multiagent:monitors -F 'monitors:#{pane_index} #{@agent_id}' 2>/dev/null
+        } | awk '$2 == "darkninja" {print $1}' || true
+    )
 
     if [[ -n "$suspicious_panes" ]]; then
         local msg="🚨 @agent_id誤設定検知！multiagentペイン(${suspicious_panes})にdarkninja IDが設定されている。yokubari.shで再起動が必要。"
@@ -366,8 +370,11 @@ validate_agent_ids() {
 get_monitored_agents() {
     # Dynamically detect agents from yokubari.sh process list
     # Exclude darkninja (human agent)
-    tmux list-panes -t multiagent:agents -F '#{@agent_id}' 2>/dev/null | \
-        grep -v '^$' | \
+    # Check both agents and monitors windows (crane/tortoise cross-machine monitoring)
+    {
+        tmux list-panes -t multiagent:agents -F '#{@agent_id}' 2>/dev/null
+        tmux list-panes -t multiagent:monitors -F '#{@agent_id}' 2>/dev/null
+    } | grep -v '^$' | \
         grep -v '^darkninja$' | \
         sort -u || true
 }
@@ -417,9 +424,17 @@ get_task_status() {
 # ─── Get pane target for agent ───
 get_pane_target() {
     local agent_id="$1"
-    # Find pane with matching @agent_id (BUG-2 fix: use named window "agents")
-    tmux list-panes -t multiagent:agents -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
-        awk -v id="$agent_id" '$2 == id {print "multiagent:agents." $1; exit}'
+    local result
+    # Find pane with matching @agent_id in agents window first (BUG-2 fix: use named window)
+    result=$(tmux list-panes -t multiagent:agents -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
+        awk -v id="$agent_id" '$2 == id {print "multiagent:agents." $1; exit}')
+    if [[ -n "$result" ]]; then
+        echo "$result"
+        return 0
+    fi
+    # Fallback: check monitors window (crane/tortoise agents)
+    tmux list-panes -t multiagent:monitors -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
+        awk -v id="$agent_id" '$2 == id {print "multiagent:monitors." $1; exit}'
 }
 
 # ─── Agent busy detection (from inbox_watcher.sh pattern) ───

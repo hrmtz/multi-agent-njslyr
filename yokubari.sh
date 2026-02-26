@@ -60,6 +60,13 @@ fi
 LANG_SETTING="${LANG_SETTING:-ja}"
 SHELL_SETTING="${SHELL_SETTING:-bash}"
 
+# マシンロール読み取り（ryzen: フル構成9体, mbp: 軽量構成5体）
+MACHINE_ROLE=""
+if [ -f "./config/settings.yaml" ]; then
+    MACHINE_ROLE=$(awk '/^  role:/{print $2}' ./config/settings.yaml 2>/dev/null)
+fi
+MACHINE_ROLE="${MACHINE_ROLE:-ryzen}"
+
 # CLI Adapter読み込み（Multi-CLI Support）
 if [ -f "$SCRIPT_DIR/lib/cli_adapter.sh" ]; then
     source "$SCRIPT_DIR/lib/cli_adapter.sh"
@@ -225,6 +232,10 @@ while [[ $# -gt 0 ]]; do
             echo "表示モード:"
             echo "  shout（デフォルト）:  タスク完了時に忍殺語echo表示"
             echo "  silent（--silent）:   echo表示なし（API節約）"
+            echo ""
+            echo "マシンロール (config/settings.yaml machine.role):"
+            echo "  ryzen（デフォルト）: フル構成（darkninja + gryakuza + yakuza1-7 + soukaiya + master_tortoise）"
+            echo "  mbp:               軽量構成（darkninja + gryakuza + yakuza1-3 + soukaiya + master_crane）"
             echo ""
             echo "エイリアス:"
             echo "  csst  → cd /mnt/c/tools/multi-agent-shogun && ./shutsujin_departure.sh"
@@ -469,7 +480,31 @@ launch_watcher() {
 show_battle_cry
 
 echo -e "  \033[1;33m◆陣立て開始◆ ドーモ。ネオサイタマ・デプロイメントを開始する。イヤーッ！\033[0m"
+echo -e "  \033[1;36m◆マシンロール◆ ${MACHINE_ROLE} $([ "$MACHINE_ROLE" = "mbp" ] && echo "(軽量構成5体)" || echo "(フル構成9体)")\033[0m"
 echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 0.5: 起動時auto-sync（state pullのみ。handoverはntfy経由のラオモト明示的指示で実行）
+# ═══════════════════════════════════════════════════════════════════════════════
+if [[ -f queue/active_machine.yaml ]]; then
+    ACTIVE_MACHINE=$(awk '/active_machine:/{print $2}' queue/active_machine.yaml 2>/dev/null)
+    if [[ -n "$ACTIVE_MACHINE" && "$ACTIVE_MACHINE" != "$MACHINE_ROLE" ]]; then
+        # NOTE: active_machine.yamlは更新しない。排他稼働切り替えはntfy handover:{target}のみ。
+        log_info "🔄 別マシン(${ACTIVE_MACHINE})がアクティブ。最新状態をpull中..."
+        current_branch=$(git branch --show-current 2>/dev/null)
+        if [[ -n "$current_branch" ]]; then
+            git pull --ff-only origin "$current_branch" 2>/dev/null || {
+                log_war "  └─ git pull失敗。手動マージが必要かもしれない。"
+            }
+        else
+            log_war "  └─ detached HEAD状態のためgit pullスキップ。ブランチを確認せよ。"
+        fi
+        if [[ -x scripts/cross_sync.sh ]]; then
+            bash scripts/cross_sync.sh pull 2>/dev/null || true
+        fi
+        log_success "  └─ state pull完了。handoverが必要ならntfyで 'handover:${MACHINE_ROLE}' を送信せよ。"
+    fi
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 1: 既存セッションクリーンアップ
@@ -538,7 +573,7 @@ if [ "$CLEAN_MODE" = true ]; then
     log_info "📜 前回のYAMLキューを破棄する…サヨナラ！"
 
     # ヤクザタスクファイルリセット
-    for i in {1..7}; do
+    for ((i=1; i<=YAKUZA_MAX; i++)); do
         cat > "./queue/tasks/yakuza${i}.yaml" << EOF
 # ヤクザ${i}専用タスクファイル
 task:
@@ -564,7 +599,7 @@ task:
 EOF
 
     # ヤクザレポートファイルリセット
-    for i in {1..7}; do
+    for ((i=1; i<=YAKUZA_MAX; i++)); do
         cat > "./queue/reports/yakuza${i}_report.yaml" << EOF
 worker_id: yakuza${i}
 task_id: null
@@ -587,8 +622,11 @@ EOF
     echo "inbox:" > ./queue/ntfy_inbox.yaml
 
     # agent inbox リセット
-    for agent in darkninja gryakuza yakuza{1..7} soukaiya; do
+    for agent in darkninja gryakuza soukaiya "$MONITOR_AGENT"; do
         echo "messages:" > "./queue/inbox/${agent}.yaml"
+    done
+    for ((i=1; i<=YAKUZA_MAX; i++)); do
+        echo "messages:" > "./queue/inbox/yakuza${i}.yaml"
     done
 
     log_success "✅ 前回のデータ、全て爆発四散！クリーンスタート！ワザマエ！"
@@ -714,7 +752,11 @@ PANE_BASE=$(tmux show-options -gv pane-base-index 2>/dev/null || echo 0)
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 5.1: multiagent セッション作成（9ペイン：gryakuza + yakuza1-8）
 # ═══════════════════════════════════════════════════════════════════════════════
-log_war "⚔️ グレーターヤクザ・ヤクザ・ソウカイヤをジェネレート中…9名配備！"
+if [[ "$MACHINE_ROLE" == "mbp" ]]; then
+    log_war "⚔️ グレーターヤクザ・ヤクザ・ソウカイヤをジェネレート中…5名配備！（MBP軽量構成）"
+else
+    log_war "⚔️ グレーターヤクザ・ヤクザ・ソウカイヤをジェネレート中…9名配備！"
+fi
 
 # 最初のペイン作成
 if ! tmux new-session -d -s multiagent -n "agents" 2>/dev/null; then
@@ -738,49 +780,64 @@ else
     tmux set-environment -t multiagent DISPLAY_MODE "shout"
 fi
 
-# 3x3グリッド作成（合計9ペイン）
-# ペイン番号は pane-base-index に依存（0 または 1）
-# 最初に3列に分割
-tmux split-window -h -t "multiagent:agents"
-tmux split-window -h -t "multiagent:agents"
+# ═══════════════════════════════════════════════════════════════════════════════
+# エージェント構成（マシンロール依存）
+# ═══════════════════════════════════════════════════════════════════════════════
+if [[ "$MACHINE_ROLE" == "mbp" ]]; then
+    # MBP軽量構成: gryakuza + yakuza1-3 + soukaiya = 5 panes
+    PANE_LABELS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "soukaiya")
+    PANE_COLORS=("red" "blue" "blue" "blue" "yellow")
+    AGENT_IDS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "soukaiya")
+    YAKUZA_MAX=3
+    if [ "$KESSEN_MODE" = true ]; then
+        MODEL_NAMES=("Opus" "Opus" "Opus" "Opus" "Opus")
+    else
+        MODEL_NAMES=("Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus")
+    fi
 
-# 各列を3行に分割
-# BUG FIX (2026-02-19): pane INDEX はv-split時に位置順で再ナンバリングされるため不安定。
-# h-split直後にpane ID（%N形式・安定）を保存し、v-split時はIDで列頭を指定する。
-# 1回の tmux list-panes で全ペインID取得（3 tmux+3 sed → 1 tmux+0 fork）
-{ read -r COL1_ID; read -r COL2_ID; read -r COL3_ID; } \
-    < <(tmux list-panes -t "multiagent:agents" -F '#{pane_id}')
-
-tmux select-pane -t "$COL1_ID"
-tmux split-window -v
-tmux split-window -v
-
-tmux select-pane -t "$COL2_ID"
-tmux split-window -v
-tmux split-window -v
-
-tmux select-pane -t "$COL3_ID"
-tmux split-window -v
-tmux split-window -v
-
-# ペインラベル設定（プロンプト用: モデル名なし）
-PANE_LABELS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
-# 色設定（gryakuza: 赤, yakuza: 青, soukaiya: 黄）
-PANE_COLORS=("red" "blue" "blue" "blue" "blue" "blue" "blue" "blue" "yellow")
-
-AGENT_IDS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
-
-# モデル名設定（pane-border-format で常時表示するため）
-# デフォルト（Claude用）
-if [ "$KESSEN_MODE" = true ]; then
-    MODEL_NAMES=("Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus")
+    # 5 panes: 4 splits then tiled layout
+    for _mbp_split in {1..4}; do
+        tmux split-window -t "multiagent:agents"
+    done
 else
-    MODEL_NAMES=("Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus")
+    # Ryzenフル構成: gryakuza + yakuza1-7 + soukaiya = 9 panes (現行)
+    PANE_LABELS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
+    PANE_COLORS=("red" "blue" "blue" "blue" "blue" "blue" "blue" "blue" "yellow")
+    AGENT_IDS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
+    YAKUZA_MAX=7
+    if [ "$KESSEN_MODE" = true ]; then
+        MODEL_NAMES=("Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus")
+    else
+        MODEL_NAMES=("Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus")
+    fi
+
+    # 3x3グリッド作成（合計9ペイン）
+    # ペイン番号は pane-base-index に依存（0 または 1）
+    # 最初に3列に分割
+    tmux split-window -h -t "multiagent:agents"
+    tmux split-window -h -t "multiagent:agents"
+
+    # BUG FIX (2026-02-19): pane INDEX はv-split時に位置順で再ナンバリングされるため不安定。
+    # h-split直後にpane ID（%N形式・安定）を保存し、v-split時はIDで列頭を指定する。
+    { read -r COL1_ID; read -r COL2_ID; read -r COL3_ID; } \
+        < <(tmux list-panes -t "multiagent:agents" -F '#{pane_id}')
+
+    tmux select-pane -t "$COL1_ID"
+    tmux split-window -v
+    tmux split-window -v
+
+    tmux select-pane -t "$COL2_ID"
+    tmux split-window -v
+    tmux split-window -v
+
+    tmux select-pane -t "$COL3_ID"
+    tmux split-window -v
+    tmux split-window -v
 fi
 
 # CLI Adapter経由でモデル名を動的に上書き
 if [ "$CLI_ADAPTER_LOADED" = true ]; then
-    for i in {0..8}; do
+    for ((i=0; i<${#AGENT_IDS[@]}; i++)); do
         _agent="${AGENT_IDS[$i]}"
         _cli=$(get_cli_type "$_agent")
         case "$_cli" in
@@ -819,7 +876,7 @@ if [ "$CLI_ADAPTER_LOADED" = true ]; then
     done
 fi
 
-for i in {0..8}; do
+for ((i=0; i<${#AGENT_IDS[@]}; i++)); do
     p=$((PANE_BASE + i))
     tmux select-pane -t "multiagent:agents.${p}" -T "${MODEL_NAMES[$i]}"
     tmux set-option -p -t "multiagent:agents.${p}" @agent_id "${AGENT_IDS[$i]}"
@@ -832,7 +889,7 @@ done
 # @agent_id 割り当て検証（2026-02-18 恒久対策: 誤設定インシデント防止）
 # 設定直後に実際値を検証し、ミスマッチがあれば即時修正する
 _verify_errors=0
-for i in {0..8}; do
+for ((i=0; i<${#AGENT_IDS[@]}; i++)); do
     p=$((PANE_BASE + i))
     _expected="${AGENT_IDS[$i]}"
     _actual=$(tmux show-options -pv -t "multiagent:agents.${p}" @agent_id 2>/dev/null || echo "")
@@ -860,6 +917,40 @@ tmux select-layout -t multiagent:agents tiled
 tmux set-hook -t multiagent client-resized 'resize-window -A -t multiagent:agents ; select-layout -t multiagent:agents tiled'
 
 log_success "  └─ グレーターヤクザ・ヤクザ・ソウカイヤのジン、コンストラクト完了！ワザマエ！"
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 5.2: multiagent:monitors ウィンドウ作成（crane/tortoise監視エージェント）
+# ═══════════════════════════════════════════════════════════════════════════════
+log_war "🔍 マスター・クレイン/トータス監視陣を構築中..."
+
+tmux new-window -t multiagent -n "monitors"
+
+# マシンロールに応じた監視エージェント配置
+if [[ "$MACHINE_ROLE" == "mbp" ]]; then
+    MONITOR_AGENT="master_crane"
+    MONITOR_LABEL="crane"
+else
+    MONITOR_AGENT="master_tortoise"
+    MONITOR_LABEL="tortoise"
+fi
+
+MONITOR_PANE="multiagent:monitors.${PANE_BASE}"
+MONITOR_PROMPT=$(generate_prompt "$MONITOR_LABEL" "cyan" "$SHELL_SETTING")
+tmux send-keys -t "$MONITOR_PANE" "cd \"$(pwd)\" && export PS1='${MONITOR_PROMPT}' && clear" Enter
+tmux set-option -p -t "$MONITOR_PANE" @agent_id "$MONITOR_AGENT"
+tmux set-option -p -t "$MONITOR_PANE" @model_name "Sonnet"
+tmux set-option -p -t "$MONITOR_PANE" @current_task ""
+
+# pane-border-format（agentsウィンドウと同一フォーマット）
+tmux set-option -t multiagent:monitors -w pane-border-status top
+tmux set-option -t multiagent:monitors -w pane-border-format \
+    '#{?pane_active,#[reverse],}#[bold]#{@agent_id}#[default] (#{@model_name}) #{@current_task}'
+
+# agentsウィンドウに戻す（STEP 6以降はagentsを操作対象とするため）
+tmux select-window -t multiagent:agents
+
+log_success "  └─ ${MONITOR_AGENT} 監視陣、コンストラクト完了！ワザマエ！"
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -900,24 +991,29 @@ if [ "$SETUP_ONLY" = false ]; then
     ( launch_agent "multiagent:agents.$((PANE_BASE + 0))" "gryakuza" "sonnet" ) &
     log_info "  ◆召喚◆ グレーターヤクザ（所属: ${GRYAKUZA_CORP}）…ニンジャソウル覚醒！イヤーッ！"
 
-    # クローンヤクザ1-7起動（バックグラウンド）
+    # クローンヤクザ起動（バックグラウンド、YAKUZA_MAX体）
     if [ "$KESSEN_MODE" = true ]; then
         _yakuza_model="opus"
     else
         _yakuza_model="sonnet"
     fi
-    for i in {1..7}; do
+    for ((i=1; i<=YAKUZA_MAX; i++)); do
         ( launch_agent "multiagent:agents.$((PANE_BASE + i))" "yakuza${i}" "$_yakuza_model" ) &
     done
     if [ "$KESSEN_MODE" = true ]; then
-        log_info "  ◆召喚×7◆ クローンヤクザ1-7（ケッセンの陣）…全員Opus！サツバツ！ザッケンナコラー！"
+        log_info "  ◆召喚×${YAKUZA_MAX}◆ クローンヤクザ1-${YAKUZA_MAX}（ケッセンの陣）…全員Opus！サツバツ！ザッケンナコラー！"
     else
-        log_info "  ◆召喚×7◆ クローンヤクザ1-7（ヘイジの陣）…ニンジャソウル覚醒！ザッケンナコラー！"
+        log_info "  ◆召喚×${YAKUZA_MAX}◆ クローンヤクザ1-${YAKUZA_MAX}（ヘイジの陣）…ニンジャソウル覚醒！ザッケンナコラー！"
     fi
 
-    # ソウカイヤ起動（バックグラウンド）
-    ( launch_agent "multiagent:agents.$((PANE_BASE + 8))" "soukaiya" "opus" ) &
+    # ソウカイヤ起動（バックグラウンド、最後のpane）
+    _soukaiya_idx=$((YAKUZA_MAX + 1))
+    ( launch_agent "multiagent:agents.$((PANE_BASE + _soukaiya_idx))" "soukaiya" "opus" ) &
     log_info "  ◆召喚◆ ソウカイヤ…戦略カイギ開始！ドーモ"
+
+    # 監視エージェント起動（バックグラウンド）
+    ( launch_agent "$MONITOR_PANE" "$MONITOR_AGENT" "sonnet" ) &
+    log_info "  ◆召喚◆ ${MONITOR_AGENT}…監視ニューロン覚醒！ドーモ"
 
     # 全バックグラウンドジョブの完了を待機
     wait
@@ -926,7 +1022,7 @@ if [ "$SETUP_ONLY" = false ]; then
     if [ "$KESSEN_MODE" = true ]; then
         log_success "✅ ◆実際ケッセンの陣◆ 全軍Opus！カラテが溢れている！！ワッショイ！"
     else
-        log_success "✅ ◆実際ヘイジの陣◆ 電脳IRC接続完了！（GrYakuza=Sonnet, Y×7=Sonnet, Soukaiya=Opus）ワザマエ！"
+        log_success "✅ ◆実際ヘイジの陣◆ 電脳IRC接続完了！（GrYakuza=Sonnet, Y×${YAKUZA_MAX}=Sonnet, Soukaiya=Opus, ${MONITOR_AGENT}=Sonnet）ワザマエ！"
     fi
     echo ""
 
@@ -1019,8 +1115,11 @@ NINJA_EOF
 
     # inbox ディレクトリ初期化（シンボリックリンク先のLinux FSに作成）
     mkdir -p "$SCRIPT_DIR/logs"
-    for agent in darkninja gryakuza yakuza{1..7} soukaiya; do
+    for agent in darkninja gryakuza soukaiya "$MONITOR_AGENT"; do
         [ -f "$SCRIPT_DIR/queue/inbox/${agent}.yaml" ] || echo "messages:" > "$SCRIPT_DIR/queue/inbox/${agent}.yaml"
+    done
+    for ((i=1; i<=YAKUZA_MAX; i++)); do
+        [ -f "$SCRIPT_DIR/queue/inbox/yakuza${i}.yaml" ] || echo "messages:" > "$SCRIPT_DIR/queue/inbox/yakuza${i}.yaml"
     done
 
     # 既存のwatcherと孤児inotifywaitをkill（プロジェクト固有パターンで誤kill防止）
@@ -1035,12 +1134,17 @@ NINJA_EOF
 
     # グレーターヤクザ・ヤクザ・ソウカイヤのwatcher
     launch_watcher "gryakuza" "multiagent:agents.${PANE_BASE}"
-    for i in {1..7}; do
+    for ((i=1; i<=YAKUZA_MAX; i++)); do
         launch_watcher "yakuza${i}" "multiagent:agents.$((PANE_BASE + i))"
     done
-    launch_watcher "soukaiya" "multiagent:agents.$((PANE_BASE + 8))"
+    _soukaiya_idx=$((YAKUZA_MAX + 1))
+    launch_watcher "soukaiya" "multiagent:agents.$((PANE_BASE + _soukaiya_idx))"
 
-    log_success "  └─ ◆実際完了◆ 10エージェント分のIRC監視起動完了！全チャンネル接続！ワザマエ！"
+    # 監視エージェントのwatcher
+    launch_watcher "$MONITOR_AGENT" "$MONITOR_PANE"
+
+    _total_watchers=$((YAKUZA_MAX + 4))  # darkninja + gryakuza + yakuzaN + soukaiya + monitor
+    log_success "  └─ ◆実際完了◆ ${_total_watchers}エージェント分のIRC監視起動完了！全チャンネル接続！ワザマエ！"
 
     # ═══════════════════════════════════════════════════════════════════
     # STEP 6.6.5: monitor_context.sh起動（コンテキスト監視・自動回復）
@@ -1151,17 +1255,33 @@ echo "     ┌──────────────────────
 echo "     │  Pane 0: ラオモト (DARKNINJA)    │  ← メガコーポCEO・プロジェクト統括"
 echo "     └─────────────────────────────────┘"
 echo ""
-echo "     【multiagentセッション】グレーターヤクザ・ヤクザ・ソウカイヤのジン（3x3 = 9ペイン）"
-echo "     ┌──────────┬─────────┬─────────┐"
-echo "     │ gryakuza │ yakuza3 │ yakuza6 │"
-echo "     │(GrYakuza)│  (Y3)   │  (Y6)   │"
-echo "     ├──────────┼─────────┼─────────┤"
-echo "     │ yakuza1  │ yakuza4 │ yakuza7 │"
-echo "     │   (Y1)   │  (Y4)   │  (Y7)   │"
-echo "     ├──────────┼─────────┼─────────┤"
-echo "     │ yakuza2  │ yakuza5 │soukaiya │"
-echo "     │   (Y2)   │  (Y5)   │(Soukaiya)│"
-echo "     └──────────┴─────────┴─────────┘"
+if [[ "$MACHINE_ROLE" == "mbp" ]]; then
+    echo "     【multiagent:agents】MBP軽量構成（5ペイン）"
+    echo "     ┌──────────┬─────────┐"
+    echo "     │ gryakuza │ yakuza2 │"
+    echo "     ├──────────┼─────────┤"
+    echo "     │ yakuza1  │ yakuza3 │"
+    echo "     ├──────────┼─────────┤"
+    echo "     │ soukaiya │         │"
+    echo "     └──────────┴─────────┘"
+else
+    echo "     【multiagent:agents】Ryzenフル構成（9ペイン）"
+    echo "     ┌──────────┬─────────┬─────────┐"
+    echo "     │ gryakuza │ yakuza3 │ yakuza6 │"
+    echo "     │(GrYakuza)│  (Y3)   │  (Y6)   │"
+    echo "     ├──────────┼─────────┼─────────┤"
+    echo "     │ yakuza1  │ yakuza4 │ yakuza7 │"
+    echo "     │   (Y1)   │  (Y4)   │  (Y7)   │"
+    echo "     ├──────────┼─────────┼─────────┤"
+    echo "     │ yakuza2  │ yakuza5 │soukaiya │"
+    echo "     │   (Y2)   │  (Y5)   │(Soukaiya)│"
+    echo "     └──────────┴─────────┴─────────┘"
+fi
+echo ""
+echo "     【multiagent:monitors】監視エージェント（1ペイン）"
+echo "     ┌─────────────────────┐"
+echo "     │ ${MONITOR_AGENT}$(printf '%*s' $((18 - ${#MONITOR_AGENT})) '')│"
+echo "     └─────────────────────┘"
 echo ""
 
 echo ""
