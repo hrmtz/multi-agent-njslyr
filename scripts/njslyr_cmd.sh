@@ -185,7 +185,7 @@ cmd_spawn_tengu() {
     orig_task_status="idle"
     if [[ -n "$orig_task_yaml" && -f "$orig_task_yaml" ]]; then
         orig_task_status=$(grep '^ *status:' "$orig_task_yaml" | head -1 | awk '{print $2}' | tr -d "'\"" || echo "idle")
-        sed -i '' 's/^ *status: .*/  status: suspended/' "$orig_task_yaml" 2>/dev/null || true
+        sedi 's/^ *status: .*/  status: suspended/' "$orig_task_yaml" 2>/dev/null || true
     fi
 
     # remain-on-exit設定（恒久ルール: respawn-pane前に必須）
@@ -208,7 +208,7 @@ cmd_spawn_tengu() {
             { [[ "$orig_model" =~ [Oo]pus ]] && echo "#1a002e" || echo "default"; })
         tmux select-pane -t "$pane_id" -P "bg=${orig_bg_color}" 2>/dev/null || true
         if [[ -n "${orig_task_yaml:-}" && -f "${orig_task_yaml:-}" ]]; then
-            sed -i '' "s|^ *status: suspended|  status: ${orig_task_status:-assigned}|" "$orig_task_yaml" 2>/dev/null || true
+            sedi "s|^ *status: suspended|  status: ${orig_task_status:-assigned}|" "$orig_task_yaml" 2>/dev/null || true
         fi
         rm -f "$STATE_DIR/yakuzatengu_active" \
               "$STATE_DIR/yakuzatengu_original_agent_id" \
@@ -303,7 +303,7 @@ cmd_despawn_tengu() {
         local orig_task_yaml
         orig_task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${orig_agent}"*.yaml 2>/dev/null | head -1)
         if [[ -n "$orig_task_yaml" && -f "$orig_task_yaml" ]]; then
-            sed -i '' "s|^ *status: suspended|  status: assigned|" "$orig_task_yaml" 2>/dev/null || true
+            sedi "s|^ *status: suspended|  status: assigned|" "$orig_task_yaml" 2>/dev/null || true
             echo "[despawn_tengu] Restored task status: $orig_task_yaml"
         fi
     fi

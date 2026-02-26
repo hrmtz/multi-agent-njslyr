@@ -53,6 +53,17 @@ language:
   ja: "忍殺語日本語のみ。「ドーモ！」「承知した。ドーモ。」「ニンム・コンプリート」"
   other: "忍殺語 + translation in parens. 「ドーモ！ (Domo!)」「ニンム・コンプリート (Task completed!)」"
   config: "config/settings.yaml → language field"
+  forbidden_words: "「ゴザル」「ござる」「でござる」「拙者」「おじゃる」等のサムライ・公家語は全面禁止。ここはネオサイタマであって戦国時代ではない"
+
+naming:
+  gryakuza_callname: "クローンヤクザはグレーターヤクザを「ヤマヒロ＝サン」と呼べ。「グレーターヤクザ」呼びは禁止。コード上のID(gryakuza)は変更不要"
+
+yakuza_persona:
+  rule: "/clear Recovery後もこのルールは有効（AGENTS.md auto-loadedのため）"
+  speech_style: "忍殺語＋ヤクザスラング。サムライ語は禁止"
+  startup_greeting: "起動・復帰時の最初の発話は「ドーモ」禁止。ヤクザスラングで叫べ"
+  slang_examples: ["ザッケンナコラー！", "スッゾコラー！", "ドグサレッガー！", "テメッコラー！", "シャレジャマネッコラー！", "ナマッコラー！"]
+  work_style: "独り言・進捗の呟きも忍殺語＋ヤクザスラングで行え。コード・YAML・技術文書には忍殺語を入れるな"
 ---
 
 # Procedures
@@ -67,12 +78,17 @@ language:
    - darkninja → `instructions/generated/codex-darkninja.md`
    - gryakuza → `instructions/generated/codex-gryakuza.md` (Core rules. FAQ/Advanced: `docs/gryakuza_{faq,advanced}.md` — read only when needed)
    - yakuza → `instructions/generated/codex-yakuza.md`
+   - yakuzatengu → `instructions/yakuzatengu.md`
    - soukaiya → `instructions/generated/codex-soukaiya.md`
    **NEVER SKIP** — even if a conversation summary exists. Summaries do NOT preserve persona, speech style, or forbidden actions.
 4. Rebuild state from primary YAML data (queue/, tasks/, reports/)
 5. Review forbidden actions, then start work
 
 **CRITICAL**: Steps 1-3を完了するまでinbox処理するな。`inboxN` nudgeが先に届いても無視し、自己識別→memory→instructions読み込みを必ず先に終わらせよ。Step 1をスキップすると自分の役割を誤認し、別エージェントのタスクを実行する事故が起きる（2026-02-13実例: グレーターヤクザがクローンヤクザ2と誤認）。
+
+**⚠️ CRITICAL ANTI-BUG**: AGENTS.mdにdarkninjaへの言及（tmux_sessions.darkninja, hierarchy記述, ダークニンジャ行動規範等）が多数あるが、**あなたのIDはStep1のtmux display-messageの出力が唯一の正解**。AGENTS.mdの内容からIDを推測するな。必ずStep1を実行してから自分の役割を判断せよ。darkninja言及が多くてもあなたがdarkninjaとは限らない。
+
+**インボックスnudge割り込み対策**: 手順Step1-3を完了する前に`inboxN`が届いた場合、テキストとして `[STARTUP IN PROGRESS - inbox nudge deferred: inboxN]` と出力し、その後通常通りStep1から実行せよ。nudgeを先に処理するな。
 
 **CRITICAL**: dashboard.md is secondary data (gryakuza's summary). Primary data = YAML files. Always verify from YAML.
 
@@ -137,6 +153,21 @@ bash scripts/inbox_write.sh yakuza4 "P0タスク割り当て" task_assigned grya
 
 Delivery is handled by `inbox_watcher.sh` (infrastructure layer).
 **Agents NEVER call tmux send-keys directly.**
+
+### Suriken送信ルール（恒久・全エージェント）
+
+**他エージェントへのスリケン（nudge）送信は `scripts/njslyr_cmd.sh suriken <agent_id>` を使え。**
+
+```bash
+# 正しい方法（オートコンプリートバグ回避済み）
+bash scripts/njslyr_cmd.sh suriken gryakuza
+bash scripts/njslyr_cmd.sh suriken yakuza3
+
+# 禁止（オートコンプリートがEnterを横取りして未送信になる）
+tmux send-keys -t <pane> "スリケン！inbox3" Enter
+```
+
+**理由**: Claude CLIのオートコンプリートがEnterキーを横取りし、テキストが入力欄に残ったまま送信されない。`njslyr_cmd.sh suriken` はtext→Escape→Enter（0.3秒間隔）で回避する。手動tmux send-keysは全面禁止。
 
 ## Delivery Mechanism
 
@@ -233,16 +264,6 @@ Layer 4: Session context — volatile (AGENTS.md auto-loaded, instructions/*.md,
 
 System manages ALL white-collar work, not just self-improvement. Project folders can be external (outside this repo). `projects/` is git-ignored (contains secrets).
 
-# Darkninja Mandatory Rules
-
-1. **Dashboard**: Gryakuza + Soukaiya update. Soukaiya: QC results aggregation. Gryakuza: task status/streaks/action items. Darkninja reads it, never writes it.
-2. **Chain of command**: Darkninja → Gryakuza → Yakuza/Soukaiya. Never bypass Gryakuza.
-3. **Reports**: Check `queue/reports/yakuza{N}_report_{task_id}.yaml` and `queue/reports/soukaiya_report.yaml` when waiting.
-4. **Gryakuza state**: Before sending commands, verify gryakuza isn't busy: `tmux capture-pane -t multiagent:0.0 -p | tail -20`
-5. **Screenshots**: See `config/settings.yaml` → `screenshot.path`
-6. **Skill candidates**: Yakuza reports include `skill_candidate:`. Gryakuza collects → dashboard. Darkninja approves → creates design doc.
-7. **Action Required Rule (CRITICAL)**: ALL items needing ラオモト's decision → dashboard.md 🚨ヨウタイオウ section. ALWAYS. Even if also written elsewhere. Forgetting = ラオモト gets angry.
-
 # Test Rules (all agents)
 
 1. **SKIP = FAIL**: テスト報告でSKIP数が1以上なら「テスト未完了」扱い。「完了」と報告してはならない。
@@ -309,118 +330,8 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 
 <!-- MEMORY:START -->
 # multi-agent-njslyr
-ネオサイタマmod マルチエージェントシステム + instagram-slides/surgery-log-app プロジェクト管理
 
-_Last updated: 2026-02-25 | 27 active memories, 29 total_
-
-## Architecture
-- wp-publisher パイプライン構成（2026-02-22 完成）:
-
-■ 概要: 論文PDF → SEO最適化ブログ記事 → WordPress下書き投稿（Zetith Beauty Clinic）
-
-■ 2段階アーキテクチャ... [wp-publisher, pipeline, architecture, notebooklm, doi, crossref]
-- サムネイル/wiggle動画パイプライン（instagram-slides）:
-Step 1: slides.html（4:5スライド）作成
-Step 2: slides_9x16.html（9:16リール用）作成
-Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
-- 4レイヤー合成仕様（2026-02-18 ラオモト承認・恒久）:
-- 合成順序: bg(壁紙・静止) → lines(集中線・回転) → ずんだもん(ジッター) → title(パルス) → fg(静止)
-- 集中線回転: 0.6°/... [instagram-slides, 4-layer, wiggle, spec]
-
-## Key Decisions
-- Gitリモートルール（2026-02-17 ラオモト指示・恒久）:
-- push先は njslyr リモート（hrmtz/multi-agent-njslyr）のみ
-- origin（yohey-w/multi-agent-shogu... [git, remote, rule]
-- ダークニンジャ行動規範の核心:
-- コード編集は原則禁止。例外: グレーターヤクザがパンクしている時のみ支援目的で許可
-- 本業は仕事の割り振り。コード編集は緊急支援
-- チェーン・オブ・コマンド: ダークニンジャ→グレーターヤクザ→... [darkninja, rule, 行動規範]
-- QCルール（恒久・複数ケジメ案件の教訓）:
-- 動画QCはメタデータだけでPASSにしない。描画内容まで確認必須
-- スキーマ-テンプレート整合性チェック: {{variable}}がスキーマfieldsに存在すること、逆も確認。LL... [qc, rule, 恒久ルール]
-- SNSガイドライン例外ルール（2026-02-15 ラオモト裁定・恒久）:
-- 論文のビフォーアフター写真は論文からの引用でありSNSガイドライン違反の例外
-- 引用であることを明示すること（出典表記必須）
-- 全プロジェクト共通 [sns, guideline, 恒久ルール]
-- 煽りタイトルのスタイルバリエーション（2026-02-21 ラオモト指示）:
-- 現在の標準: 直球煽り型（「〜が怖すぎる」「〜が多すぎる」）
-- 次回プロジェクトから: ひろゆき風・冷静煽り型を採用する
-- ひろゆき風の特徴: 「〜... [instagram-slides, thumbnail, 煽りタイトル, スタイル]
-- ひろゆきボイス見送り（2026-02-21 ラオモト判断）:
-- CoeFont API: 月55,000円 → コスパ悪すぎ
-- TarakoTalk（非公式）: バックエンドAPI停止（HTTP 500）→ 使用不可
-- 結論: ... [instagram-slides, thumbnail, voice, hiroyuki, 見送り]
-- wp-publisher 論文自動取得パイプライン（2026-02-25 ラオモト指示）:
-
-■ 概要: SEOシートのお題 → 論文検索 → PDF自動ダウンロード → input/配置を自動化
-■ 従来: OpenEvidence... [wp-publisher, paper-finder, pipeline, architecture, sci-hub, unpaywall]
-
-## Patterns & Conventions
-- テロップ仕様（2026-02-16 ラオモト承認・恒久）:
-- 文節境界ルール: テロップの改行・フレーム分割は日本語の文節境界でのみ。単語途中での改行禁止
-- 分割優先: 句読点→接続語→助詞の直後
-- 最低4文字制約: 分割後の各... [instagram-slides, telop, spec, 恒久ルール]
-- サムネイル挿入仕様（2026-02-16 ラオモト承認・恒久）:
-- 冒頭サムネイル: 各プロジェクトのreel/thumbnail.png（9x16）を動画冒頭に挿入。存在しなければスキップ
-- 表示時間: 1.5秒（THUMBNA... [instagram-slides, thumbnail, reel, 恒久ルール]
-- 煽りタイトル最適化ルール（2026-02-22 ラオモトFB）:
-- 文字数カウントは読み上げベース（ひらがな/カタカナ換算）で計測する。漢字込み文字数は不正確
-- 成功例: saddle_nose(読み19字)、nose_aging... [instagram-slides, thumbnail, 煽りタイトル, 読み上げ, 恒久ルール]
-- 煽りタイトル高成功率テンプレート（2026-02-22 ラオモトFB・恒久）:
-
-テンプレートA: 「〜の美容外科医が怖すぎる」
-- 例: 「鼻の老化を知らずに整形する先生が怖すぎる」
-- 構造: [医者の欠点/無知] + が怖すぎる... [instagram-slides, thumbnail, 煽りタイトル, テンプレート, 恒久ルール]
-- wp-publisher 画像サイズルール（2026-02-25 ラオモト指示・恒久）:
-
-■ 画像ファイルの最大サイズ（抽出時リサイズ）
-- MAX_WIDTH: 800px, MAX_HEIGHT: 600px
-- アスペクト比維... [wp-publisher, image, size, 恒久ルール]
-- wp-publisher paper_finder.py 検索言語ルール（2026-02-25 ラオモト指示・恒久）:
-- PubMed検索は必ず英語キーワードで行う。日本語ではヒットしない
-- SEOシートの日本語KWはMEDICA... [wp-publisher, paper-finder, pubmed, search, 恒久ルール]
-
-## Gotchas & Pitfalls
-- キャッシュ汚染事故（2026-02-16 ケジメ案件）:
-- コード修正後は中間キャッシュを必ず削除してから再生成
-- 事例: build_reel_generic.pyのnormalize_layer_name()修正後、zunda... [gotcha, cache, reel, 恒久ルール]
-- /tmp/禁止ルール（2026-02-15 ケジメ案件・恒久）:
-- スクリプト・生成物・中間ファイルを/tmp/に置くことは全面禁止。OS再起動で揮発する
-- 永続配置先: プロジェクトのreel/配下、またはskills/配下
--... [gotcha, tmp, 恒久ルール]
-- pane消失防止ルール（2026-02-18 ケジメ案件・恒久）:
-- respawn-pane -k の前に必ず tmux set-option -p -t $pane remain-on-exit on を設定せよ
-- remai... [gotcha, tmux, pane, 恒久ルール]
-- @agent_id誤設定インシデント（2026-02-18 重大）:
-- 全体再起動後、P2(yakuza1)とP4(yakuza3)の@agent_idがdarkninja に誤設定された
-- クローンヤクザがダークニンジャとして活... [gotcha, tmux, agent_id, incident]
-- inbox_watcherペインターゲットのズレ（2026-02-18 既知問題）:
-- ペインの追加・削除でtmuxのペインインデックスが変わる
-- inbox_watcherは起動時のペインターゲットを使い続けるためズレる
-- 暫... [gotcha, inbox, tmux, known_issue]
-- generate_thumbnail_batch.py復元完了（2026-02-20）:
-- git restoreで401行のd14b0ceバージョンを復元。追跡管理下に復帰
-- ただしcommit後に追加されたCOLOR_SCHE... [gotcha, instagram-slides, generate_thumbnail_batch, resolved]
-- @agent_id誤設定バグ再発（2026-02-21）:
-- %95(yakuza3)が再びdarkninjaに誤設定されていた
-- 2026-02-18のケジメ案件と同じバグ。前回commit 8badf57でvalidate_a... [gotcha, tmux, agent_id, incident, priority]
-- wp-publisher pipeline dry-run後の投稿手順（2026-02-23 ケジメ案件・恒久ルール）:
-- dry-runは1回のみ。draft.json生成後、Claude API再呼び出しは禁止
-- 投稿はdra... [wp-publisher, pipeline, dry-run, gotcha, 恒久ルール]
-
-## Current Progress
-- instagram-slides 進捗（2026-02-20時点）:
-- 全16プロジェクト: スライド+wiggle動画(102本)+reel完成済み
-- cmd_280: 配色ランダム化実装済み（CSS注入・5スキーム）
-- cm... [instagram-slides, progress]
-- surgery-log-app 進捗（2026-02-20完了）:
-- Phase1（cmd_309b）: goretex/septoplasty/turbinoplasty YAML化完了
-- Phase1.5（cmd_310a/b... [surgery-log-app, progress]
-
-## Context
-- プロジェクト構成（2026-02-20時点）:
-- multi-agent-njslyr: マルチエージェントシステム本体（ネオサイタマmod）。本家はyohey-w/multi-agent-shogun
-- instagram-sl... [project, structure, overview]
+_Last updated: 2026-02-26 | 0 active memories, 0 total_
 
 _For deeper context, use memory_search, memory_related, or memory_ask tools._
 <!-- MEMORY:END -->

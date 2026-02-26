@@ -14,7 +14,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"/opt/homebrew/lib/node_modules/claude-code-memory/dist/extractor.js\"",
+            "command": "node \"$(npm root -g)/claude-code-memory/dist/extractor.js\"",
             "timeout": 30
           }
         ]
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"/opt/homebrew/lib/node_modules/claude-code-memory/dist/extractor.js\"",
+            "command": "node \"$(npm root -g)/claude-code-memory/dist/extractor.js\"",
             "timeout": 30
           }
         ]
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"/opt/homebrew/lib/node_modules/claude-code-memory/dist/extractor.js\"",
+            "command": "node \"$(npm root -g)/claude-code-memory/dist/extractor.js\"",
             "timeout": 30
           }
         ]

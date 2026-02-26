@@ -1,9 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-# macOS (Darwin): GNU coreutils via Homebrew gnubin
+# macOS (Darwin): GNU coreutils + util-linux (flock) via Homebrew
 if [[ "$(uname -s)" == "Darwin" ]]; then
-    export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
+    _HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+    export PATH="${_HOMEBREW_PREFIX}/opt/coreutils/libexec/gnubin:${_HOMEBREW_PREFIX}/opt/util-linux/bin:$PATH"
 fi
 
 # Keep inbox watchers alive in a persistent tmux-hosted shell.

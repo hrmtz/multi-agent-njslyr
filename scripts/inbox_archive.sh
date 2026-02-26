@@ -5,6 +5,12 @@
 
 set -e
 
+# macOS (Darwin): util-linux (flock) via Homebrew
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    _HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+    export PATH="${_HOMEBREW_PREFIX}/opt/util-linux/bin:$PATH"
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Parse arguments

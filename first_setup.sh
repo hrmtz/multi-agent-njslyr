@@ -44,6 +44,15 @@ log_step() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# クロスプラットフォーム sed -i (BSD vs GNU)
+sedi() {
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
 # 結果追跡用変数
 RESULTS=()
 HAS_ERROR=false
@@ -641,11 +650,11 @@ ALIAS_ADDED=false
 if [ -f "$BASHRC_FILE" ]; then
     # 古い alias 形式を削除（存在する場合）
     if grep -q "alias css=" "$BASHRC_FILE" 2>/dev/null; then
-        sed -i '/alias css=/d' "$BASHRC_FILE"
+        sedi '/alias css=/d' "$BASHRC_FILE"
         log_info "旧 alias css を削除しました"
     fi
     if grep -q "alias csm=" "$BASHRC_FILE" 2>/dev/null; then
-        sed -i '/alias csm=/d' "$BASHRC_FILE"
+        sedi '/alias csm=/d' "$BASHRC_FILE"
         log_info "旧 alias csm を削除しました"
     fi
 
@@ -660,7 +669,7 @@ if [ -f "$BASHRC_FILE" ]; then
         ALIAS_ADDED=true
     else
         # 関数は存在する → 最新版に更新
-        sed -i '/^css()/d' "$BASHRC_FILE"
+        sedi '/^css()/d' "$BASHRC_FILE"
         echo "$CSS_FUNC" >> "$BASHRC_FILE"
         log_info "css 関数を更新しました"
         ALIAS_ADDED=true
@@ -672,7 +681,7 @@ if [ -f "$BASHRC_FILE" ]; then
         log_info "csm 関数を追加しました（グレーターヤクザ・ヤクザウィンドウ — 自動掃除付き）"
         ALIAS_ADDED=true
     else
-        sed -i '/^csm()/d' "$BASHRC_FILE"
+        sedi '/^csm()/d' "$BASHRC_FILE"
         echo "$CSM_FUNC" >> "$BASHRC_FILE"
         log_info "csm 関数を更新しました"
         ALIAS_ADDED=true
@@ -711,7 +720,7 @@ if [ "$IS_WSL" = true ]; then
                 # [experimental] セクションがあるか確認
                 if grep -q "\[experimental\]" "$WSLCONFIG_PATH" 2>/dev/null; then
                     # [experimental] セクションの直後に追加
-                    sed -i '/\[experimental\]/a autoMemoryReclaim=gradual' "$WSLCONFIG_PATH"
+                    sedi '/\[experimental\]/a autoMemoryReclaim=gradual' "$WSLCONFIG_PATH"
                 else
                     echo "" >> "$WSLCONFIG_PATH"
                     echo "[experimental]" >> "$WSLCONFIG_PATH"

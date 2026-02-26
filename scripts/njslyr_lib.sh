@@ -20,6 +20,17 @@ SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$SCRIPT_DIR")}"
 STATE_DIR="${STATE_DIR:-$PROJECT_ROOT/.state}"
 
+# ─── Cross-platform sed -i (BSD vs GNU) ───
+# njslyr.sh source前に定義: source失敗時でもsedi()を提供する
+# 他スクリプトから source scripts/njslyr_lib.sh で利用可能
+sedi() {
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
 # ─── njslyr.sh の関数群を継承 ───
 # 方針A: __NJSLYR_TESTING__=1 でmain()起動を抑制してsource
 # - njslyr.shのstage3_slay()、agent_is_busy()等の関数が利用可能になる

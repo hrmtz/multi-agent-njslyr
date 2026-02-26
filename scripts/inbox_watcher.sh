@@ -30,9 +30,10 @@ _UNAME_S=$(uname -s)
 if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
     set -euo pipefail
 
-    # macOS (Darwin): GNU coreutils (timeout etc.) via Homebrew gnubin
+    # macOS (Darwin): GNU coreutils (timeout etc.) + util-linux (flock) via Homebrew
     if [[ "$_UNAME_S" == "Darwin" ]]; then
-        export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
+        _HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+        export PATH="${_HOMEBREW_PREFIX}/opt/coreutils/libexec/gnubin:${_HOMEBREW_PREFIX}/opt/util-linux/bin:$PATH"
     fi
 
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

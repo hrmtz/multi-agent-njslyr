@@ -14,6 +14,15 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
 fi
 
+# Cross-platform sed -i (BSD vs GNU)
+sedi() {
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
 # ─── Configuration ───
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$SCRIPT_DIR")}"
@@ -613,7 +622,7 @@ stage3_slay() {
     if [[ -n "$pre_slay_task_yaml" && -f "$pre_slay_task_yaml" ]]; then
         current_task_id=$(grep '^ *task_id: ' "$pre_slay_task_yaml" | head -1 | sed 's/.*task_id: *//;s/^"//;s/"$//' || echo "unknown")
         log "Data preservation: タスクYAML状態更新 (${pre_slay_task_yaml})..."
-        sed -i '' 's/^ *status: .*/  status: slayed_by_njslyr/' "$pre_slay_task_yaml" 2>/dev/null || true
+        sedi 's/^ *status: .*/  status: slayed_by_njslyr/' "$pre_slay_task_yaml" 2>/dev/null || true
     fi
 
     # Data preservation Step 4: 粛清ログ記録
@@ -886,7 +895,7 @@ spawn_yakuzatengu() {
     if [[ -n "$task_yaml" && -f "$task_yaml" ]]; then
         # BUG-T3 fix: 変更前のstatusを保存（rollback時に復元する）
         orig_task_status=$(grep '^ *status:' "$task_yaml" | head -1 | awk '{print $2}' | tr -d "'\"")
-        sed -i '' 's/^ *status: .*/  status: suspended/' "$task_yaml" 2>/dev/null || true
+        sedi 's/^ *status: .*/  status: suspended/' "$task_yaml" 2>/dev/null || true
         log "spawn_yakuzatengu: ${orig_agent} タスクYAML statusをsuspendedに変更（元: ${orig_task_status}）"
     fi
 
@@ -924,7 +933,7 @@ spawn_yakuzatengu() {
         tmux select-pane -t "$pane_target" -P "bg=${orig_bg_color}" 2>/dev/null || true
         # BUG-T3 fix: task YAML status復元（suspendedから元のstatusに戻す）
         if [[ -n "${task_yaml:-}" && -f "${task_yaml:-}" ]]; then
-            sed -i '' "s/^ *status: suspended/  status: ${orig_task_status:-assigned}/" "$task_yaml" 2>/dev/null || true
+            sedi "s/^ *status: suspended/  status: ${orig_task_status:-assigned}/" "$task_yaml" 2>/dev/null || true
         fi
         rm -f "$STATE_DIR/yakuzatengu_active" \
               "$STATE_DIR/yakuzatengu_original_agent_id" \

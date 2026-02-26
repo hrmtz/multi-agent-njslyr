@@ -50,8 +50,7 @@ append_ntfy_inbox() {
     local ts="$2"
     local msg="$3"
 
-    (
-        flock -w 5 200 || exit 1
+    _run_locked() {
         NTFY_INBOX_PATH="$INBOX" \
         NTFY_CORRUPT_DIR="$CORRUPT_DIR" \
         MSG_ID="$msg_id" \
@@ -128,7 +127,25 @@ except Exception as e:
     print(f"[ntfy_listener] failed to write inbox: {e}", file=sys.stderr)
     sys.exit(1)
 PY
-    ) 200>"$LOCKFILE"
+    }
+
+    # Cross-platform file locking: flock (Linux) or mkdir fallback (macOS)
+    if command -v flock &>/dev/null; then
+        ( flock -w 5 200 || exit 1; _run_locked ) 200>"$LOCKFILE"
+    else
+        local lock_dir="${LOCKFILE}.d"
+        local retries=10
+        while ! mkdir "$lock_dir" 2>/dev/null; do
+            retries=$((retries - 1))
+            if [[ $retries -le 0 ]]; then
+                echo "[ntfy_listener] failed to acquire lock" >&2
+                return 1
+            fi
+            sleep 0.5
+        done
+        _run_locked
+        rmdir "$lock_dir" 2>/dev/null
+    fi
 }
 
 echo "[$(date)] ntfy listener started — topic: $TOPIC (auth: ${NTFY_TOKEN:+token}${NTFY_USER:+basic}${NTFY_TOKEN:-${NTFY_USER:-none}})" >&2
@@ -149,7 +166,8 @@ while true; do
         [ -z "$MSG" ] && continue
 
         MSG_ID=$(echo "$line" | parse_json id)
-        TIMESTAMP=$(date "+%Y-%m-%dT%H:%M:%S%:z")
+        # %:z is GNU-only (+09:00). Use %z (+0900) and insert colon for portability.
+        TIMESTAMP=$(date "+%Y-%m-%dT%H:%M:%S%z" | sed 's/\([+-][0-9][0-9]\)\([0-9][0-9]\)$/\1:\2/')
 
         echo "[$(date)] Received: $MSG" >&2
 
