@@ -1034,8 +1034,8 @@ NINJA_EOF
     # ═══════════════════════════════════════════════════════════════════
     log_info "📊 ◆コンテキスト監視開始◆ ニンジャソウル健康状態監視…ボディ・ガード起動！"
 
-    # launch_monitor.sh経由でバックグラウンドウィンドウに起動
-    bash "$SCRIPT_DIR/scripts/launch_monitor.sh" 2>&1 | tee -a "$SCRIPT_DIR/logs/monitor_context_launch.log"
+    # monitor_context.shをバックグラウンドで直接起動
+    nohup bash "$SCRIPT_DIR/scripts/monitor_context.sh" >> "$SCRIPT_DIR/logs/monitor_context.log" 2>&1 &
 
     log_success "  └─ ◆実際完了◆ コンテキスト監視起動完了！閾値: 30%警告/20%アラート/10%自動clear。ワザマエ！"
     echo ""
