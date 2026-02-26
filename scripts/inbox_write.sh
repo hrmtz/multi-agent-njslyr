@@ -12,7 +12,7 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     export PATH="${_HOMEBREW_PREFIX}/opt/util-linux/bin:$PATH"
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)"
 TARGET="$1"
 CONTENT="$2"
 TYPE="${3:-wake_up}"
@@ -28,7 +28,7 @@ if [ -z "$PRIORITY_ARG" ]; then
             ;;
         report_received)
             # Check for BLOCKING keyword in content
-            if echo "$CONTENT" | grep -qi "BLOCKING"; then
+            if [[ "$CONTENT" =~ [Bb][Ll][Oo][Cc][Kk][Ii][Nn][Gg] ]]; then
                 PRIORITY="P0"  # BLOCKING issue = emergency
             else
                 PRIORITY="P1"  # Normal QC result = high priority
@@ -71,15 +71,17 @@ if [ ! -f "$INBOX" ]; then
     echo "messages: []" > "$INBOX"
 fi
 
-# Generate unique message ID (timestamp-based)
-MSG_ID="msg_$(date +%Y%m%d_%H%M%S)_$(head -c 4 /dev/urandom | xxd -p)"
+# Generate unique message ID (timestamp-based; single date fork, printf builtin for rand)
 TIMESTAMP=$(date "+%Y-%m-%dT%H:%M:%S")
+printf -v _rand '%04x%04x' "$RANDOM" "$RANDOM"
+MSG_ID="msg_${TIMESTAMP//[^0-9]/}_${_rand}"
 
 # Atomic write with flock (exponential backoff: max 5 retries)
 # Backoff delays: 0.1s, 0.2s, 0.4s, 0.8s (doubles each time)
 attempt=0
 max_attempts=5
 
+_backoff_delays=("" "0.2" "0.4" "0.8" "1.6")
 while [ $attempt -lt $max_attempts ]; do
     if (
         flock -w 5 200 || exit 1
@@ -149,9 +151,8 @@ except Exception as e:
         # Lock timeout or error
         attempt=$((attempt + 1))
         if [ $attempt -lt $max_attempts ]; then
-            # Exponential backoff: 0.1s * 2^attempt (attempt is post-increment)
-            # attempt=1 → 0.2s, attempt=2 → 0.4s, attempt=3 → 0.8s, attempt=4 → 1.6s
-            backoff_delay=$(awk "BEGIN {print 0.1 * (2 ^ $attempt)}")
+            # Exponential backoff (precomputed): 0.1s * 2^attempt
+            backoff_delay="${_backoff_delays[$attempt]}"
             echo "[inbox_write] Lock timeout for $INBOX (attempt $((attempt + 1))/$max_attempts), retrying in ${backoff_delay}s..." >&2
             sleep "$backoff_delay"
         else

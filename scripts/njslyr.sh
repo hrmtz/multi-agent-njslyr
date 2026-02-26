@@ -25,7 +25,7 @@ sedi() {
 
 # ─── Configuration ───
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
-PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$SCRIPT_DIR")}"
+PROJECT_ROOT="${PROJECT_ROOT:-${SCRIPT_DIR%/*}}"
 DASHBOARD="$PROJECT_ROOT/dashboard.md"
 LOG_DIR="$PROJECT_ROOT/queue/logs"
 METRICS_DIR="$PROJECT_ROOT/queue/metrics"
@@ -408,9 +408,9 @@ get_task_status() {
         return 0
     fi
 
-    # Extract status field from YAML (simple grep approach)
+    # Extract status field from YAML (single awk — replaces grep|head|sed 3-process pipe)
     local status
-    status=$(grep '^ *status: ' "$task_yaml" | head -1 | sed 's/.*status: *//;s/ *$//' || true)
+    status=$(awk '/^ *status: /{sub(/.*status: */,""); sub(/ *$/,""); print; exit}' "$task_yaml" 2>/dev/null || true)
     echo "${status:-idle}"
 }
 
@@ -430,7 +430,7 @@ agent_is_busy() {
     pane_tail=$(timeout 1 tmux capture-pane -t "$pane_target" -p 2>/dev/null | tail -5 || echo "")
 
     # Check for busy markers (BUG-3 fix: expanded patterns — confirmed Claude Code outputs only)
-    if echo "$pane_tail" | grep -qiE '(Working|Thinking|Planning|Sending|Generating|\(thinking\)|thought for|Cogitated|思考中|考え中|計画中|送信中|処理中|実行中|生成中|esc to interrupt)'; then
+    if grep -qiE '(Working|Thinking|Planning|Sending|Generating|\(thinking\)|thought for|Cogitated|思考中|考え中|計画中|送信中|処理中|実行中|生成中|esc to interrupt)' <<< "$pane_tail"; then
         return 0  # busy
     fi
 
@@ -445,7 +445,7 @@ agent_is_thinking() {
     pane_content=$(timeout 1 tmux capture-pane -t "$pane_target" -p 2>/dev/null | tail -10 || echo "")
 
     # Check for thinking markers (BUG-3 fix: add bracketed (thinking) pattern)
-    if echo "$pane_content" | grep -qiE '(Thinking|\(thinking\)|思考中|Planning|考え中|計画中)'; then
+    if grep -qiE '(Thinking|\(thinking\)|思考中|Planning|考え中|計画中)' <<< "$pane_content"; then
         return 0  # thinking
     fi
 
@@ -471,7 +471,7 @@ inbox_watcher_recently_cleared() {
     [[ ! -f "$clear_lock" ]] && return 1
 
     local last_clear_ts
-    last_clear_ts=$(cat "$clear_lock" 2>/dev/null || echo "0")
+    read -r last_clear_ts < "$clear_lock" 2>/dev/null || last_clear_ts=0
 
     local now
     now=$(date +%s)
@@ -488,7 +488,7 @@ get_restart_count() {
     [[ ! -f "$restart_file" ]] && echo "0" && return 0
 
     local count
-    count=$(grep 'count:' "$restart_file" 2>/dev/null | sed 's/.*: *//' || echo "0")
+    count=$(awk '/count:/{sub(/.*: */,""); print; exit}' "$restart_file" 2>/dev/null); count="${count:-0}"
     echo "$count"
 }
 
@@ -522,10 +522,10 @@ check_restart_loop() {
 
     [[ ! -f "$restart_file" ]] && return 1  # no loop
 
-    local count
-    local last_restart
-    count=$(grep 'count:' "$restart_file" 2>/dev/null | sed 's/.*: *//' || echo "0")
-    last_restart=$(grep 'last_restart:' "$restart_file" 2>/dev/null | sed 's/.*: *"//;s/".*//' || echo "1970-01-01T00:00:00")
+    local count last_restart
+    # Single awk per field (replaces grep|sed 2-process pipe with 1 awk each)
+    count=$(awk '/count:/{sub(/.*: */,""); print; exit}' "$restart_file" 2>/dev/null); count="${count:-0}"
+    last_restart=$(awk '/last_restart:/{sub(/.*: *"/,""); sub(/".*/,""); print; exit}' "$restart_file" 2>/dev/null); last_restart="${last_restart:-1970-01-01T00:00:00}"
 
     # Convert timestamp to epoch (macOS native date: -j flag; GNU date: -d flag)
     local last_restart_epoch
@@ -647,7 +647,7 @@ stage3_slay() {
     pre_slay_task_yaml=$(get_latest_task_yaml "$agent_id")
     local current_task_id="unknown"
     if [[ -n "$pre_slay_task_yaml" && -f "$pre_slay_task_yaml" ]]; then
-        current_task_id=$(grep '^ *task_id: ' "$pre_slay_task_yaml" | head -1 | sed 's/.*task_id: *//;s/^"//;s/"$//' || echo "unknown")
+        current_task_id=$(awk '/^ *task_id: /{sub(/.*task_id: */,""); gsub(/"/,""); print; exit}' "$pre_slay_task_yaml" 2>/dev/null); current_task_id="${current_task_id:-unknown}"
         log "Data preservation: タスクYAML状態更新 (${pre_slay_task_yaml})..."
         sedi 's/^ *status: .*/  status: slayed_by_njslyr/' "$pre_slay_task_yaml" 2>/dev/null || true
     fi
@@ -760,7 +760,7 @@ check_cooldown() {
     [[ ! -f "$cooldown_file" ]] && return 0  # No cooldown active
 
     local last_ts
-    last_ts=$(cat "$cooldown_file" 2>/dev/null); last_ts="${last_ts:-0}"
+    read -r last_ts < "$cooldown_file" 2>/dev/null || last_ts=0
 
     local now
     now=$(date +%s)
@@ -836,7 +836,7 @@ should_spawn_yakuzatengu() {
         [[ ! "$yid" =~ ^yakuza[0-9]+$ ]] && continue
         local idle_file="$STATE_DIR/njslyr_${yid}_idle_start"
         [[ ! -f "$idle_file" ]] && continue
-        local idle_start; idle_start=$(cat "$idle_file" 2>/dev/null); idle_start="${idle_start:-0}"
+        local idle_start; read -r idle_start < "$idle_file" 2>/dev/null || idle_start=0
         local idle_elapsed=$((now - idle_start))
         [[ $idle_elapsed -ge 300 ]] && idle_count=$(( idle_count + 1 ))
     done < <(get_monitored_agents)
@@ -866,7 +866,7 @@ spawn_yakuzatengu() {
         [[ ! "$yid" =~ ^yakuza[0-9]+$ ]] && continue
         local idle_file="$STATE_DIR/njslyr_${yid}_idle_start"
         if [[ -f "$idle_file" ]]; then
-            local idle_start; idle_start=$(cat "$idle_file" 2>/dev/null); idle_start="${idle_start:-0}"
+            local idle_start; read -r idle_start < "$idle_file" 2>/dev/null || idle_start=0
             local idle_elapsed=$((now - idle_start))
             if [[ $idle_elapsed -gt $max_idle ]]; then
                 max_idle=$idle_elapsed
@@ -921,7 +921,7 @@ spawn_yakuzatengu() {
     task_yaml=$(get_latest_task_yaml "$orig_agent")
     if [[ -n "$task_yaml" && -f "$task_yaml" ]]; then
         # BUG-T3 fix: 変更前のstatusを保存（rollback時に復元する）
-        orig_task_status=$(grep '^ *status:' "$task_yaml" | head -1 | awk '{print $2}' | tr -d "'\"")
+        orig_task_status=$(awk '/^ *status:/{gsub(/['\''"]/, "", $2); print $2; exit}' "$task_yaml" 2>/dev/null); orig_task_status="${orig_task_status:-assigned}"
         sedi 's/^ *status: .*/  status: suspended/' "$task_yaml" 2>/dev/null || true
         log "spawn_yakuzatengu: ${orig_agent} タスクYAML statusをsuspendedに変更（元: ${orig_task_status}）"
     fi
@@ -990,7 +990,7 @@ spawn_yakuzatengu() {
 should_despawn_yakuzatengu() {
     # Guard時間チェック: spawn後300秒未満はdespawn禁止（M-2）
     local spawn_time now elapsed
-    spawn_time=$(cat "$STATE_DIR/yakuzatengu_spawn_time" 2>/dev/null || echo 0)
+    read -r spawn_time < "$STATE_DIR/yakuzatengu_spawn_time" 2>/dev/null || spawn_time=0
     now=$(date +%s)
     elapsed=$((now - spawn_time))
     if [[ $elapsed -lt 300 ]]; then
@@ -1044,9 +1044,9 @@ despawn_yakuzatengu() {
 
     # STATEファイル読み込み
     local orig_agent orig_pane orig_model
-    orig_agent=$(cat "$STATE_DIR/yakuzatengu_original_agent_id" 2>/dev/null || echo "")
-    orig_pane=$(cat "$STATE_DIR/yakuzatengu_original_pane" 2>/dev/null || echo "")
-    orig_model=$(cat "$STATE_DIR/yakuzatengu_original_model" 2>/dev/null || echo "Sonnet")
+    read -r orig_agent < "$STATE_DIR/yakuzatengu_original_agent_id" 2>/dev/null || orig_agent=""
+    read -r orig_pane < "$STATE_DIR/yakuzatengu_original_pane" 2>/dev/null || orig_pane=""
+    read -r orig_model < "$STATE_DIR/yakuzatengu_original_model" 2>/dev/null || orig_model="Sonnet"
 
     if [[ -z "$orig_agent" || -z "$orig_pane" ]]; then
         log "ERROR: despawn_yakuzatengu: STATEファイル不完全。cleanup実行。"
@@ -1111,7 +1111,7 @@ despawn_yakuzatengu() {
 check_long_running_refresh() {
     local now last_refresh elapsed
     now=$(date +%s)
-    last_refresh=$(cat "$STATE_DIR/njslyr_last_refresh" 2>/dev/null); last_refresh="${last_refresh:-0}"
+    read -r last_refresh < "$STATE_DIR/njslyr_last_refresh" 2>/dev/null || last_refresh=0
     elapsed=$(( now - last_refresh ))
 
     if [[ $elapsed -ge $REFRESH_INTERVAL ]]; then
@@ -1137,7 +1137,7 @@ check_stale_state() {
                       "$STATE_DIR/njslyr_${agent_id}_stage2_last" \
                       "$STATE_DIR/njslyr_${agent_id}_stage3_last"; do
         [[ ! -f "$state_file" ]] && continue
-        ts=$(cat "$state_file" 2>/dev/null); ts="${ts:-0}"
+        read -r ts < "$state_file" 2>/dev/null || ts=0
         age=$(( now - ts ))
         if [[ $age -gt $STALE_THRESHOLD ]]; then
             log "WARN: stale state file detected: $state_file (age: ${age}s). Removing."
@@ -1156,7 +1156,7 @@ check_agent_idle_v2() {
     # Step0: graceピリオドチェック（/clear直後180秒間はidle扱いしない）
     # clear_last_${agent_id} は A-2 chop() が echo "$(date +%s)" で更新する
     local clear_last grace_elapsed
-    clear_last=$(cat "$STATE_DIR/clear_last_${agent_id}" 2>/dev/null); clear_last="${clear_last:-0}"
+    read -r clear_last < "$STATE_DIR/clear_last_${agent_id}" 2>/dev/null || clear_last=0
     grace_elapsed=$(( $(date +%s) - clear_last ))
     if [[ $grace_elapsed -lt 180 ]]; then
         return 1  # grace period: /clear直後はidle扱いしない
@@ -1168,8 +1168,8 @@ check_agent_idle_v2() {
     if [[ -z "$task_yaml" ]]; then
         task_status="idle"
     else
-        task_status=$(grep '^ *status: ' "$task_yaml" | head -1 | \
-            sed 's/.*status: *//;s/ *$//' || echo "idle")
+        task_status=$(awk '/^ *status: /{sub(/.*status: */,""); sub(/ *$/,""); print; exit}' "$task_yaml" 2>/dev/null || true)
+        task_status="${task_status:-idle}"
     fi
 
     # Step2: inbox unread確認（unreadがある場合はidle扱いしない）
@@ -1261,7 +1261,7 @@ check_agent() {
 
         # Calculate elapsed thinking time
         local thinking_start
-        thinking_start=$(cat "$thinking_state_file" 2>/dev/null || echo "0")
+        read -r thinking_start < "$thinking_state_file" 2>/dev/null || thinking_start=0
         local now
         now=$(date +%s)
         local thinking_elapsed=$((now - thinking_start))
@@ -1316,7 +1316,7 @@ check_agent() {
     local stage1_ts_file="$STATE_DIR/njslyr_${agent_id}_stage1_last"
     if [[ -f "$stage1_ts_file" ]]; then
         local stage1_ts
-        stage1_ts=$(cat "$stage1_ts_file" 2>/dev/null); stage1_ts="${stage1_ts:-0}"
+        read -r stage1_ts < "$stage1_ts_file" 2>/dev/null || stage1_ts=0
         local now
         now=$(date +%s)
         local elapsed=$((now - stage1_ts))
@@ -1352,7 +1352,7 @@ check_agent() {
     local stage2_ts_file="$STATE_DIR/njslyr_${agent_id}_stage2_last"
     if [[ -f "$stage2_ts_file" ]]; then
         local stage2_ts
-        stage2_ts=$(cat "$stage2_ts_file" 2>/dev/null); stage2_ts="${stage2_ts:-0}"
+        read -r stage2_ts < "$stage2_ts_file" 2>/dev/null || stage2_ts=0
         local now
         now=$(date +%s)
         local elapsed=$((now - stage2_ts))
@@ -1398,7 +1398,7 @@ check_agent() {
         fi
 
         local idle_start
-        idle_start=$(cat "$idle_state_file" 2>/dev/null || echo "0")
+        read -r idle_start < "$idle_state_file" 2>/dev/null || idle_start=0
         local idle_elapsed=$((now - idle_start))
 
         if [[ $idle_elapsed -ge $IDLE_TIMEOUT ]]; then

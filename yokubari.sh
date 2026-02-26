@@ -43,14 +43,20 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
 fi
 
-# 言語・シェル設定を読み取り
+# 言語・シェル設定を読み取り（設定ファイル1回読み・fork 0で全キー抽出）
 LANG_SETTING="ja"
 SHELL_SETTING="bash"
+NTFY_TOPIC=""
 if [ -f "./config/settings.yaml" ]; then
-    LANG_SETTING=$(grep "^language:" ./config/settings.yaml 2>/dev/null | awk '{print $2}' || true)
-    SHELL_SETTING=$(grep "^shell:" ./config/settings.yaml 2>/dev/null | awk '{print $2}' || true)
+    while read -r line; do
+        case "$line" in
+            language:*) LANG_SETTING="${line#*: }" ;;
+            shell:*) SHELL_SETTING="${line#*: }" ;;
+            ntfy_topic:*) NTFY_TOPIC="${line#*: }"; NTFY_TOPIC="${NTFY_TOPIC//\"/}" ;;
+        esac
+    done < ./config/settings.yaml
 fi
-# 空文字列ガード: grep無マッチ時にawkが空を返すケースに対応
+# 空文字列ガード
 LANG_SETTING="${LANG_SETTING:-ja}"
 SHELL_SETTING="${SHELL_SETTING:-bash}"
 
@@ -741,9 +747,9 @@ tmux split-window -h -t "multiagent:agents"
 # 各列を3行に分割
 # BUG FIX (2026-02-19): pane INDEX はv-split時に位置順で再ナンバリングされるため不安定。
 # h-split直後にpane ID（%N形式・安定）を保存し、v-split時はIDで列頭を指定する。
-COL1_ID=$(tmux list-panes -t "multiagent:agents" -F '#{pane_id}' | sed -n '1p')
-COL2_ID=$(tmux list-panes -t "multiagent:agents" -F '#{pane_id}' | sed -n '2p')
-COL3_ID=$(tmux list-panes -t "multiagent:agents" -F '#{pane_id}' | sed -n '3p')
+# 1回の tmux list-panes で全ペインID取得（3 tmux+3 sed → 1 tmux+0 fork）
+{ read -r COL1_ID; read -r COL2_ID; read -r COL3_ID; } \
+    < <(tmux list-panes -t "multiagent:agents" -F '#{pane_id}')
 
 tmux select-pane -t "$COL1_ID"
 tmux split-window -v
@@ -781,27 +787,33 @@ if [ "$CLI_ADAPTER_LOADED" = true ]; then
             claude)
                 _claude_model=$(get_agent_model "$_agent")
                 if [[ -n "$_claude_model" ]]; then
-                    # haiku→Haiku, opus→Opus, sonnet→Sonnet に正規化（macOS BSD sed は \U 非対応）
-                    _first=$(echo "${_claude_model:0:1}" | tr '[:lower:]' '[:upper:]')
-                    MODEL_NAMES[$i]="${_first}${_claude_model:1}"
+                    # haiku→Haiku, opus→Opus, sonnet→Sonnet に正規化（fork不要・bash 3.2+互換）
+                    case "$_claude_model" in
+                        opus)   MODEL_NAMES[i]="Opus" ;;
+                        sonnet) MODEL_NAMES[i]="Sonnet" ;;
+                        haiku)  MODEL_NAMES[i]="Haiku" ;;
+                        *)  _first=$(echo "${_claude_model:0:1}" | tr '[:lower:]' '[:upper:]')
+                            MODEL_NAMES[i]="${_first}${_claude_model:1}" ;;
+                    esac
                 fi
                 ;;
             codex)
                 # settings.yamlのmodelを優先表示、なければconfig.tomlのeffort
                 _codex_model=$(get_agent_model "$_agent")
                 if [[ -n "$_codex_model" ]]; then
-                    MODEL_NAMES[$i]="codex/${_codex_model}"
+                    MODEL_NAMES[i]="codex/${_codex_model}"
                 else
-                    _codex_effort=$(grep '^model_reasoning_effort' ~/.codex/config.toml 2>/dev/null | head -1 | sed 's/.*= *"\(.*\)"/\1/')
+                    # grep|head|sed → 単一awk（3 fork → 1 fork）
+                    _codex_effort=$(awk -F'"' '/^model_reasoning_effort/{print $2; exit}' ~/.codex/config.toml 2>/dev/null)
                     _codex_effort=${_codex_effort:-high}
-                    MODEL_NAMES[$i]="codex/${_codex_effort}"
+                    MODEL_NAMES[i]="codex/${_codex_effort}"
                 fi
                 ;;
             copilot)
-                MODEL_NAMES[$i]="Copilot"
+                MODEL_NAMES[i]="Copilot"
                 ;;
             kimi)
-                MODEL_NAMES[$i]="Kimi"
+                MODEL_NAMES[i]="Kimi"
                 ;;
         esac
     done
@@ -1108,7 +1120,7 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 6.8: ntfy入力リスナー起動
 # ═══════════════════════════════════════════════════════════════════════════════
-NTFY_TOPIC=$(grep 'ntfy_topic:' ./config/settings.yaml 2>/dev/null | awk '{print $2}' | tr -d '"')
+# NTFY_TOPIC は起動時の settings.yaml 読み込みで取得済み（grep|awk|tr → 0 fork）
 if [ -n "$NTFY_TOPIC" ]; then
     pkill -f "ntfy_listener.sh" 2>/dev/null || true
     [ ! -f ./queue/ntfy_inbox.yaml ] && echo "inbox:" > ./queue/ntfy_inbox.yaml

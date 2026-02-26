@@ -50,23 +50,24 @@ start_watcher_if_missing() {
         return 0
     fi
 
-    cli=$(tmux show-options -p -t "$pane" -v @agent_cli 2>/dev/null || echo "claude")
+    cli=$(tmux show-options -p -t "$pane" -v @agent_cli 2>/dev/null); cli=${cli:-claude}
     nohup bash scripts/inbox_watcher.sh "$agent" "$pane" "$cli" >> "$log_file" 2>&1 &
 }
 
 # For all agents except darkninja: dynamically resolve pane_id from @agent_id.
 # UNIFIED-MED-005: pgrep uses [%] to match %pane_id format (avoids trailing-space ambiguity).
 # C-ISSUE-1: pane_exists() is not used here; empty pane_id check replaces it.
+# pane_map: cached output of "tmux list-panes -a -F '#{@agent_id} #{pane_id}'" (passed from scan_all_agents)
 start_watcher_for_agent() {
     local agent="$1"
     local log_file="$2"
+    local pane_map="$3"
 
     ensure_inbox_file "$agent"
 
-    # Dynamic pane lookup by @agent_id
+    # Dynamic pane lookup by @agent_id (uses caller-cached tmux output — no extra fork)
     local pane_id
-    pane_id=$(tmux list-panes -a -F '#{@agent_id} #{pane_id}' 2>/dev/null \
-        | awk -v id="$agent" '$1 == id {print $2; exit}')
+    pane_id=$(awk -v id="$agent" '$1 == id {print $2; exit}' <<< "$pane_map")
 
     if [[ -z "$pane_id" ]]; then
         # Pane not found: skip (expected after yakuzatengu despawn or pane not yet spawned)
@@ -79,7 +80,7 @@ start_watcher_for_agent() {
     fi
 
     local cli
-    cli=$(tmux show-options -p -t "$pane_id" -v @agent_cli 2>/dev/null || echo "claude")
+    cli=$(tmux show-options -p -t "$pane_id" -v @agent_cli 2>/dev/null); cli=${cli:-claude}
     nohup bash scripts/inbox_watcher.sh "$agent" "$pane_id" "$cli" >> "$log_file" 2>&1 &
     echo "[watcher_supervisor] started inbox_watcher for $agent → $pane_id"
 }
@@ -90,13 +91,18 @@ scan_all_agents() {
     # darkninja: fixed session target (separate dedicated session)
     start_watcher_if_missing "darkninja" "darkninja:main.0" "logs/inbox_watcher_darkninja.log"
 
+    # Cache full pane map once to avoid N tmux calls per agent (N+1 → 1).
+    local pane_map
+    pane_map=$(tmux list-panes -a -F '#{@agent_id} #{pane_id}' 2>/dev/null)
+
     # All agents in multiagent:agents window: detect dynamically by @agent_id.
     # Handles yakuzatengu spawn/despawn transparently.
+    # awk replaces grep -v '^$' | sort -u (one process instead of two).
     while IFS= read -r agent; do
         [[ -z "$agent" || "$agent" == "darkninja" ]] && continue
-        start_watcher_for_agent "$agent" "logs/inbox_watcher_${agent}.log"
+        start_watcher_for_agent "$agent" "logs/inbox_watcher_${agent}.log" "$pane_map"
     done < <(tmux list-panes -t multiagent:agents -F '#{@agent_id}' 2>/dev/null \
-        | grep -v '^$' | sort -u)
+        | awk 'NF && !seen[$0]++')
 }
 
 # Graceful shutdown: log and exit cleanly on SIGTERM/SIGINT

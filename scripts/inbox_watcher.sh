@@ -36,7 +36,7 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
         export PATH="${_HOMEBREW_PREFIX}/opt/coreutils/libexec/gnubin:${_HOMEBREW_PREFIX}/opt/util-linux/bin:$PATH"
     fi
 
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)"
     AGENT_ID="$1"
     PANE_TARGET="$2"
     CLI_TYPE="${3:-claude}"  # CLI種別（claude/codex/copilot）。未指定→claude（後方互換）
@@ -54,7 +54,7 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
 
     # Initialize inbox if not exists (atomic: write to tmp then rename to avoid TOCTOU)
     if [ ! -f "$INBOX" ]; then
-        mkdir -p "$(dirname "$INBOX")"
+        mkdir -p "${INBOX%/*}"
         _init_tmp="${INBOX}.init.$$"
         echo "messages: []" > "$_init_tmp"
         # mv -n: no-clobber — if another process created the file first, keep theirs
@@ -130,7 +130,7 @@ ASW_PROCESS_TIMEOUT=${ASW_PROCESS_TIMEOUT:-1}
 READ_COUNT=${READ_COUNT:-0}
 READ_BYTES_TOTAL=${READ_BYTES_TOTAL:-0}
 ESTIMATED_TOKENS_TOTAL=${ESTIMATED_TOKENS_TOTAL:-0}
-METRICS_FILE=${METRICS_FILE:-${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/queue/metrics/${AGENT_ID:-unknown}_selfwatch.yaml}
+METRICS_FILE=${METRICS_FILE:-${SCRIPT_DIR:-$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)}/queue/metrics/${AGENT_ID:-unknown}_selfwatch.yaml}
 
 update_metrics() {
     local bytes_read="${1:-0}"
@@ -146,7 +146,7 @@ update_metrics() {
         unread_latency_sec=$((now - FIRST_UNREAD_SEEN))
     fi
 
-    mkdir -p "$(dirname "$METRICS_FILE")" 2>/dev/null || true
+    mkdir -p "${METRICS_FILE%/*}" 2>/dev/null || true
     cat > "$METRICS_FILE" <<EOF
 agent_id: "${AGENT_ID:-unknown}"
 timestamp: "$(date -Iseconds)"
@@ -212,8 +212,6 @@ disable_normal_nudge() {
 
 should_throttle_nudge() {
     local unread_count="${1:-0}"
-    local now
-    now=$(date +%s)
 
     local effective_cli
     effective_cli=$(get_effective_cli_type)
@@ -224,7 +222,7 @@ should_throttle_nudge() {
     fi
 
     if [ "${LAST_NUDGE_COUNT:-}" = "$unread_count" ] && [ "${LAST_NUDGE_TS:-0}" -gt 0 ]; then
-        local age=$((now - LAST_NUDGE_TS))
+        local age=$((SECONDS - LAST_NUDGE_TS))
         if [ "$age" -lt "${cooldown_sec}" ]; then
             echo "[$(date)] [SKIP] Throttling スリケン for $AGENT_ID: inbox${unread_count} (${age}s < ${cooldown_sec}s, cli=$effective_cli)" >&2
             return 0
@@ -232,7 +230,7 @@ should_throttle_nudge() {
     fi
 
     LAST_NUDGE_COUNT="$unread_count"
-    LAST_NUDGE_TS="$now"
+    LAST_NUDGE_TS="$SECONDS"
     return 1
 }
 
@@ -243,32 +241,46 @@ is_valid_cli_type() {
     esac
 }
 
+# ─── CLI type cache (TTL 5s, avoids repeated tmux show-options calls) ───
+_CLI_CACHE_RESULT=""
+_CLI_CACHE_TS=0
+
 get_effective_cli_type() {
+    # Cache hit: reuse if within TTL (5 seconds)
+    if [ -n "$_CLI_CACHE_RESULT" ] && [ "$(( SECONDS - _CLI_CACHE_TS ))" -lt 5 ]; then
+        echo "$_CLI_CACHE_RESULT"
+        return 0
+    fi
+
     local pane_cli_raw=""
     local pane_cli=""
+    local result=""
 
     pane_cli_raw=$(timeout 2 tmux show-options -p -t "$PANE_TARGET" -v @agent_cli 2>/dev/null || true)
-    pane_cli=$(echo "$pane_cli_raw" | tr -d '\r' | head -n1 | tr -d '[:space:]')
+    # Consolidate echo|tr|head|tr pipe (4 forks) into parameter expansion (0 forks)
+    pane_cli="${pane_cli_raw%%$'\n'*}"
+    pane_cli="${pane_cli//$'\r'/}"
+    pane_cli="${pane_cli//[[:space:]]/}"
 
     if is_valid_cli_type "$pane_cli"; then
         if is_valid_cli_type "${CLI_TYPE:-}" && [ "$pane_cli" != "${CLI_TYPE}" ]; then
             echo "[$(date)] [WARN] CLI drift detected for $AGENT_ID: arg=${CLI_TYPE}, pane=${pane_cli}. Using pane value." >&2
         fi
-        echo "$pane_cli"
-        return 0
-    fi
-
-    if is_valid_cli_type "${CLI_TYPE:-}"; then
+        result="$pane_cli"
+    elif is_valid_cli_type "${CLI_TYPE:-}"; then
         if [ -n "$pane_cli" ]; then
             echo "[$(date)] [WARN] Invalid pane @agent_cli for $AGENT_ID: '${pane_cli}'. Falling back to arg=${CLI_TYPE}." >&2
         fi
-        echo "${CLI_TYPE}"
-        return 0
+        result="${CLI_TYPE}"
+    else
+        # Fail-closed: when CLI is unknown, take codex-safe path (no C-c, /clear->/new)
+        echo "[$(date)] [WARN] CLI unresolved for $AGENT_ID (pane='${pane_cli:-<empty>}', arg='${CLI_TYPE:-<empty>}'). Fallback=codex-safe." >&2
+        result="codex"
     fi
 
-    # Fail-closed: when CLI is unknown, take codex-safe path (no C-c, /clear->/new)
-    echo "[$(date)] [WARN] CLI unresolved for $AGENT_ID (pane='${pane_cli:-<empty>}', arg='${CLI_TYPE:-<empty>}'). Fallback=codex-safe." >&2
-    echo "codex"
+    _CLI_CACHE_RESULT="$result"
+    _CLI_CACHE_TS=$SECONDS
+    echo "$result"
 }
 
 normalize_special_command() {
@@ -360,32 +372,19 @@ no_idle_full_read() {
 }
 
 # summary-first: unread_count fast-path before full read
+# Replaced python3+yaml.safe_load with grep (avoids ~50ms python3 startup).
+# Pattern: exactly 2-space indented "read: false" (matches YAML field, not content).
 get_unread_count_fast() {
-    INBOX_PATH="$INBOX" python3 - << 'PY'
-import json
-import os
-import yaml
-
-inbox = os.environ.get("INBOX_PATH", "")
-try:
-    with open(inbox, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
-    messages = data.get("messages", []) or []
-    unread_count = sum(1 for m in messages if not m.get("read", False))
-    print(json.dumps({"count": unread_count}))
-except Exception:
-    print(json.dumps({"count": 0}))
-PY
+    grep -c '^  read: false$' "$INBOX" 2>/dev/null || echo 0
 }
 
-# ─── Extract unread message info (lock-free read) ───
-# Returns JSON lines: {"count": N, "has_special": true/false, "specials": [...]}
+# ─── Extract unread message info ───
+# Output: line 1=normal_count, line 2=has_task_assigned(0/1), line 3+=specials(type\tcontent)
 # Test anchor for bats awk pattern: get_unread_info\\(\\)
 get_unread_info() {
     (
         flock -x 200
         INBOX_PATH="$INBOX" python3 - << 'PY'
-import json
 import os
 import yaml
 
@@ -418,16 +417,35 @@ try:
     normal_count = len(unread) - len(specials)
     normal_msgs = [m for m in unread if m.get("type") not in special_types]
     has_task_assigned = any(m.get("type") == "task_assigned" for m in normal_msgs)
-    payload = {
-        "count": normal_count,
-        "has_task_assigned": has_task_assigned,
-        "specials": [{"type": m.get("type", ""), "content": m.get("content", "")} for m in specials],
-    }
-    print(json.dumps(payload))
+    # Output: line 1=count, line 2=has_task_assigned(0/1), line 3+=specials(type\tcontent)
+    # Bash-parseable format eliminates 3 downstream python3 invocations.
+    print(normal_count)
+    print(1 if has_task_assigned else 0)
+    for s in specials:
+        t = s.get("type", "")
+        c = (s.get("content", "") or "").replace("\t", " ").replace("\n", " ").strip()
+        print(f"{t}\t{c}")
 except Exception:
-    print(json.dumps({"count": 0, "specials": []}))
+    print("0")
+    print("0")
 PY
     ) 200>"$LOCKFILE" 2>/dev/null
+}
+
+# ─── Parse get_unread_info() output (pure bash, 0 forks) ───
+# Sets: _UI_COUNT, _UI_HAS_TASK, _UI_SPECIALS
+_parse_unread_info() {
+    local _info="$1"
+    _UI_COUNT="${_info%%$'\n'*}"
+    _UI_COUNT="${_UI_COUNT:-0}"
+    local _rest="${_info#*$'\n'}"
+    _UI_HAS_TASK="${_rest%%$'\n'*}"
+    _UI_HAS_TASK="${_UI_HAS_TASK:-0}"
+    if [[ "$_rest" == *$'\n'* ]]; then
+        _UI_SPECIALS="${_rest#*$'\n'}"
+    else
+        _UI_SPECIALS=""
+    fi
 }
 
 # ─── Resolve pane target dynamically via @agent_id ───
@@ -438,11 +456,8 @@ _RESOLVE_CACHE_TARGET=""
 _RESOLVE_CACHE_TS=0
 
 resolve_pane_target() {
-    local now
-    now=$(date +%s)
-
-    # Cache hit: reuse if within TTL (5 seconds)
-    if [ -n "$_RESOLVE_CACHE_TARGET" ] && [ "$(( now - _RESOLVE_CACHE_TS ))" -lt 5 ]; then
+    # Cache hit: reuse if within TTL (5 seconds). Uses $SECONDS (bash builtin, 0 forks).
+    if [ -n "$_RESOLVE_CACHE_TARGET" ] && [ "$(( SECONDS - _RESOLVE_CACHE_TS ))" -lt 5 ]; then
         PANE_TARGET="$_RESOLVE_CACHE_TARGET"
         return 0
     fi
@@ -450,7 +465,7 @@ resolve_pane_target() {
     # Darkninja uses a separate session — skip dynamic resolution
     if [ "$AGENT_ID" = "darkninja" ]; then
         _RESOLVE_CACHE_TARGET="$PANE_TARGET"
-        _RESOLVE_CACHE_TS=$now
+        _RESOLVE_CACHE_TS=$SECONDS
         return 0
     fi
 
@@ -462,14 +477,14 @@ resolve_pane_target() {
     if [ -n "$resolved" ]; then
         PANE_TARGET="$resolved"
         _RESOLVE_CACHE_TARGET="$resolved"
-        _RESOLVE_CACHE_TS=$now
+        _RESOLVE_CACHE_TS=$SECONDS
         return 0
     fi
 
     # Fallback: keep startup PANE_TARGET (may be stale but better than nothing)
     echo "[$(date)] [WARN] resolve_pane_target: @agent_id=$AGENT_ID not found, using fallback $PANE_TARGET" >&2
     _RESOLVE_CACHE_TARGET="$PANE_TARGET"
-    _RESOLVE_CACHE_TS=$now
+    _RESOLVE_CACHE_TS=$SECONDS
     return 0
 }
 
@@ -703,8 +718,10 @@ agent_is_busy() {
         local cache_age=$((now - cache_mtime))
         if [ "$cache_age" -lt "$cache_ttl_sec" ]; then
             # Cache hit — return cached value (validate: must be 0 or 1)
+            # $(<file) avoids cat fork
             local cached_result
-            cached_result=$(cat "$cache_file" 2>/dev/null || echo "1")
+            cached_result=$(<"$cache_file") 2>/dev/null
+            cached_result="${cached_result:-1}"
             case "$cached_result" in
                 0|1) return "$cached_result" ;;
                 *) ;; # corrupted cache — fall through to actual check
@@ -726,26 +743,14 @@ agent_is_busy() {
         return 1  # timeout → idle (proceed with スリケン)
     fi
 
-    # ── Idle check (takes priority) ──
-    if echo "$pane_tail" | grep -qE '(\? for shortcuts|context left)'; then
+    # ── Idle check (takes priority) — consolidated from 2 greps into 1 ──
+    if grep -qE '(\? for shortcuts|context left|^(❯|›)[[:space:]]*$)' <<< "$pane_tail"; then
         echo "1" > "$cache_file"  # cache: idle
-        return 1  # idle — Codex idle prompt
-    fi
-    if echo "$pane_tail" | grep -qE '^(❯|›)\s*$'; then
-        echo "1" > "$cache_file"  # cache: idle
-        return 1  # idle — Claude Code or Codex bare prompt
+        return 1  # idle
     fi
 
-    # ── Busy markers (bottom 5 lines only) ──
-    if echo "$pane_tail" | grep -qiF 'esc to interrupt'; then
-        echo "0" > "$cache_file"  # cache: busy
-        return 0  # busy
-    fi
-    if echo "$pane_tail" | grep -qiF 'background terminal running'; then
-        echo "0" > "$cache_file"  # cache: busy
-        return 0  # busy
-    fi
-    if echo "$pane_tail" | grep -qiE '(Working|Thinking|Planning|Sending|task is in progress|Compacting conversation|thought for|思考中|考え中|計画中|送信中|処理中|実行中)'; then
+    # ── Busy markers (bottom 5 lines only) — consolidated from 3 greps into 1 ──
+    if grep -qiE '(esc to interrupt|background terminal running|Working|Thinking|Planning|Sending|task is in progress|Compacting conversation|thought for|思考中|考え中|計画中|送信中|処理中|実行中)' <<< "$pane_tail"; then
         echo "0" > "$cache_file"  # cache: busy
         return 0  # busy
     fi
@@ -913,10 +918,9 @@ process_unread() {
 
     # summary-first: unread_count fast-path (Phase 2/3 optimization)
     # unread_count fast-path lets us skip expensive full reads when idle.
-    local fast_info
-    fast_info=$(get_unread_count_fast)
+    # get_unread_count_fast now outputs plain number (grep-based, no python3).
     local fast_count
-    fast_count=$(echo "$fast_info" | python3 -c "import sys,json; print(json.load(sys.stdin).get('count',0))" 2>/dev/null)
+    fast_count=$(get_unread_count_fast)
     fast_count="${fast_count:-0}"
 
     # P1-2: fast-path expansion — skip full read when unread=0, regardless of trigger type
@@ -942,6 +946,13 @@ process_unread() {
     local info
     info=$(get_unread_info)
 
+    # Parse info in one pass (pure bash, 0 forks — replaces 3 python3 invocations)
+    local normal_count has_task_assigned specials
+    _parse_unread_info "$info"
+    normal_count=$_UI_COUNT
+    has_task_assigned=$_UI_HAS_TASK
+    specials=$_UI_SPECIALS
+
     local read_bytes=0
     if [ -f "$INBOX" ]; then
         read_bytes=$(wc -c < "$INBOX" 2>/dev/null || echo 0)
@@ -949,15 +960,6 @@ process_unread() {
     update_metrics "${read_bytes:-0}"
 
     # Handle special CLI commands first (/clear, /model)
-    local specials
-    specials=$(echo "$info" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-for s in data.get('specials', []):
-    t = s.get('type', '')
-    c = (s.get('content', '') or '').replace('\t', ' ').replace('\n', ' ').strip()
-    print(f'{t}\t{c}')
-" 2>/dev/null)
 
     local clear_seen=0
     if [ -n "$specials" ]; then
@@ -983,17 +985,10 @@ for s in data.get('specials', []):
             echo "[$(date)] [AUTO-RECOVERY] queued task_assigned for $AGENT_ID ($recovery_id)" >&2
         fi
         info=$(get_unread_info)
+        _parse_unread_info "$info"
+        normal_count=$_UI_COUNT
+        has_task_assigned=$_UI_HAS_TASK
     fi
-
-    # Send wake-up nudge for normal messages (with escalation)
-    local normal_count
-    normal_count=$(echo "$info" | python3 -c "import sys,json; print(json.load(sys.stdin).get('count',0))" 2>/dev/null)
-    normal_count="${normal_count:-0}"
-
-    # Check if unread messages include task_assigned (for context reset)
-    local has_task_assigned
-    has_task_assigned=$(echo "$info" | python3 -c "import sys,json; print(1 if json.load(sys.stdin).get('has_task_assigned') else 0)" 2>/dev/null)
-    has_task_assigned="${has_task_assigned:-0}"
 
     if [ "$normal_count" -gt 0 ] 2>/dev/null; then
         local now

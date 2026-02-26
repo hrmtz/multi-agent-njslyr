@@ -35,7 +35,7 @@ set -euo pipefail
 
 # ─── Variables ───
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="${SCRIPT_DIR%/*}"
 STATE_DIR="$PROJECT_ROOT/.state"
 mkdir -p "$STATE_DIR"
 
@@ -188,7 +188,7 @@ cmd_spawn_tengu() {
     orig_task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${orig_agent}"*.yaml 2>/dev/null | head -1)
     orig_task_status="idle"
     if [[ -n "$orig_task_yaml" && -f "$orig_task_yaml" ]]; then
-        orig_task_status=$(grep '^ *status:' "$orig_task_yaml" | head -1 | awk '{print $2}' | tr -d "'\"" || echo "idle")
+        orig_task_status=$(awk '/^ *status:/ {gsub(/['"'"'"]/, "", $2); print $2; exit}' "$orig_task_yaml" 2>/dev/null || echo "idle")
         sedi 's/^ *status: .*/  status: suspended/' "$orig_task_yaml" 2>/dev/null || true
     fi
 

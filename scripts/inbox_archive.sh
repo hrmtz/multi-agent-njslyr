@@ -11,7 +11,7 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     export PATH="${_HOMEBREW_PREFIX}/opt/util-linux/bin:$PATH"
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)"
 
 # Parse arguments
 AGENT_ID=""
@@ -79,6 +79,7 @@ mkdir -p "$ARCHIVE_DIR"
 attempt=0
 max_attempts=5
 
+_backoff_delays=("" "0.2" "0.4" "0.8" "1.6")
 while [ $attempt -lt $max_attempts ]; do
     if (
         flock -w 5 200 || exit 1
@@ -148,9 +149,8 @@ except Exception as e:
     else
         attempt=$((attempt + 1))
         if [ $attempt -lt $max_attempts ]; then
-            # Exponential backoff: 0.1s * 2^attempt (attempt is post-increment)
-            # attempt=1 → 0.2s, attempt=2 → 0.4s, attempt=3 → 0.8s, attempt=4 → 1.6s
-            backoff_delay=$(awk "BEGIN {print 0.1 * (2 ^ $attempt)}")
+            # Exponential backoff (precomputed): 0.1s * 2^attempt
+            backoff_delay="${_backoff_delays[$attempt]}"
             echo "[inbox_archive] Lock timeout for $INBOX (attempt $((attempt + 1))/$max_attempts), retrying in ${backoff_delay}s..." >&2
             sleep "$backoff_delay"
         else

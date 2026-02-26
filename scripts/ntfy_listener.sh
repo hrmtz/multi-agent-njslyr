@@ -8,7 +8,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SETTINGS="$SCRIPT_DIR/config/settings.yaml"
-TOPIC=$(grep 'ntfy_topic:' "$SETTINGS" | awk '{print $2}' | tr -d '"')
+TOPIC=$(awk '/ntfy_topic:/ {gsub(/"/, ""); print $2; exit}' "$SETTINGS")
 INBOX="$SCRIPT_DIR/queue/ntfy_inbox.yaml"
 LOCKFILE="${INBOX}.lock"
 CORRUPT_DIR="$SCRIPT_DIR/logs/ntfy_inbox_corrupt"
@@ -168,7 +168,7 @@ while true; do
     # Stream new messages (long-lived connection, blocks until message arrives)
     curl -s --no-buffer "${AUTH_ARGS[@]}" "https://ntfy.sh/$TOPIC/json" 2>/dev/null | while IFS= read -r line; do
         # Parse all needed fields in a single python3 call
-        IFS=$'\x1f' read -r EVENT TAGS MSG MSG_ID <<< "$(printf '%s\n' "$line" | parse_message_fields)"
+        IFS=$'\x1f' read -r EVENT TAGS MSG MSG_ID < <(parse_message_fields <<< "$line")
 
         # Skip keepalive pings and non-message events
         [[ "$EVENT" != "message" ]] && continue
@@ -180,7 +180,8 @@ while true; do
         [[ -z "$MSG" ]] && continue
 
         # %:z is GNU-only (+09:00). Use %z (+0900) and insert colon for portability.
-        TIMESTAMP=$(date "+%Y-%m-%dT%H:%M:%S%z" | sed 's/\([+-][0-9][0-9]\)\([0-9][0-9]\)$/\1:\2/')
+        TIMESTAMP=$(date "+%Y-%m-%dT%H:%M:%S%z")
+        TIMESTAMP="${TIMESTAMP:0:-2}:${TIMESTAMP: -2}"
 
         echo "[$(date)] Received: $MSG" >&2
 

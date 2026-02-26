@@ -17,7 +17,7 @@ __NJSLYR_LIB_LOADED__=1
 
 # ─── Variables ───
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
-PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$SCRIPT_DIR")}"
+PROJECT_ROOT="${PROJECT_ROOT:-${SCRIPT_DIR%/*}}"
 STATE_DIR="${STATE_DIR:-$PROJECT_ROOT/.state}"
 
 # ─── Cross-platform sed -i (BSD vs GNU) ───

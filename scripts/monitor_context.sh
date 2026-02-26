@@ -8,7 +8,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="${SCRIPT_DIR%/*}"
 DASHBOARD="$PROJECT_ROOT/dashboard.md"
 DEBUG_DIR="$HOME/.claude/debug"
 
@@ -48,8 +48,8 @@ get_context_usage() {
     local tokens
     local window
 
-    tokens=$(echo "$autocompact_line" | grep -o 'tokens=[0-9]*' | cut -d= -f2)
-    window=$(echo "$autocompact_line" | grep -o 'effectiveWindow=[0-9]*' | cut -d= -f2)
+    tokens="${autocompact_line#*tokens=}"; tokens="${tokens%%[^0-9]*}"
+    window="${autocompact_line#*effectiveWindow=}"; window="${window%%[^0-9]*}"
 
     if [[ -z "$tokens" || -z "$window" || "$window" -eq 0 ]]; then
         echo "ERROR: Failed to parse autocompact data: $autocompact_line" >&2

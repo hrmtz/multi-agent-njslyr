@@ -219,15 +219,14 @@ EOF
     # get_unread_info 実行
     info=$(get_unread_info)
 
-    # JSON検証: count=1
+    # テキスト行形式検証: line1=count, line2=has_task_assigned(0/1)
     python3 <<EOF
-import json
+lines = '''$info'''.strip().split('\n')
+count = int(lines[0])
+has_task = lines[1] == '1' if len(lines) > 1 else False
 
-info = '''$info'''
-data = json.loads(info)
-
-assert data['count'] == 1, f'Expected count=1, got {data["count"]}'
-assert data['has_task_assigned'] == False, f'Expected has_task_assigned=False, got {data["has_task_assigned"]}'
+assert count == 1, f'Expected count=1, got {count}'
+assert has_task is False, f'Expected has_task_assigned=False, got {has_task}'
 
 print('T-E2E-003: PASS')
 EOF
@@ -293,14 +292,11 @@ EOF
     # get_unread_count_fast 実行
     fast_info=$(get_unread_count_fast)
 
-    # JSON検証: count=50
+    # plain number検証: get_unread_count_fast returns grep count
     python3 <<EOF
-import json
+count = int('''$fast_info'''.strip())
 
-info = '''$fast_info'''
-data = json.loads(info)
-
-assert data['count'] == 50, f'Expected count=50, got {data["count"]}'
+assert count == 50, f'Expected count=50, got {count}'
 
 print('T-E2E-005: PASS')
 EOF

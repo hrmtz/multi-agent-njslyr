@@ -109,11 +109,16 @@ YAML
     [ "$status" -eq 0 ]
 
     python3 - << 'PY' "$output" "$TEST_INBOX"
-import json, sys, yaml
-payload = json.loads(sys.argv[1])
+import sys, yaml
+output = sys.argv[1]
 inbox_path = sys.argv[2]
-assert payload["count"] == 1, payload
-assert len(payload["specials"]) == 2, payload
+lines = output.strip().split('\n')
+count = int(lines[0])
+has_task = lines[1] == '1' if len(lines) > 1 else False
+specials = lines[2:] if len(lines) > 2 else []
+assert count == 1, f'count={count}'
+assert has_task is True, f'has_task={has_task}'
+assert len(specials) == 2, f'specials={specials}'
 
 with open(inbox_path) as f:
     data = yaml.safe_load(f)
