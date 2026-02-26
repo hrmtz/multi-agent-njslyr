@@ -375,7 +375,9 @@ no_idle_full_read() {
 # Replaced python3+yaml.safe_load with grep (avoids ~50ms python3 startup).
 # Pattern: exactly 2-space indented "read: false" (matches YAML field, not content).
 get_unread_count_fast() {
-    grep -c '^  read: false$' "$INBOX" 2>/dev/null || echo 0
+    local count
+    count=$(grep -c '^  read: false$' "$INBOX" 2>/dev/null) || count=0
+    echo "$count"
 }
 
 # ─── Extract unread message info ───

@@ -114,7 +114,7 @@ cmd_chop() {
     local retry=0
     while [[ $retry -lt 3 ]]; do
         local unread_count
-        unread_count=$(grep -c 'read: false' "$PROJECT_ROOT/queue/inbox/${agent_id}.yaml" 2>/dev/null || echo "0")
+        unread_count=$(grep -c 'read: false' "$PROJECT_ROOT/queue/inbox/${agent_id}.yaml" 2>/dev/null) || unread_count=0
         if [[ "$unread_count" -gt 0 ]]; then
             cmd_suriken "$agent_id"
             break

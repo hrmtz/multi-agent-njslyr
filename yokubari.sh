@@ -376,7 +376,7 @@ inject_barikidorink() {
     elif [ "$current_model" != "Opus" ] && [ -n "$agent_id" ]; then
         # Re-nudge: no task_yaml given, manually check inbox unread and send nudge
         local unread_count
-        unread_count=$(grep -c 'read: false' "$_project_root/queue/inbox/${agent_id}.yaml" 2>/dev/null || echo "0")
+        unread_count=$(grep -c 'read: false' "$_project_root/queue/inbox/${agent_id}.yaml" 2>/dev/null) || unread_count=0
         if [ "$unread_count" -gt 0 ]; then
             tmux send-keys -t "$pane" "inbox${unread_count}"
             sleep 0.3
