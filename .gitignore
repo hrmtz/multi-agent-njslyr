@@ -92,6 +92,8 @@
 !scripts/seo_qc.sh
 !scripts/stop_hook_inbox.sh
 !scripts/njslyr.sh
+!scripts/njslyr_lib.sh
+!scripts/njslyr_cmd.sh
 !scripts/monitor_context.sh
 !scripts/test_inbox_write.sh
 !scripts/inbox_archive.sh

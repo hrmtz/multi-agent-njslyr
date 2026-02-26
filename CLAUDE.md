@@ -154,6 +154,21 @@ bash scripts/inbox_write.sh yakuza4 "P0タスク割り当て" task_assigned grya
 Delivery is handled by `inbox_watcher.sh` (infrastructure layer).
 **Agents NEVER call tmux send-keys directly.**
 
+### Suriken送信ルール（恒久・全エージェント）
+
+**他エージェントへのスリケン（nudge）送信は `scripts/njslyr_cmd.sh suriken <agent_id>` を使え。**
+
+```bash
+# 正しい方法（オートコンプリートバグ回避済み）
+bash scripts/njslyr_cmd.sh suriken gryakuza
+bash scripts/njslyr_cmd.sh suriken yakuza3
+
+# 禁止（オートコンプリートがEnterを横取りして未送信になる）
+tmux send-keys -t <pane> "スリケン！inbox3" Enter
+```
+
+**理由**: Claude CLIのオートコンプリートがEnterキーを横取りし、テキストが入力欄に残ったまま送信されない。`njslyr_cmd.sh suriken` はtext→Escape→Enter（0.3秒間隔）で回避する。手動tmux send-keysは全面禁止。
+
 ## Delivery Mechanism
 
 Two layers:
@@ -317,7 +332,7 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 # multi-agent-njslyr
 ネオサイタマmod マルチエージェントシステム + instagram-slides/surgery-log-app プロジェクト管理
 
-_Last updated: 2026-02-26 | 36 active memories, 39 total_
+_Last updated: 2026-02-26 | 39 active memories, 42 total_
 
 ## Architecture
 - wp-publisher パイプライン構成（2026-02-22 完成）:
@@ -384,6 +399,10 @@ Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
 - njslyrコマンド体系ワンコマンド化（2026-02-26 ラオモト指示・cmd_269で実装）:
 - spawn_tengu [mission]: 天狗召喚（STATE作成→respawn→inbox→nudge一括）
 - sur... [njslyr, command, suriken, chop, slay, spawn_tengu, 改修]
+- Opus3体相互批判QCルーチンの命名: monju（モンジュ）（2026-02-26 ラオモト命名）
+- 由来: 三人寄れば文殊の知恵 + 忍殺世界の仏教用語親和性
+- スキル名: monju（skills/monju/）
+- 用途... [monju, opus, skill, 命名, 恒久ルール]
 
 ## Patterns & Conventions
 - wp-publisher 画像サイズルール（2026-02-25 ラオモト指示・恒久）:
@@ -412,6 +431,8 @@ Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
 - バリキドリンク解毒ルール（2026-02-25 ラオモト指示・恒久）:
 - バリキドリンク（Opus昇格）投与後、タスク完了時に必ず解毒（Sonnetへ復帰）すること
 - 解毒手順: /model sonnet → @model_na... [バリキドリンク, opus, 解毒, 恒久ルール]
+- スリケン送信はnjslyr_cmd.shを使え（2026-02-26 ラオモト指示・恒久）:
+- エージェントが他エージェントにスリケン（nudge）を送る場合、`bash scripts/njslyr_cmd.sh suriken ... [suriken, autocomplete, bug, tmux, 恒久ルール, njslyr_cmd]
 
 ## Gotchas & Pitfalls
 - wp-publisher pipeline dry-run後の投稿手順（2026-02-23 ケジメ案件・恒久ルール）:
@@ -440,6 +461,12 @@ Step 3: i... [instagram-slides, pipeline, thumbnail, wiggle]
 - @agent_id誤設定バグ再発（2026-02-21）:
 - %95(yakuza3)が再びdarkninjaに誤設定されていた
 - 2026-02-18のケジメ案件と同じバグ。前回commit 8badf57でvalidate_a... [gotcha, tmux, agent_id, incident, priority]
+
+## Current Progress
+- cmd_269 njslyrインフラ改修 進捗（2026-02-26 15:30時点）:
+- Phase1（設計書）: 完了（yakuza1）
+- Phase2a（Opus3体独立レビュー）: 完了（yakuza3/4/6）
+- Ph... [cmd_269, progress, njslyr, infra]
 
 ## Context
 - プロジェクト構成（2026-02-20時点）:

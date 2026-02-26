@@ -27,6 +27,13 @@ THINKING_TIMEOUT=600       # 10 minutes thinking
 STAGE3_COOLDOWN=1800       # 30 minutes cooldown for Stage 3
 RESTART_LOOP_WINDOW=1800   # 30 minutes window for restart loop detection
 RESTART_LOOP_MAX=3         # Max 3 restarts in 30 min
+# B-2: STALE_THRESHOLD >= STAGE3_COOLDOWN * 2 (3600 >= 1800*2) to avoid deleting
+# stage_last files that are still within the cooldown window.
+STALE_THRESHOLD=3600       # 1 hour: stale state file age threshold (B-2 check_stale_state)
+# B-4: 4-hour long-running refresh interval. Chosen to be long enough that it does not
+# interfere with normal operation cycles (15-min interval * 16 = 4h), but short enough
+# to prevent STATE_DIR accumulation in multi-day continuous runs.
+REFRESH_INTERVAL=14400     # 4 hours: long-running refresh interval (B-4)
 
 # ─── Session mode (default: once) ───
 # "once" = single execution (for cron/tmux timer)
@@ -674,7 +681,7 @@ SLAY_EOF
 
     # ADDON-1: Clear thinking/idle state (prevent false positive after restart)
     rm -f "$STATE_DIR/njslyr_${agent_id}_thinking_start"
-    rm -f "$STATE_DIR/njslyr_${agent_id}_idle_start"
+    rm -f "$STATE_DIR/njslyr_${agent_id}_idle_start"  # TODO(UNIFIED-MED-003): idle_start廃止後は削除
 
     # Step 5: Restart agent using respawn-pane (M3 fix - preserves grid layout)
     log "◆再ショウカン◆ ${agent_id}（type: ${agent_type}, model: ${model}, bg: ${bg_color}）…ニンジャソウル再覚醒！"
@@ -743,7 +750,7 @@ cleanup_yakuzatengu_state() {
           "$STATE_DIR/yakuzatengu_done" \
           "$STATE_DIR/clear_last_yakuzatengu" \
           "$STATE_DIR/njslyr_yakuzatengu_thinking_start" \
-          "$STATE_DIR/njslyr_yakuzatengu_idle_start"
+          "$STATE_DIR/njslyr_yakuzatengu_idle_start"  # TODO(UNIFIED-MED-003): idle_start廃止後は削除
 }
 
 # ─── Yakuza Tengu: spawn判定（M-4） ───
@@ -762,7 +769,7 @@ should_spawn_yakuzatengu() {
         local has_idle=false
         while IFS= read -r yid; do
             [[ ! "$yid" =~ ^yakuza[0-9]+$ ]] && continue
-            [[ -f "$STATE_DIR/njslyr_${yid}_idle_start" ]] && { has_idle=true; break; }
+            [[ -f "$STATE_DIR/njslyr_${yid}_idle_start" ]] && { has_idle=true; break; }  # TODO(UNIFIED-MED-003): check_agent_idle_v2()ベースに置き換え
         done < <(get_monitored_agents)
         if [[ "$has_idle" == "true" ]]; then
             log "spawn trigger: ${agent_id} inbox未読 ${unread_count}件 >= 5 (idle yakuza存在確認)"
@@ -773,6 +780,7 @@ should_spawn_yakuzatengu() {
 
     # トリガー条件2: アイドルyakuza >= 3体 × 300秒
     # NOTE: stat -c %Y はmacOS非対応（CB-04/CB-7）。catでidle_start中身を読む（S-4）
+    # TODO(UNIFIED-MED-003): idle_start廃止後はcheck_agent_idle_v2()ベースに置き換え
     local idle_count=0
     local now; now=$(date +%s)
     while IFS= read -r yid; do
@@ -801,6 +809,7 @@ spawn_yakuzatengu() {
     is_yakuzatengu_active && { log "SKIP: yakuzatengu already active"; return 0; }
 
     # アイドルyakuzaNを選択（idle_elapsed最長の1体）
+    # TODO(UNIFIED-MED-003): idle_start廃止後はcheck_agent_idle_v2()ベースに置き換え
     local orig_agent=""
     local max_idle=0
     local now; now=$(date +%s)
@@ -856,7 +865,7 @@ spawn_yakuzatengu() {
 
     # M-8: spawn時にidle/thinkingファイル削除
     rm -f "$STATE_DIR/njslyr_${orig_agent}_thinking_start"
-    rm -f "$STATE_DIR/njslyr_${orig_agent}_idle_start"
+    rm -f "$STATE_DIR/njslyr_${orig_agent}_idle_start"  # TODO(UNIFIED-MED-003): idle_start廃止後は削除
 
     # S-3: 元yakuzaNタスクYAML statusをsuspendedに変更
     local task_yaml orig_task_status
@@ -1044,12 +1053,102 @@ despawn_yakuzatengu() {
 }
 
 # ─── Main agent check logic ───
+# ─── B-4: check_long_running_refresh ─────────────────────────────────────────
+# 長期稼働リフレッシュ（UNIFIED-LOW-005/MED-006）
+# 4時間に1回、staleなidle_startファイルを削除してSTATE_DIRを整理する
+# idle_startのみを削除対象。stage_lastはB-2 check_stale_state()の責任。
+# REFRESH_INTERVAL=14400 の根拠: 15分巡回サイクル * 16 = 4時間。
+# 多日連続稼働時のSTATE_DIR肥大化を防ぎつつ、通常運用サイクルに干渉しない間隔。
+check_long_running_refresh() {
+    local now last_refresh elapsed
+    now=$(date +%s)
+    last_refresh=$(cat "$STATE_DIR/njslyr_last_refresh" 2>/dev/null || echo "0")
+    elapsed=$(( now - last_refresh ))
+
+    if [[ $elapsed -ge $REFRESH_INTERVAL ]]; then
+        log "INFO: 長期稼働リフレッシュ実行（${elapsed}秒経過）"
+        # idle_startのみ削除（stage_lastはB-2の責任）
+        find "$STATE_DIR" -name "njslyr_*_idle_start" -mmin +30 -delete 2>/dev/null || true
+        echo "$now" > "$STATE_DIR/njslyr_last_refresh"
+        log "INFO: リフレッシュ完了"
+    fi
+}
+
+# ─── B-2: check_stale_state ───────────────────────────────────────────────────
+# 健全性チェック: staleなタイムスタンプファイルを検知して削除する（UNIFIED-MED-004/MED-006参照）
+# stage_last削除責任はcheck_stale_state()のみが持つ（B-4は削除しない）
+# 制約: STALE_THRESHOLD >= STAGE3_COOLDOWN * 2 (3600 >= 1800*2) を維持すること
+check_stale_state() {
+    local agent_id="$1"
+    local now
+    now=$(date +%s)
+
+    local state_file age ts
+    for state_file in "$STATE_DIR/njslyr_${agent_id}_stage1_last" \
+                      "$STATE_DIR/njslyr_${agent_id}_stage2_last" \
+                      "$STATE_DIR/njslyr_${agent_id}_stage3_last"; do
+        [[ ! -f "$state_file" ]] && continue
+        ts=$(cat "$state_file" 2>/dev/null || echo "0")
+        age=$(( now - ts ))
+        if [[ $age -gt $STALE_THRESHOLD ]]; then
+            log "WARN: stale state file detected: $state_file (age: ${age}s). Removing."
+            rm -f "$state_file"
+        fi
+    done
+}
+
+# ─── B-1: check_agent_idle_v2 ─────────────────────────────────────────────────
+# idle_start非依存のidle判定（UNIFIED-HIGH-004 + UNIFIED-MED-009連携）
+# Returns 0 (idle) or 1 (not idle)
+# 前提: A-2 chop() が $STATE_DIR/clear_last_${agent_id} を更新していること（UNIFIED-MED-009）
+check_agent_idle_v2() {
+    local agent_id="$1"
+
+    # Step0: graceピリオドチェック（/clear直後180秒間はidle扱いしない）
+    # clear_last_${agent_id} は A-2 chop() が echo "$(date +%s)" で更新する
+    local clear_last grace_elapsed
+    clear_last=$(cat "$STATE_DIR/clear_last_${agent_id}" 2>/dev/null || echo 0)
+    grace_elapsed=$(( $(date +%s) - clear_last ))
+    if [[ $grace_elapsed -lt 180 ]]; then
+        return 1  # grace period: /clear直後はidle扱いしない
+    fi
+
+    # Step1: タスクYAMLでstatus確認
+    local task_yaml task_status
+    task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${agent_id}"*.yaml 2>/dev/null | head -1)
+    if [[ -z "$task_yaml" ]]; then
+        task_status="idle"
+    else
+        task_status=$(grep '^ *status: ' "$task_yaml" | head -1 | \
+            sed 's/.*status: *//;s/ *$//' || echo "idle")
+    fi
+
+    # Step2: inbox unread確認（unreadがある場合はidle扱いしない）
+    if has_inbox_unread "$agent_id"; then
+        return 1  # not idle (has work to do)
+    fi
+
+    # Step3: pane出力確認（Working/Thinkingでないか）
+    local pane_target
+    pane_target=$(get_pane_target "$agent_id")
+    if [[ -n "$pane_target" ]] && agent_is_busy "$pane_target"; then
+        return 1  # not idle (actively working)
+    fi
+
+    [[ "$task_status" == "idle" ]]
+}
+
 check_agent() {
     local agent_id="$1"
 
     # State file paths (BUG-4/5: declared once, used in thinking/idle blocks)
     local thinking_state_file="$STATE_DIR/njslyr_${agent_id}_thinking_start"
+    # TODO(UNIFIED-MED-003/MED-010): idle_state_file is kept for safety during transition.
+    # check_agent_idle_v2() no longer depends on this file. Remove after stabilization.
     local idle_state_file="$STATE_DIR/njslyr_${agent_id}_idle_start"
+
+    # B-2: 健全性チェック（staleなタイムスタンプファイルを削除）
+    check_stale_state "$agent_id"
 
     # Get pane target
     local pane_target
@@ -1236,8 +1335,9 @@ check_agent() {
     fi
 
     # (1) Idle timeout
-    # Check if agent has no task and has been idle for 5+ minutes
-    if [[ "$task_status" == "idle" ]]; then
+    # B-1: check_agent_idle_v2() でidle判定（idle_start非依存・graceピリオド付き）
+    # graceピリオド/inbox unread/pane busyを総合判断してアイドル状態を返す（UNIFIED-HIGH-004）
+    if check_agent_idle_v2 "$agent_id"; then
         local now
         now=$(date +%s)
 
@@ -1298,6 +1398,9 @@ main() {
 
     local slain_count=0
     local healthy_count=0
+
+    # B-4: 長期稼働リフレッシュチェック（各ループ開始時）
+    check_long_running_refresh
 
     # @agent_id誤設定検証（darkninja IDがmultiagentペインに混入していないか確認）
     validate_agent_ids || true
