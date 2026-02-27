@@ -95,6 +95,8 @@ LAST_CLEAR_TS=${LAST_CLEAR_TS:-0}
 ESCALATE_PHASE1=${ESCALATE_PHASE1:-120}
 ESCALATE_PHASE2=${ESCALATE_PHASE2:-240}
 ESCALATE_COOLDOWN=${ESCALATE_COOLDOWN:-300}
+# FIX-006: Track busy→idle transitions to prevent false escalation after long tasks
+PREV_WAS_BUSY=${PREV_WAS_BUSY:-0}
 
 # ─── Nudge throttle ───
 # Avoid spamming the same "inboxN" into the pane every timeout tick.
@@ -301,65 +303,59 @@ normalize_special_command() {
     esac
 }
 
+# FIX-014: bash化 (python3排除) + task_yaml_path動的引継ぎ
 enqueue_recovery_task_assigned() {
     (
         flock -x 200
-        INBOX_PATH="$INBOX" AGENT_ID="$AGENT_ID" python3 - << 'PY'
-import datetime
-import os
-import uuid
-import yaml
 
-inbox = os.environ.get("INBOX_PATH", "")
-agent_id = os.environ.get("AGENT_ID", "agent")
+        # Dedup guard: existing unread auto-recovery → skip
+        _dedup=$(awk '
+            BEGIN { found = 0 }
+            /^- / {
+                if (in_block && is_recovery && is_unread) { found = 1; exit }
+                in_block = 1; is_recovery = 0; is_unread = 0
+            }
+            in_block && /\[auto-recovery\]/ { is_recovery = 1 }
+            in_block && /read: false/ { is_unread = 1 }
+            END {
+                if (in_block && is_recovery && is_unread) found = 1
+                print found
+            }
+        ' "$INBOX" 2>/dev/null)
+        if [ "${_dedup:-0}" = "1" ]; then
+            echo "SKIP_DUPLICATE"
+            exit 0
+        fi
 
-try:
-    with open(inbox, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
+        # FIX-014: Find last task_yaml_path from task_assigned (dynamic, not hardcoded)
+        _last_task_path=$(awk '
+            /^- / { in_block = 1; is_ta = 0; tp = "" }
+            in_block && /type: task_assigned/ { is_ta = 1 }
+            in_block && /task_yaml_path: / {
+                tp = $0; sub(/.*task_yaml_path: */, "", tp)
+                gsub(/^[\047"]|[\047"]$/, "", tp)
+            }
+            in_block && /^  read:/ && is_ta && tp != "" { last = tp }
+            END { if (last != "") print last }
+        ' "$INBOX" 2>/dev/null)
+        _last_task_path="${_last_task_path:-queue/tasks/${AGENT_ID}.yaml}"
 
-    messages = data.get("messages", []) or []
+        # Handle "messages: []" (inline empty list) → convert to block format for append
+        if grep -q '^messages: \[\]' "$INBOX" 2>/dev/null; then
+            sed -i 's/^messages: \[\]$/messages:/' "$INBOX"
+        fi
 
-    # Dedup guard: keep only one pending auto-recovery hint at a time.
-    for m in reversed(messages):
-        if (
-            m.get("from") == "inbox_watcher"
-            and m.get("type") == "task_assigned"
-            and m.get("read", False) is False
-            and "[auto-recovery]" in (m.get("content") or "")
-        ):
-            print("SKIP_DUPLICATE")
-            raise SystemExit(0)
+        _now_ts=$(date -Iseconds)
+        _msg_id="msg_auto_recovery_$(date +%Y%m%d_%H%M%S)_$(head -c4 /dev/urandom | od -A n -t x1 | tr -d ' \n')"
 
-    now = datetime.datetime.now(datetime.timezone.utc).astimezone()
-    msg = {
-        "content": (
-            f"[auto-recovery] /clear 後の再着手通知。"
-            f"queue/tasks/{agent_id}.yaml を再読し、assigned タスクを即時再開せよ。"
-        ),
-        "from": "inbox_watcher",
-        "id": f"msg_auto_recovery_{now.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}",
-        "read": False,
-        "timestamp": now.replace(microsecond=0).isoformat(),
-        "type": "task_assigned",
-    }
-    messages.append(msg)
-    data["messages"] = messages
-
-    tmp_path = f"{inbox}.tmp.{os.getpid()}"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        yaml.safe_dump(
-            data,
-            f,
-            default_flow_style=False,
-            allow_unicode=True,
-            sort_keys=False,
-        )
-    os.replace(tmp_path, inbox)
-    print(msg["id"])
-except Exception:
-    # Best-effort safety net only. Primary /clear delivery must not fail here.
-    print("ERROR")
-PY
+        printf '%s\n' \
+            "- content: \"[auto-recovery] /clear 後の再着手通知。${_last_task_path} を再読し、assigned タスクを即時再開せよ。\"" \
+            "  from: inbox_watcher" \
+            "  id: ${_msg_id}" \
+            "  read: false" \
+            "  timestamp: '${_now_ts}'" \
+            "  type: task_assigned" >> "$INBOX"
+        echo "$_msg_id"
     ) 200>"$LOCKFILE" 2>/dev/null
 }
 
@@ -381,56 +377,103 @@ get_unread_count_fast() {
 }
 
 # ─── Extract unread message info ───
+# FIX-002: bash/awk implementation (replaces python3 — saves 50-130ms/call)
+# FIX-005: Pure read-only (no specials marking). Use mark_specials_read() after delivery.
 # Output: line 1=normal_count, line 2=has_task_assigned(0/1), line 3+=specials(type\tcontent)
 # Test anchor for bats awk pattern: get_unread_info\\(\\)
 get_unread_info() {
     (
+        flock -s 200  # FIX-002: shared lock (read-only, no writes)
+        awk '
+        /^- / {
+            if (in_block && is_unread) {
+                if (btype == "clear_command" || btype == "model_switch") {
+                    gsub(/\t/, " ", bcontent)
+                    if (sp != "") sp = sp "\n"
+                    sp = sp btype "\t" bcontent
+                } else {
+                    nc++
+                    if (btype == "task_assigned") ht = 1
+                }
+            }
+            in_block = 1; is_unread = 0; btype = ""; bcontent = ""
+            if (/^- content: /) {
+                bcontent = $0; sub(/^- content: */, "", bcontent)
+                gsub(/^[\047"]|[\047"]$/, "", bcontent)
+            } else if (/^- type: /) {
+                btype = $0; sub(/^- type: */, "", btype)
+            } else if (/^- read: false/) { is_unread = 1 }
+            next
+        }
+        in_block && /^  content: / {
+            bcontent = $0; sub(/^  content: */, "", bcontent)
+            gsub(/^[\047"]|[\047"]$/, "", bcontent)
+            next
+        }
+        in_block && /^  type: / { btype = $0; sub(/^  type: */, "", btype); next }
+        in_block && /^  read: false/ { is_unread = 1; next }
+        in_block && /^  read: true/ { is_unread = 0; next }
+        END {
+            if (in_block && is_unread) {
+                if (btype == "clear_command" || btype == "model_switch") {
+                    gsub(/\t/, " ", bcontent)
+                    if (sp != "") sp = sp "\n"
+                    sp = sp btype "\t" bcontent
+                } else {
+                    nc++
+                    if (btype == "task_assigned") ht = 1
+                }
+            }
+            print nc + 0
+            print ht + 0
+            if (sp != "") print sp
+        }
+        ' "$INBOX" 2>/dev/null
+    ) 200>"$LOCKFILE"
+}
+
+# ─── Mark special messages as read (at-least-once delivery) ───
+# FIX-005: Called AFTER send_cli_command() succeeds for specials.
+# If this fails, specials remain unread → next cycle retries.
+mark_specials_read() {
+    (
         flock -x 200
-        INBOX_PATH="$INBOX" python3 - << 'PY'
-import os
-import yaml
-
-inbox = os.environ.get("INBOX_PATH", "")
-try:
-    with open(inbox, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
-
-    messages = data.get("messages", []) or []
-    unread = [m for m in messages if not m.get("read", False)]
-    special_types = ("clear_command", "model_switch")
-    specials = [m for m in unread if m.get("type") in special_types]
-
-    if specials:
-        for m in messages:
-            if not m.get("read", False) and m.get("type") in special_types:
-                m["read"] = True
-
-        tmp_path = f"{inbox}.tmp.{os.getpid()}"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            yaml.safe_dump(
-                data,
-                f,
-                default_flow_style=False,
-                allow_unicode=True,
-                sort_keys=False,
-            )
-        os.replace(tmp_path, inbox)
-
-    normal_count = len(unread) - len(specials)
-    normal_msgs = [m for m in unread if m.get("type") not in special_types]
-    has_task_assigned = any(m.get("type") == "task_assigned" for m in normal_msgs)
-    # Output: line 1=count, line 2=has_task_assigned(0/1), line 3+=specials(type\tcontent)
-    # Bash-parseable format eliminates 3 downstream python3 invocations.
-    print(normal_count)
-    print(1 if has_task_assigned else 0)
-    for s in specials:
-        t = s.get("type", "")
-        c = (s.get("content", "") or "").replace("\t", " ").replace("\n", " ").strip()
-        print(f"{t}\t{c}")
-except Exception:
-    print("0")
-    print("0")
-PY
+        awk '
+        { lines[NR] = $0 }
+        END {
+            changed = 0; in_block = 0; is_special = 0; read_line = 0; is_unread = 0
+            for (i = 1; i <= NR; i++) {
+                if (lines[i] ~ /^- /) {
+                    if (in_block && is_special && is_unread && read_line > 0) {
+                        sub(/read: false/, "read: true", lines[read_line])
+                        changed = 1
+                    }
+                    in_block = 1; is_special = 0; read_line = 0; is_unread = 0
+                }
+                if (in_block && (lines[i] ~ /  type: clear_command/ || lines[i] ~ /  type: model_switch/)) {
+                    is_special = 1
+                }
+                if (in_block && lines[i] ~ /  read: false/) {
+                    read_line = i; is_unread = 1
+                }
+                if (in_block && lines[i] ~ /  read: true/) {
+                    is_unread = 0; read_line = 0
+                }
+            }
+            if (in_block && is_special && is_unread && read_line > 0) {
+                sub(/read: false/, "read: true", lines[read_line])
+                changed = 1
+            }
+            if (changed) {
+                for (i = 1; i <= NR; i++) print lines[i]
+            }
+        }
+        ' "$INBOX" > "${INBOX}.tmp.$$" 2>/dev/null
+        if [ -s "${INBOX}.tmp.$$" ]; then
+            mv "${INBOX}.tmp.$$" "$INBOX"
+        else
+            rm -f "${INBOX}.tmp.$$"
+        fi
     ) 200>"$LOCKFILE" 2>/dev/null
 }
 
@@ -967,6 +1010,8 @@ process_unread() {
             cmd=$(normalize_special_command "$msg_type" "$msg_content")
             [ -n "$cmd" ] && send_cli_command "$cmd"
         done <<< "$specials"
+        # FIX-005: Mark specials as read AFTER delivery (at-least-once guarantee)
+        mark_specials_read
     fi
 
     # /clear は Codex で /new へ変換される。再起動直後の取りこぼし防止として
@@ -988,22 +1033,19 @@ process_unread() {
         now=$(date +%s)
 
         # When the agent is busy/thinking, do NOT escalate. Interrupting with Escape or /clear
-        # can terminate the current thought. Also pause the escalation timer while busy so we
-        # don't immediately jump to Phase 2/3 once it becomes idle.
+        # can terminate the current thought.
+        # FIX-006: Track busy→idle transition. While busy, true pause (no timer update).
+        # On idle after busy, restart timer from Phase 1 (prevents immediate Phase 2/3 jump).
         if agent_is_busy; then
-            local busy_cli
-            busy_cli=$(get_effective_cli_type)
-            if [[ "$busy_cli" == "claude" ]]; then
-                # Claude Code: Stop hook will catch unread messages when the agent's
-                # turn ends. スリケン不要 at all — just log and skip completely.
-                # Don't reset FIRST_UNREAD_SEEN so idle-スリケン works if hook misses.
-                echo "[$(date)] $normal_count unread for $AGENT_ID but agent is busy (claude) — Stop hook will deliver" >&2
-            else
-                # Codex/Copilot/Kimi: No Stop hook. Pause escalation timer while busy.
-                FIRST_UNREAD_SEEN=$now
-                echo "[$(date)] $normal_count unread for $AGENT_ID but agent is busy ($busy_cli) — pausing escalation timer" >&2
-            fi
+            PREV_WAS_BUSY=1
+            echo "[$(date)] $normal_count unread for $AGENT_ID but agent is busy — pausing escalation (true pause)" >&2
             return 0
+        fi
+        # FIX-006: busy→idle transition — restart escalation from Phase 1
+        if [ "$PREV_WAS_BUSY" -eq 1 ]; then
+            FIRST_UNREAD_SEEN=$now
+            PREV_WAS_BUSY=0
+            echo "[$(date)] $AGENT_ID busy→idle transition — escalation timer restarted from Phase 1" >&2
         fi
 
         # ─── Context reset before new task ───
