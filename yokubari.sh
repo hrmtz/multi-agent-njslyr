@@ -1006,10 +1006,8 @@ tmux set-option -g aggressive-resize on 2>/dev/null || true
 #   （kyoto: main:tortoise, neosaitama: main:crane）
 # ═══════════════════════════════════════════════════════════════════════════════
 tmux select-window -t multiagent:agents
-# neosaitama: "agents" → "neosaitama" リネーム（全 multiagent:agents 操作完了後）
-if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-    tmux rename-window -t multiagent:agents "neosaitama"
-fi
+# neosaitama: "agents" → "neosaitama" リネームは全agent起動完了後に実施（STEP 6.7）
+# ここでリネームするとSTEP 6のlaunch_agent "multiagent:agents.N" が全て空振りする
 log_success "  └─ ${MONITOR_AGENT} 監視陣、コンストラクト完了！（${MONITOR_PANE}）ワザマエ！"
 echo ""
 
@@ -1273,6 +1271,18 @@ NINJA_EOF
     # 自分のinstructions/*.mdを読み込む。検証済み (2026-02-08)。
     log_info "📜 ◆自律実行◆ オキテの読み込みは各ニンジャが自律実行する。カラテは己で磨け"
     echo ""
+
+    # ═══════════════════════════════════════════════════════════════════
+    # STEP 6.8: neosaitama ウィンドウリネーム（全agent起動・watcher完了後）
+    # NOTE: STEP 5.2で先にリネームするとlaunch_agent "multiagent:agents.N" が空振りする
+    # ═══════════════════════════════════════════════════════════════════
+    if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+        tmux rename-window -t multiagent:agents "neosaitama"
+        # client-resizedフックもリネーム後の名前に更新
+        tmux set-hook -t multiagent client-resized \
+            'resize-window -A -t multiagent:neosaitama ; select-layout -t multiagent:neosaitama tiled'
+        log_info "  └─ multiagent:agents → multiagent:neosaitama リネーム完了"
+    fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
