@@ -43,6 +43,66 @@ mkdir -p "$STATE_DIR"
 # shellcheck source=scripts/njslyr_lib.sh
 source "$SCRIPT_DIR/njslyr_lib.sh"
 
+# ─── helper: ntfy fallback for suriken (cross-machine) ───
+# ローカルペインが見つからない場合にntfy経由でリモートマシンにスリケンを送る
+# 引数: agent_id (必須)
+_cmd_suriken_ntfy_fallback() {
+    local agent_id="$1"
+
+    # inbox unread count を取得
+    local unread_count
+    unread_count=$(grep -c 'read: false' \
+        "$PROJECT_ROOT/queue/inbox/${agent_id}.yaml" 2>/dev/null || echo "0")
+
+    # settings.yaml から ntfy_topic と machine.role を読む
+    local ntfy_topic machine_role
+    ntfy_topic=$(awk '/^ntfy_topic:/ {gsub(/"/, ""); print $2; exit}' \
+        "$PROJECT_ROOT/config/settings.yaml")
+    machine_role=$(awk '/^  role:/ {print $2; exit}' \
+        "$PROJECT_ROOT/config/settings.yaml")
+
+    # legacy role name normalization (ryzen→kyoto, mbp→neosaitama)
+    case "$machine_role" in
+        mbp)   machine_role="neosaitama" ;;
+        ryzen) machine_role="kyoto" ;;
+    esac
+
+    # machine.role に基づいてpeer topicを決定
+    local peer_topic
+    case "$machine_role" in
+        kyoto|ryzen)     peer_topic="${ntfy_topic}-neosaitama" ;;
+        neosaitama|mbp)  peer_topic="${ntfy_topic}-kyoto" ;;
+        *)
+            echo "[suriken] ntfy fallback: unknown machine role: $machine_role" >&2
+            return 1
+            ;;
+    esac
+
+    # lib/ntfy_auth.sh を source して認証引数取得
+    # shellcheck source=lib/ntfy_auth.sh
+    source "$SCRIPT_DIR/lib/ntfy_auth.sh"
+    local auth_args=()
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && auth_args+=("$line")
+    done < <(ntfy_get_auth_args "$PROJECT_ROOT/config/ntfy_auth.env")
+
+    # curl で POST
+    local response_code
+    response_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        "${auth_args[@]}" \
+        -H 'Title: suriken' \
+        -d "suriken:${agent_id}:${unread_count}" \
+        "https://ntfy.sh/${peer_topic}")
+
+    if [[ "$response_code" =~ ^2 ]]; then
+        echo "[suriken] ntfy fallback → ${peer_topic}: suriken:${agent_id}:${unread_count} (HTTP ${response_code})"
+        return 0
+    else
+        echo "[suriken] ntfy fallback FAILED: HTTP ${response_code}" >&2
+        return 1
+    fi
+}
+
 # ─── A-1: suriken — エージェントにnudgeを送る ───
 # 設計書 Section A-1 準拠
 # 引数: agent_id (必須), message (任意), type (任意), priority (任意)
@@ -57,8 +117,9 @@ cmd_suriken() {
     pane_id=$(resolve_pane_by_agent_id "$agent_id")
 
     if [[ -z "$pane_id" ]]; then
-        echo "ERROR: suriken: pane not found for $agent_id" >&2
-        return 1
+        echo "[suriken] pane not found for $agent_id — trying ntfy fallback..." >&2
+        _cmd_suriken_ntfy_fallback "$agent_id"
+        return $?
     fi
 
     # メッセージがある場合はinbox_write（from="njslyr"固定）
