@@ -252,7 +252,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "エイリアス:"
             echo "  csst  → cd /mnt/c/tools/multi-agent-shogun && ./shutsujin_departure.sh"
-            echo "  css   → tmux attach-session -t darkninja"
+            echo "  css   → tmux attach-session -t main"
             echo "  csm   → tmux attach-session -t multiagent"
             echo ""
             exit 0
@@ -531,19 +531,14 @@ if tmux kill-session -t multiagent 2>/dev/null; then
 else
     log_info "  └─ multiagent…存在セズ。ナムアミダブツ"
 fi
-if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-    if tmux kill-session -t crane 2>/dev/null; then
-        log_info "  └─ crane…サヨナラ！爆発四散！"
-    else
-        log_info "  └─ crane…存在セズ。ナムアミダブツ"
-    fi
+if tmux kill-session -t main 2>/dev/null; then
+    log_info "  └─ main…サヨナラ！爆発四散！"
 else
-    if tmux kill-session -t darkninja 2>/dev/null; then
-        log_info "  └─ darkninja…サヨナラ！爆発四散！"
-    else
-        log_info "  └─ darkninja…存在セズ。ナムアミダブツ"
-    fi
+    log_info "  └─ main…存在セズ。ナムアミダブツ"
 fi
+# レガシーセッション名の掃除
+tmux kill-session -t darkninja 2>/dev/null || true
+tmux kill-session -t crane 2>/dev/null || true
 tmux kill-session -t shogun 2>/dev/null || true
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -756,35 +751,33 @@ fi
 # 先にセッションを作成してサーバーを起動し、その後にグローバルオプションを設定する。
 
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-    # neosaitama: crane セッションにmaster_crane常駐
+    # neosaitama: main セッション、window "crane" にmaster_crane常駐
     log_war "🦢 クレイン・ホンジンをコンストラクト中...イヤーッ！"
-    # TOCTOU防止: 直接作成を試みる（-x/-y でSSH等クライアント未接続時のサイズ確保）
-    tmux new-session -d -s crane -n main -x 200 -y 50 2>/dev/null || true
+    tmux new-session -d -s main -n crane -x 200 -y 50 2>/dev/null || true
     CRANE_PROMPT=$(generate_prompt "crane" "cyan" "$SHELL_SETTING")
-    tmux send-keys -t crane:main "cd \"$(pwd)\" && export PS1='${CRANE_PROMPT}' && clear" Enter
-    tmux set-option -p -t crane:main @agent_id "master_crane"
-    tmux set-option -p -t crane:main @model_name "Sonnet"
-    tmux set-option -p -t crane:main @current_task ""
-    MONITOR_PANE="crane:main"
+    tmux send-keys -t main:crane "cd \"$(pwd)\" && export PS1='${CRANE_PROMPT}' && clear" Enter
+    tmux set-option -p -t main:crane @agent_id "master_crane"
+    tmux set-option -p -t main:crane @model_name "Sonnet"
+    tmux set-option -p -t main:crane @current_task ""
+    MONITOR_PANE="main:crane"
     log_success "  └─ クレイン・ホンジン、コンストラクト完了！ワザマエ！"
 else
-    # kyoto: darkninja セッション（main: ラオモト本体, monitor: master_tortoise）
+    # kyoto: main セッション、window "darkninja" にラオモト本体、window "monitor" にmaster_tortoise
     log_war "👑 ラオモトのホンジンをコンストラクト中...イヤーッ！"
-    # window 0 のみ作成し -n main で名前付け。TOCTOU防止: 直接作成を試みる
-    tmux new-session -d -s darkninja -n main -x 200 -y 50 2>/dev/null || true
+    tmux new-session -d -s main -n darkninja -x 200 -y 50 2>/dev/null || true
     SHOGUN_PROMPT=$(generate_prompt "ラオモト" "magenta" "$SHELL_SETTING")
-    tmux send-keys -t darkninja:main "cd \"$(pwd)\" && export PS1='${SHOGUN_PROMPT}' && clear" Enter
-    tmux select-pane -t darkninja:main -P 'bg=#001520'  # ダークニンジャの Dark Blue
-    tmux set-option -p -t darkninja:main @agent_id "darkninja"
-    # darkninja:monitor ウィンドウ - master_tortoise監視
-    tmux new-window -t darkninja -n monitor
+    tmux send-keys -t main:darkninja "cd \"$(pwd)\" && export PS1='${SHOGUN_PROMPT}' && clear" Enter
+    tmux select-pane -t main:darkninja -P 'bg=#001520'  # ダークニンジャの Dark Blue
+    tmux set-option -p -t main:darkninja @agent_id "darkninja"
+    # main:monitor ウィンドウ - master_tortoise監視
+    tmux new-window -t main -n monitor
     TORTOISE_PROMPT=$(generate_prompt "tortoise" "cyan" "$SHELL_SETTING")
-    tmux send-keys -t darkninja:monitor "cd \"$(pwd)\" && export PS1='${TORTOISE_PROMPT}' && clear" Enter
-    tmux set-option -p -t darkninja:monitor @agent_id "master_tortoise"
-    tmux set-option -p -t darkninja:monitor @model_name "Sonnet"
-    tmux set-option -p -t darkninja:monitor @current_task ""
-    MONITOR_PANE="darkninja:monitor"
-    log_success "  └─ ラオモトのホンジン（main + monitor）、コンストラクト完了！ワザマエ！"
+    tmux send-keys -t main:monitor "cd \"$(pwd)\" && export PS1='${TORTOISE_PROMPT}' && clear" Enter
+    tmux set-option -p -t main:monitor @agent_id "master_tortoise"
+    tmux set-option -p -t main:monitor @model_name "Sonnet"
+    tmux set-option -p -t main:monitor @current_task ""
+    MONITOR_PANE="main:monitor"
+    log_success "  └─ ラオモトのホンジン（darkninja + monitor）、コンストラクト完了！ワザマエ！"
 fi
 
 # サーバー起動後にグローバルオプション設定（セッション作成でサーバーが起動済み）
@@ -982,7 +975,7 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 5.2: multiagent:agents ウィンドウをアクティブに戻す
 #   監視エージェント配置は STEP 5 で完了済み
-#   （kyoto: darkninja:monitor, neosaitama: crane:main）
+#   （kyoto: main:monitor, neosaitama: main:crane）
 # ═══════════════════════════════════════════════════════════════════════════════
 tmux select-window -t multiagent:agents
 log_success "  └─ ${MONITOR_AGENT} 監視陣、コンストラクト完了！（${MONITOR_PANE}）ワザマエ！"
@@ -1020,7 +1013,7 @@ if [ "$SETUP_ONLY" = false ]; then
         if [ "$SHOGUN_NO_THINKING" = true ]; then
             _darkninja_extra="MAX_THINKING_TOKENS=0"
         fi
-        ( launch_agent "darkninja:main" "darkninja" "opus" "$_darkninja_extra" ) &
+        ( launch_agent "main:darkninja" "darkninja" "opus" "$_darkninja_extra" ) &
         log_info "  ◆召喚◆ ダークニンジャ…ニンジャソウル覚醒！イヤーッ！"
     fi
 
@@ -1136,10 +1129,10 @@ NINJA_EOF
 
     # エージェント起動確認（最大10秒待機）【Phase 1高速化: 30秒→10秒】
     if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-        _wait_pane="crane:main"
+        _wait_pane="main:crane"
         echo "  ◆電脳空間同期待機◆ マスター・クレインのニンジャソウル起動を待機中（最大10秒）..."
     else
-        _wait_pane="darkninja:main"
+        _wait_pane="main:darkninja"
         echo "  ◆電脳空間同期待機◆ ラオモトのニンジャソウル起動を待機中（最大10秒）..."
     fi
 
@@ -1173,7 +1166,7 @@ NINJA_EOF
 
     # ダークニンジャのwatcher（安全モード: エスカレーション無効、event-drivenのみ）（kyoto のみ）
     if [[ "$MACHINE_ROLE" != "neosaitama" && "$MACHINE_ROLE" != "mbp" ]]; then
-        launch_watcher "darkninja" "darkninja:main" \
+        launch_watcher "darkninja" "main:darkninja" \
             "ASW_DISABLE_ESCALATION=1 ASW_PROCESS_TIMEOUT=0 ASW_DISABLE_NORMAL_NUDGE=0"
     fi
 
@@ -1316,14 +1309,14 @@ echo "  │  📋 フジンズ (Battle Formation)                           │"
 echo "  └──────────────────────────────────────────────────────────┘"
 echo ""
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-    echo "     【craneセッション】クレイン・ホンジン"
+    echo "     【mainセッション】クレイン・ホンジン"
     echo "     ┌─────────────────────────────────┐"
-    echo "     │  crane:main: master_crane        │  ← 監視エージェント（crane）"
+    echo "     │  main:crane — master_crane       │  ← 監視エージェント"
     echo "     └─────────────────────────────────┘"
 else
-    echo "     【darkninjaセッション】ラオモトのホンジン"
+    echo "     【mainセッション】ラオモトのホンジン"
     echo "     ┌──────────────┬────────────────────┐"
-    echo "     │ main         │ monitor            │"
+    echo "     │ darkninja    │ monitor            │"
     echo "     │ ラオモト(CEO) │ master_tortoise    │"
     echo "     └──────────────┴────────────────────┘"
 fi
@@ -1369,7 +1362,7 @@ if [ "$SETUP_ONLY" = true ]; then
     echo "  手動でショウカンするには:"
     echo "  ┌──────────────────────────────────────────────────────────┐"
     echo "  │  # ダークニンジャをショウカン                                              │"
-    echo "  │  tmux send-keys -t darkninja:main \\                      │"
+    echo "  │  tmux send-keys -t main:darkninja \\                      │"
     echo "  │    'claude --dangerously-skip-permissions' Enter         │"
     echo "  │                                                          │"
     echo "  │  # グレーターヤクザ・ヤクザを一斉ショウカン                                  │"
@@ -1385,10 +1378,10 @@ echo "  ◆ ツギノ・アクション:"
 echo "  ┌──────────────────────────────────────────────────────────┐"
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
 echo "  │  クレイン・ホンジンにアタッチ（監視開始）:                          │"
-echo "  │     tmux attach-session -t crane        (または: css)    │"
+echo "  │     tmux attach-session -t main        (または: css)     │"
 else
 echo "  │  ラオモトのホンジンにアタッチしてメイレイを開始:                    │"
-echo "  │     tmux attach-session -t darkninja   (または: css)     │"
+echo "  │     tmux attach-session -t main        (または: css)     │"
 fi
 echo "  │                                                          │"
 echo "  │  グレーターヤクザ・ヤクザのジンを確認する:                            │"
@@ -1411,7 +1404,7 @@ if [ "$OPEN_TERMINAL" = true ]; then
 
     # Windows Terminal が利用可能か確認
     if command -v wt.exe &> /dev/null; then
-        wt.exe -w 0 new-tab wsl.exe -e bash -c "tmux attach-session -t darkninja" \; new-tab wsl.exe -e bash -c "tmux attach-session -t multiagent"
+        wt.exe -w 0 new-tab wsl.exe -e bash -c "tmux attach-session -t main" \; new-tab wsl.exe -e bash -c "tmux attach-session -t multiagent"
         log_success "  └─ ターミナルタブ展開完了！ワザマエ！"
     else
         log_info "  └─ アイエエエ！wt.exeが見つからない。手動でジャックインせよ"
