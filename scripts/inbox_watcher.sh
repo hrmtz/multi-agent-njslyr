@@ -10,9 +10,9 @@
 #   エージェントが自分でinboxをReadして処理する
 #   冪等: 2回届いてもunreadがなければ何もしない
 #
-# ファイル変更検知: Linux→inotifywait, macOS→fswatch（イベント駆動、ポーリングではない）
-# Fallback 1: 30秒タイムアウト（WSL2 inotify不発時 / fswatch timeout の安全網）
-# Fallback 2: rc=1処理（Claude Code atomic write = tmp+rename でinode変更時）
+# ファイル変更検知: Linux→inotifywait (dir+moved_to監視, atomic write対応), macOS→fswatch（イベント駆動、ポーリングではない）
+# Fallback 1: 10秒タイムアウト（WSL2 inotify不発時 / fswatch timeout の安全網）
+# Fallback 2: rc=1処理（Claude Code atomic write = tmp+rename でinode変更時 → moved_toで検知）
 #
 # エスカレーション（未読メッセージが放置されている場合）:
 #   0〜2分: 通常スリケン（send-keys）。ただしWorking中はスキップ
@@ -658,7 +658,10 @@ _wait_for_file_change() {
         fi
         return $rc
     else
-        inotifywait -q -t "$sec" -e modify -e close_write "$file" 2>/dev/null
+        local dir="${file%/*}"
+        local filename="${file##*/}"
+        inotifywait -q -t "$sec" -e moved_to -e close_write -e modify \
+            --include "^${filename}$" "$dir" 2>/dev/null
         return $?
     fi
 }
@@ -1110,9 +1113,9 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
 process_unread_once
 
 # ─── Main loop: event-driven via inotifywait ───
-# Timeout 30s: WSL2 /mnt/c/ can miss inotify events.
-# Shorter timeout = faster escalation retry for stuck agents.
-INOTIFY_TIMEOUT="${INOTIFY_TIMEOUT:-30}"
+# Timeout 10s: WSL2 /mnt/c/ can miss inotify events. Shorter timeout = faster escalation retry.
+# Linux: dir監視 + moved_to イベントで atomic write (tmp→rename) に対応。
+INOTIFY_TIMEOUT="${INOTIFY_TIMEOUT:-10}"
 
 while true; do
     # Orphan watcher check: paneが消失していたら自己終了（despawn_tengu後のゾンビwatcher防止）
@@ -1129,11 +1132,9 @@ while true; do
     rc=$?
     set -e
 
-    # rc=0: event fired (instant delivery)
-    # rc=1: watch invalidated — Claude Code uses atomic write (tmp+rename),
-    #        which replaces the inode. inotifywait sees DELETE_SELF → rc=1.
-    #        File still exists with new inode. Treat as event, re-watch next loop.
-    # rc=2: timeout (30s safety net for WSL2 inotify gaps)
+    # rc=0: event fired (instant delivery — moved_to/close_write/modify)
+    # rc=1: watch invalidated — rare on dir-watch, but treated as event, re-watch next loop.
+    # rc=2: timeout (10s safety net for WSL2 inotify gaps)
     # All cases: check for unread, then loop back to inotifywait (re-watches new inode)
     sleep 0.3
 

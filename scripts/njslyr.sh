@@ -1202,6 +1202,23 @@ check_agent_idle_v2() {
     [[ "$task_status" == "idle" ]]
 }
 
+# ─── Check inbox_watcher process health ───
+check_inbox_watcher() {
+    local agent_id="$1"
+    # pgrep で watcher プロセスを確認
+    if ! pgrep -f "inbox_watcher.sh.*${agent_id}" >/dev/null 2>&1; then
+        log "WARN: inbox_watcher for ${agent_id} not found. Attempting restart..."
+        # watcher_supervisor.sh が存在すれば、それ経由で再起動
+        local supervisor="${SCRIPT_DIR}/watcher_supervisor.sh"
+        if [[ -f "$supervisor" ]]; then
+            bash "$supervisor" "$agent_id" &
+            log "INFO: watcher_supervisor started for ${agent_id}"
+        else
+            log "ERROR: watcher_supervisor.sh not found. Manual restart required."
+        fi
+    fi
+}
+
 check_agent() {
     local agent_id="$1"
 
@@ -1213,6 +1230,9 @@ check_agent() {
 
     # B-2: 健全性チェック（staleなタイムスタンプファイルを削除）
     check_stale_state "$agent_id"
+
+    # Watcher health check
+    check_inbox_watcher "$agent_id"
 
     # Get pane target
     local pane_target

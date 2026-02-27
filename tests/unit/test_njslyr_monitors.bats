@@ -365,3 +365,97 @@ soukaiya"
     PATH="${MOCK_BIN}:$PATH" run validate_agent_ids
     [ "$status" -eq 0 ]
 }
+
+# =============================================================================
+# T-NJ-MON-005: check_inbox_watcher watcher生存チェック
+# =============================================================================
+
+# ヘルパー: check_inbox_watcher関数を定義（pgrep mock付き）
+load_check_inbox_watcher() {
+    # log stub（未定義の場合）
+    if ! declare -f log >/dev/null 2>&1; then
+        log() { echo "[LOG] $*"; }
+        export -f log
+    fi
+
+    check_inbox_watcher() {
+        local agent_id="$1"
+        if ! pgrep -f "inbox_watcher.sh.*${agent_id}" >/dev/null 2>&1; then
+            log "WARN: inbox_watcher for ${agent_id} not found. Attempting restart..."
+            local supervisor="${SCRIPT_DIR}/watcher_supervisor.sh"
+            if [[ -f "$supervisor" ]]; then
+                bash "$supervisor" "$agent_id" &
+                log "INFO: watcher_supervisor started for ${agent_id}"
+            else
+                log "ERROR: watcher_supervisor.sh not found. Manual restart required."
+            fi
+        fi
+    }
+}
+
+@test "T-NJ-MON-005a: watcher生存中 → no action (no WARN log)" {
+    load_njslyr_functions
+    load_check_inbox_watcher
+
+    # pgrep mock: 常に0(found)を返す
+    cat > "${MOCK_BIN}/pgrep" << 'SCRIPT'
+#!/bin/bash
+exit 0
+SCRIPT
+    chmod +x "${MOCK_BIN}/pgrep"
+
+    PATH="${MOCK_BIN}:$PATH" run check_inbox_watcher "yakuza1"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"WARN"* ]]
+    [[ "$output" != *"not found"* ]]
+}
+
+@test "T-NJ-MON-005b: watcher死亡 + supervisor存在 → WARN + supervisor起動" {
+    load_njslyr_functions
+    load_check_inbox_watcher
+
+    # pgrep mock: 常に1(not found)を返す
+    cat > "${MOCK_BIN}/pgrep" << 'SCRIPT'
+#!/bin/bash
+exit 1
+SCRIPT
+    chmod +x "${MOCK_BIN}/pgrep"
+
+    # 偽のwatcher_supervisor.shを配置
+    mkdir -p "${TEST_TMP}/scripts"
+    cat > "${TEST_TMP}/scripts/watcher_supervisor.sh" << 'SCRIPT'
+#!/bin/bash
+echo "supervisor called for: $1"
+exit 0
+SCRIPT
+    chmod +x "${TEST_TMP}/scripts/watcher_supervisor.sh"
+    export SCRIPT_DIR="${TEST_TMP}/scripts"
+
+    PATH="${MOCK_BIN}:$PATH" run check_inbox_watcher "yakuza3"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"WARN"* ]]
+    [[ "$output" == *"inbox_watcher for yakuza3 not found"* ]]
+    [[ "$output" == *"INFO: watcher_supervisor started for yakuza3"* ]]
+}
+
+@test "T-NJ-MON-005c: watcher死亡 + supervisor不在 → WARN + ERROR log" {
+    load_njslyr_functions
+    load_check_inbox_watcher
+
+    # pgrep mock: 常に1(not found)を返す
+    cat > "${MOCK_BIN}/pgrep" << 'SCRIPT'
+#!/bin/bash
+exit 1
+SCRIPT
+    chmod +x "${MOCK_BIN}/pgrep"
+
+    # supervisor不在のディレクトリをSCRIPT_DIRに設定
+    local no_supervisor_dir="${TEST_TMP}/no_supervisor"
+    mkdir -p "$no_supervisor_dir"
+    export SCRIPT_DIR="$no_supervisor_dir"
+
+    PATH="${MOCK_BIN}:$PATH" run check_inbox_watcher "yakuza5"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"WARN"* ]]
+    [[ "$output" == *"ERROR: watcher_supervisor.sh not found"* ]]
+}
