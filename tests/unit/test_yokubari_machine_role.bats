@@ -52,7 +52,7 @@ get_machine_config() {
 # T-YK-MR-001: MACHINE_ROLE=kyoto時のYAKUZA_MAX=7確認
 # =============================================================================
 
-@test "T-YK-MR-001: MACHINE_ROLE=kyoto → YAKUZA_MAX=7, MONITOR=master_tortoise" {
+@test "T-YK-MR-001: kyoto role sets YAKUZA_MAX=7 and MONITOR=master_tortoise" { # MACHINE_ROLE=kyoto → YAKUZA_MAX=7, MONITOR=master_tortoise
     cat > "${TEST_TMP}/settings.yaml" << 'YAML'
 language: ja
 shell: bash
@@ -72,7 +72,7 @@ YAML
 # T-YK-MR-002: MACHINE_ROLE=neosaitama時のYAKUZA_MAX=3確認
 # =============================================================================
 
-@test "T-YK-MR-002: MACHINE_ROLE=neosaitama → YAKUZA_MAX=7, MONITOR=master_crane" {
+@test "T-YK-MR-002: neosaitama role sets YAKUZA_MAX=7 and MONITOR=master_crane" { # MACHINE_ROLE=neosaitama → YAKUZA_MAX=7, MONITOR=master_crane
     cat > "${TEST_TMP}/settings.yaml" << 'YAML'
 language: ja
 shell: bash
@@ -92,7 +92,7 @@ YAML
 # T-YK-MR-003: MACHINE_ROLE未設定時のデフォルト動作
 # =============================================================================
 
-@test "T-YK-MR-003a: machineセクションなし → kyotoデフォルト" {
+@test "T-YK-MR-003a: missing machine section defaults to kyoto" { # machineセクションなし → kyotoデフォルト
     cat > "${TEST_TMP}/settings.yaml" << 'YAML'
 language: ja
 shell: bash
@@ -102,20 +102,20 @@ YAML
     [ "$role" = "kyoto" ]
 }
 
-@test "T-YK-MR-003b: settings.yaml不在 → kyotoデフォルト" {
+@test "T-YK-MR-003b: missing settings.yaml defaults to kyoto" { # settings.yaml不在 → kyotoデフォルト
     local role
     role=$(read_machine_role "${TEST_TMP}/nonexistent.yaml")
     [ "$role" = "kyoto" ]
 }
 
-@test "T-YK-MR-003c: 空settings.yaml → kyotoデフォルト" {
+@test "T-YK-MR-003c: empty settings.yaml defaults to kyoto" { # 空settings.yaml → kyotoデフォルト
     touch "${TEST_TMP}/settings.yaml"
     local role
     role=$(read_machine_role "${TEST_TMP}/settings.yaml")
     [ "$role" = "kyoto" ]
 }
 
-@test "T-YK-MR-003d: roleフィールドが空 → kyotoデフォルト" {
+@test "T-YK-MR-003d: empty role field defaults to kyoto" { # roleフィールドが空 → kyotoデフォルト
     cat > "${TEST_TMP}/settings.yaml" << 'YAML'
 machine:
   role:
@@ -129,7 +129,7 @@ YAML
 # T-YK-MR-004: CLEAN_MODEでYAKUZA_MAX早期定義が機能（Round1修正確認）
 # =============================================================================
 
-@test "T-YK-MR-004a: yokubari.sh内でYAKUZA_MAXがCLEAN_MODEブロックより前に定義" {
+@test "T-YK-MR-004a: YAKUZA_MAX defined before CLEAN_MODE block in yokubari.sh" { # yokubari.sh内でYAKUZA_MAXがCLEAN_MODEブロックより前に定義
     # YAKUZA_MAX定義行 < CLEAN_MODE使用行（for ((i=1; i<=YAKUZA_MAX...))）を検証
     local yakuza_def_line clean_use_line
 
@@ -143,7 +143,7 @@ YAML
     [ "$yakuza_def_line" -lt "$clean_use_line" ]
 }
 
-@test "T-YK-MR-004b: YAKUZA_MAXがCLEAN_MODEのforループより前に定義" {
+@test "T-YK-MR-004b: YAKUZA_MAX defined before CLEAN_MODE for-loop" { # YAKUZA_MAXがCLEAN_MODEのforループより前に定義
     # forループ内のYAKUZA_MAX使用行を特定
     local yakuza_def_line for_loop_line
 
@@ -155,7 +155,7 @@ YAML
     [ "$yakuza_def_line" -lt "$for_loop_line" ]
 }
 
-@test "T-YK-MR-004c: MONITOR_AGENTがCLEAN_MODEブロックより前に定義" {
+@test "T-YK-MR-004c: MONITOR_AGENT defined before CLEAN_MODE block" { # MONITOR_AGENTがCLEAN_MODEブロックより前に定義
     local monitor_def_line clean_use_line
 
     # MONITOR_AGENT初回定義行
@@ -172,7 +172,7 @@ YAML
 # エッジケース: awkパーサー
 # =============================================================================
 
-@test "T-YK-MR-EDGE: roleにextraスペースがあっても正しく読み取れる" {
+@test "T-YK-MR-EDGE: role with extra spaces parsed correctly" { # roleにextraスペースがあっても正しく読み取れる
     cat > "${TEST_TMP}/settings.yaml" << 'YAML'
 machine:
   role: neosaitama
@@ -182,7 +182,7 @@ YAML
     [ "$role" = "neosaitama" ]
 }
 
-@test "T-YK-MR-EDGE: role値の前後にコメントがない正常値" {
+@test "T-YK-MR-EDGE: role value without inline comment parsed correctly" { # role値の前後にコメントがない正常値
     cat > "${TEST_TMP}/settings.yaml" << 'YAML'
 machine:
   role: kyoto              # kyoto | neosaitama
@@ -273,48 +273,48 @@ eval_ntfy_startup_condition() {
     fi
 }
 
-@test "T-YK-NTFY-001: kyoto + ntfy_topic設定 → 起動条件が真" {
+@test "T-YK-NTFY-001: kyoto with ntfy_topic triggers startup" { # kyoto + ntfy_topic設定 → 起動条件が真
     local result
     result=$(eval_ntfy_startup_condition "kyoto" "test-topic-xyz")
     [ "$result" = "start" ]
 }
 
-@test "T-YK-NTFY-002: neosaitama + ntfy_topic設定 → 起動条件が真（FIX-002）" {
+@test "T-YK-NTFY-002: neosaitama with ntfy_topic triggers startup (FIX-002)" { # neosaitama + ntfy_topic設定 → 起動条件が真（FIX-002）
     # FIX-002: neosaitamaでもntfy_listenerが起動するよう修正
     local result
     result=$(eval_ntfy_startup_condition "neosaitama" "test-topic-xyz")
     [ "$result" = "start" ]
 }
 
-@test "T-YK-NTFY-003: kyoto + 既に起動中 → PIDチェックでスキップ" {
+@test "T-YK-NTFY-003: kyoto already running skips via PID check" { # kyoto + 既に起動中 → PIDチェックでスキップ
     local result
     result=$(eval_ntfy_startup_condition "kyoto" "test-topic-xyz" "true")
     [ "$result" = "skip_pid" ]
 }
 
-@test "T-YK-NTFY-004: kyoto + 未起動 → 起動実行" {
+@test "T-YK-NTFY-004: kyoto not running triggers startup" { # kyoto + 未起動 → 起動実行
     local result
     result=$(eval_ntfy_startup_condition "kyoto" "test-topic-xyz" "false")
     [ "$result" = "start" ]
 }
 
-@test "T-YK-NTFY-005: ntfy_topic未設定 → 起動しない" {
+@test "T-YK-NTFY-005: empty ntfy_topic skips startup" { # ntfy_topic未設定 → 起動しない
     local result
     result=$(eval_ntfy_startup_condition "kyoto" "")
     [ "$result" = "skip_notopic" ]
 }
 
-@test "T-YK-NTFY-006: yokubari.shにPIDチェック実装が存在することを確認" {
+@test "T-YK-NTFY-006: yokubari.sh has pgrep PID check implementation" { # yokubari.shにPIDチェック実装が存在することを確認
     # yokubari.shにpgrepによるPIDチェックが実装されているか検証
     grep -q 'pgrep -f "ntfy_listener.sh"' "$PROJECT_ROOT/yokubari.sh"
 }
 
-@test "T-YK-NTFY-007: yokubari.shにMACHINE_ROLE=kyoto条件が存在することを確認" {
+@test "T-YK-NTFY-007: yokubari.sh has MACHINE_ROLE kyoto condition" { # yokubari.shにMACHINE_ROLE=kyoto条件が存在することを確認
     # MACHINE_ROLE == kyoto かつ NTFY_TOPIC の複合条件が実装されているか検証
     grep -q 'MACHINE_ROLE.*==.*kyoto' "$PROJECT_ROOT/yokubari.sh"
 }
 
-@test "T-YK-NTFY-008: yokubari.sh STEP6.9でpkill無条件kill削除を確認" {
+@test "T-YK-NTFY-008: STEP6.9 has no unconditional pkill ntfy_listener" { # yokubari.sh STEP6.9でpkill無条件kill削除を確認
     # 旧実装: pkill -f "ntfy_listener.sh" が無条件に実行されていた
     # 新実装: PIDチェック後のみ起動 → pkillによる強制killは削除
     # ntfy起動ブロック内に無条件pkillがないことを確認
@@ -328,19 +328,19 @@ eval_ntfy_startup_condition() {
 # FIX-002追加テスト: neosaitama/mbpでのntfy_listener起動
 # =============================================================================
 
-@test "T-YK-NTFY-009: neosaitama + ntfy_topic設定 + 未起動 → 起動実行（FIX-002）" {
+@test "T-YK-NTFY-009: neosaitama not running triggers startup (FIX-002)" { # neosaitama + ntfy_topic設定 + 未起動 → 起動実行（FIX-002）
     local result
     result=$(eval_ntfy_startup_condition "neosaitama" "test-topic-xyz" "false")
     [ "$result" = "start" ]
 }
 
-@test "T-YK-NTFY-010: mbp(legacy) + ntfy_topic設定 → 起動実行（FIX-002後方互換）" {
+@test "T-YK-NTFY-010: mbp legacy with ntfy_topic triggers startup (FIX-002 compat)" { # mbp(legacy) + ntfy_topic設定 → 起動実行（FIX-002後方互換）
     local result
     result=$(eval_ntfy_startup_condition "mbp" "test-topic-xyz")
     [ "$result" = "start" ]
 }
 
-@test "T-YK-NTFY-011: yokubari.shにneosaitama条件が存在することを確認（FIX-002）" {
+@test "T-YK-NTFY-011: yokubari.sh has neosaitama condition (FIX-002)" { # yokubari.shにneosaitama条件が存在することを確認（FIX-002）
     grep -q 'MACHINE_ROLE.*==.*neosaitama' "$PROJECT_ROOT/yokubari.sh"
 }
 
@@ -369,41 +369,41 @@ eval_active_mode_action() {
     fi
 }
 
-@test "T-YK-AM-001: mode=simultaneous → auto-syncスキップ（FIX-005）" {
+@test "T-YK-AM-001: simultaneous mode skips auto-sync (FIX-005)" { # mode=simultaneous → auto-syncスキップ（FIX-005）
     # simultaneous mode では両マシン同時稼働のためauto-syncをスキップ
     local result
     result=$(eval_active_mode_action "simultaneous" "" "kyoto")
     [ "$result" = "simultaneous_skip" ]
 }
 
-@test "T-YK-AM-002: mode=exclusive + 別マシンがactive → sync_needed（FIX-005）" {
+@test "T-YK-AM-002: exclusive mode with different active machine needs sync (FIX-005)" { # mode=exclusive + 別マシンがactive → sync_needed（FIX-005）
     local result
     result=$(eval_active_mode_action "exclusive" "neosaitama" "kyoto")
     [ "$result" = "sync_needed" ]
 }
 
-@test "T-YK-AM-003: mode=exclusive + 自マシンがactive → no_sync（FIX-005）" {
+@test "T-YK-AM-003: exclusive mode with self as active needs no sync (FIX-005)" { # mode=exclusive + 自マシンがactive → no_sync（FIX-005）
     local result
     result=$(eval_active_mode_action "exclusive" "kyoto" "kyoto")
     [ "$result" = "no_sync" ]
 }
 
-@test "T-YK-AM-004: mode未設定 → exclusive扱い（FIX-005後方互換）" {
+@test "T-YK-AM-004: missing mode field defaults to exclusive (FIX-005 compat)" { # mode未設定 → exclusive扱い（FIX-005後方互換）
     # modeフィールドが存在しない場合はexclusive相当として動作
     local result
     result=$(eval_active_mode_action "" "neosaitama" "kyoto")
     [ "$result" = "sync_needed" ]
 }
 
-@test "T-YK-AM-005: yokubari.shにmode:明示チェック実装が存在することを確認（FIX-005）" {
+@test "T-YK-AM-005: yokubari.sh has ACTIVE_MODE awk mode check (FIX-005)" { # yokubari.shにmode:明示チェック実装が存在することを確認（FIX-005）
     grep -q 'ACTIVE_MODE.*awk.*mode:' "$PROJECT_ROOT/yokubari.sh"
 }
 
-@test "T-YK-AM-006: yokubari.shにsimultaneous mode分岐が存在することを確認（FIX-005）" {
+@test "T-YK-AM-006: yokubari.sh has simultaneous mode branch (FIX-005)" { # yokubari.shにsimultaneous mode分岐が存在することを確認（FIX-005）
     grep -q 'ACTIVE_MODE.*==.*simultaneous' "$PROJECT_ROOT/yokubari.sh"
 }
 
-@test "T-YK-NS-001: neosaitamaブロックでresize-windowがsplit-windowより前に位置する（132x40対応）" {
+@test "T-YK-NS-001: resize-window precedes split-window in neosaitama block" { # neosaitamaブロックでresize-windowがsplit-windowより前に位置する（132x40対応）
     # neosaitamaブロック内のtmux resize-windowの行番号
     resize_line=$(grep -n 'resize-window.*multiagent:agents' "$PROJECT_ROOT/yokubari.sh" | head -1 | cut -d: -f1)
     # neosaitamaブロック内の最初のsplit-window（split-window -h -t multiagent:agents）の行番号
@@ -415,7 +415,7 @@ eval_active_mode_action() {
     [ "$resize_line" -lt "$split_line" ]
 }
 
-@test "T-YK-NS-002: neosaitamaブロックにresize-window -x 220 -y 55の実装が存在する" {
+@test "T-YK-NS-002: neosaitama block has resize-window -x 220 -y 55" { # neosaitamaブロックにresize-window -x 220 -y 55の実装が存在する
     grep -q 'resize-window.*-x 220.*-y 55' "$PROJECT_ROOT/yokubari.sh"
 }
 
@@ -426,14 +426,14 @@ eval_active_mode_action() {
 # T-YK-STEP68-003: client-resizedフック更新確認
 # =============================================================================
 
-@test "T-YK-STEP68-001: kyotoモードでSTEP6.8がmultiagent:agents→kyotoにリネームする" {
+@test "T-YK-STEP68-001: kyoto mode renames multiagent:agents to kyoto" { # kyotoモードでSTEP6.8がmultiagent:agents→kyotoにリネームする
     # kyoto (else分岐) で _agents_new_name="kyoto" が設定されることを確認
     grep -q '_agents_new_name="kyoto"' "$PROJECT_ROOT/yokubari.sh"
     # rename-windowコマンドが存在し、multiagent:agentsから$_agents_new_nameにリネームすることを確認
     grep -q 'tmux rename-window -t multiagent:agents "$_agents_new_name"' "$PROJECT_ROOT/yokubari.sh"
 }
 
-@test "T-YK-STEP68-002: neosaitamaモードでSTEP6.8がmultiagent:agents→neosaitamaにリネームする" {
+@test "T-YK-STEP68-002: neosaitama mode renames multiagent:agents to neosaitama" { # neosaitamaモードでSTEP6.8がmultiagent:agents→neosaitamaにリネームする
     # neosaitama/mbp分岐で _agents_new_name="neosaitama" が設定されることを確認
     grep -q '_agents_new_name="neosaitama"' "$PROJECT_ROOT/yokubari.sh"
     # MACHINE_ROLE条件にneosaitamaが含まれることを確認
@@ -447,7 +447,7 @@ eval_active_mode_action() {
         }
 }
 
-@test "T-YK-STEP68-003: STEP6.8後にclient-resizedフックがリネーム後のwindow名を使用する" {
+@test "T-YK-STEP68-003: client-resized hook uses renamed window name after STEP6.8" { # STEP6.8後にclient-resizedフックがリネーム後のwindow名を使用する
     # client-resizedフックが _agents_new_name 変数を参照していることを確認
     # (リネーム後のwindow名が動的に反映される)
     # grep -F で固定文字列マッチ（${} がregexメタキャラクタのため）
@@ -463,11 +463,11 @@ eval_active_mode_action() {
 # T-YK-293-002: kyotoでmain:tortoiseウィンドウが作成される
 # =============================================================================
 
-@test "T-YK-293-001: neosaitamaブロックにSSH窓(darkninja/tortoise)が存在しない" {
+@test "T-YK-293-001: neosaitama block has no SSH windows (darkninja/tortoise)" { # neosaitamaブロックにSSH窓(darkninja/tortoise)が存在しない
     # neosaitama mainセッションにSSHコマンドが含まれないこと
     ! grep -A5 'neosaitama: main セッション' "$PROJECT_ROOT/yokubari.sh" | grep -q "ssh -p"
 }
 
-@test "T-YK-293-002: kyotoブロックにmain:tortoiseウィンドウ作成が存在する" {
+@test "T-YK-293-002: kyoto block creates main:tortoise window" { # kyotoブロックにmain:tortoiseウィンドウ作成が存在する
     grep -q '\-n tortoise' "$PROJECT_ROOT/yokubari.sh"
 }
