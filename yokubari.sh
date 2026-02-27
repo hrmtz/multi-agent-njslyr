@@ -804,8 +804,10 @@ else
     log_success "  └─ ラオモトのホンジン（darkninja + monitor）、コンストラクト完了！ワザマエ！"
 fi
 
-# NOTE: window-size latest + aggressive-resize on は全ペイン分割完了後に設定する（STEP 5.3）
-# 分割前に設定するとクライアントサイズ(132x40等)に縮小されno space for new paneが発生する
+# ペイン分割前にaggressive-resizeを無効化（前回実行時の設定がサーバーに残留するため）
+# 分割完了後にSTEP 5.1.1で再有効化する
+tmux set-option -g window-size manual 2>/dev/null || true
+tmux set-option -g aggressive-resize off 2>/dev/null || true
 echo ""
 
 # pane-base-index を取得（1 の環境ではペインは 1,2,... になる）
