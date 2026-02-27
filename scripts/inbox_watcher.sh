@@ -320,8 +320,13 @@ enqueue_recovery_task_assigned() {
         _last_task_path="${_last_task_path:-queue/tasks/${AGENT_ID}.yaml}"
 
         # Handle "messages: []" (inline empty list) → convert to block format for append
+        # macOS: sed -i requires '' as backup extension (BSD sed vs GNU sed)
         if grep -q '^messages: \[\]' "$INBOX" 2>/dev/null; then
-            sed -i 's/^messages: \[\]$/messages:/' "$INBOX"
+            if [[ "$(uname -s)" == "Darwin" ]]; then
+                sed -i '' 's/^messages: \[\]$/messages:/' "$INBOX"
+            else
+                sed -i 's/^messages: \[\]$/messages:/' "$INBOX"
+            fi
         fi
 
         _now_ts=$(date -Iseconds)
