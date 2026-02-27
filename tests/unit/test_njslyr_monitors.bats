@@ -175,7 +175,7 @@ load_njslyr_functions() {
 # T-NJ-MON-001: get_monitored_agents monitorsウィンドウ存在時
 # =============================================================================
 
-@test "T-NJ-MON-001a: agentsのみ → agents windowのagentを返す" {
+@test 'T-NJ-MON-001a: agents-only window returns agents' { # agentsのみ → agents windowのagentを返す
     create_tmux_mock
     load_njslyr_functions
 
@@ -198,7 +198,7 @@ soukaiya"
     [ "$status" -eq 0 ]
 }
 
-@test "T-NJ-MON-001b: agents + monitors → 両方のagentを返す" {
+@test 'T-NJ-MON-001b: agents and monitors returns both windows' { # agents + monitors → 両方のagentを返す
     create_tmux_mock
     load_njslyr_functions
 
@@ -215,7 +215,7 @@ soukaiya"
     [[ "$output" == *"master_tortoise"* ]]
 }
 
-@test "T-NJ-MON-001c: monitors=master_crane (mbp構成)" {
+@test 'T-NJ-MON-001c: monitors=master_crane (mbp config)' { # monitors=master_crane (mbp構成)
     create_tmux_mock
     load_njslyr_functions
 
@@ -232,7 +232,7 @@ soukaiya"
     [[ "$output" == *"gryakuza"* ]]
 }
 
-@test "T-NJ-MON-001d: darkninja が agents window にいても除外される" {
+@test 'T-NJ-MON-001d: darkninja in agents window is excluded' { # darkninja が agents window にいても除外される
     create_tmux_mock
     load_njslyr_functions
 
@@ -252,7 +252,7 @@ yakuza1"
 # T-NJ-MON-002: get_monitored_agents monitorsウィンドウ不在時（空配列）
 # =============================================================================
 
-@test "T-NJ-MON-002a: 両window空 → 空出力" {
+@test 'T-NJ-MON-002a: both windows empty returns empty output' { # 両window空 → 空出力
     create_tmux_mock
     load_njslyr_functions
 
@@ -264,7 +264,7 @@ yakuza1"
     [ -z "$output" ]
 }
 
-@test "T-NJ-MON-002b: agentsのみ（monitors未作成） → agentsのみ返す" {
+@test 'T-NJ-MON-002b: agents-only no monitors returns agents only' { # agentsのみ（monitors未作成） → agentsのみ返す
     create_tmux_mock
     load_njslyr_functions
 
@@ -283,7 +283,7 @@ soukaiya"
 # T-NJ-MON-003: get_pane_target agents→monitors fallback
 # =============================================================================
 
-@test "T-NJ-MON-003a: agentsウィンドウで見つかる → multiagent:{window}.N (動的)" {
+@test 'T-NJ-MON-003a: found in agents window returns dynamic multiagent window target' { # agentsウィンドウで見つかる → multiagent:{window}.N (動的)
     create_tmux_mock
     load_njslyr_functions
 
@@ -298,7 +298,7 @@ soukaiya"
     [ "$output" = "multiagent:kyoto.1" ]
 }
 
-@test "T-NJ-MON-003b: agentsに不在→monitorsウィンドウにfallback" {
+@test 'T-NJ-MON-003b: not in agents falls back to monitors window' { # agentsに不在→monitorsウィンドウにfallback
     create_tmux_mock
     load_njslyr_functions
 
@@ -311,7 +311,7 @@ soukaiya"
     [ "$output" = "multiagent:monitors.0" ]
 }
 
-@test "T-NJ-MON-003c: master_crane (mbp) もfallbackで見つかる" {
+@test 'T-NJ-MON-003c: master_crane also found via monitors fallback' { # master_crane (mbp) もfallbackで見つかる
     create_tmux_mock
     load_njslyr_functions
 
@@ -327,7 +327,7 @@ soukaiya"
     [ "$output" = "multiagent:monitors.0" ]
 }
 
-@test "T-NJ-MON-003d: どちらにも不在 → 空出力" {
+@test 'T-NJ-MON-003d: not found in either window returns empty' { # どちらにも不在 → 空出力
     create_tmux_mock
     load_njslyr_functions
 
@@ -344,7 +344,7 @@ soukaiya"
 # T-NJ-MON-004: validate_agent_ids monitors agent含む
 # =============================================================================
 
-@test "T-NJ-MON-004a: 正常（darkninja IDなし） → return 0" {
+@test 'T-NJ-MON-004a: normal no darkninja id returns 0' { # 正常（darkninja IDなし） → return 0
     create_tmux_mock
     load_njslyr_functions
 
@@ -358,7 +358,7 @@ soukaiya"
     [ "$status" -eq 0 ]
 }
 
-@test "T-NJ-MON-004b: agentsにdarkninja誤設定 → return 1 + 警告" {
+@test 'T-NJ-MON-004b: darkninja misconfigured in agents returns 1 with warning' { # agentsにdarkninja誤設定 → return 1 + 警告
     create_tmux_mock
     load_njslyr_functions
 
@@ -372,7 +372,7 @@ soukaiya"
     [[ "$output" == *"誤設定検知"* ]]
 }
 
-@test "T-NJ-MON-004c: monitorsにdarkninja誤設定 → return 1 + 警告" {
+@test 'T-NJ-MON-004c: darkninja misconfigured in monitors returns 1 with warning' { # monitorsにdarkninja誤設定 → return 1 + 警告
     create_tmux_mock
     load_njslyr_functions
 
@@ -385,7 +385,7 @@ soukaiya"
     [[ "$output" == *"誤設定検知"* ]]
 }
 
-@test "T-NJ-MON-004d: 両window正常（master_crane含む） → return 0" {
+@test 'T-NJ-MON-004d: both windows normal with master_crane returns 0' { # 両window正常（master_crane含む） → return 0
     create_tmux_mock
     load_njslyr_functions
 
@@ -427,7 +427,7 @@ load_check_inbox_watcher() {
     }
 }
 
-@test "T-NJ-MON-005a: watcher生存中 → no action (no WARN log)" {
+@test 'T-NJ-MON-005a: watcher alive no action no WARN log' { # watcher生存中 → no action (no WARN log)
     load_njslyr_functions
     load_check_inbox_watcher
 
@@ -444,7 +444,7 @@ SCRIPT
     [[ "$output" != *"not found"* ]]
 }
 
-@test "T-NJ-MON-005b: watcher死亡 + supervisor存在 → WARN + supervisor起動" {
+@test 'T-NJ-MON-005b: watcher dead supervisor exists triggers restart' { # watcher死亡 + supervisor存在 → WARN + supervisor起動
     load_njslyr_functions
     load_check_inbox_watcher
 
@@ -472,7 +472,7 @@ SCRIPT
     [[ "$output" == *"INFO: watcher_supervisor started for yakuza3"* ]]
 }
 
-@test "T-NJ-MON-005c: watcher死亡 + supervisor不在 → WARN + ERROR log" {
+@test 'T-NJ-MON-005c: watcher dead no supervisor logs error' { # watcher死亡 + supervisor不在 → WARN + ERROR log
     load_njslyr_functions
     load_check_inbox_watcher
 
