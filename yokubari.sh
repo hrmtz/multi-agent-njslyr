@@ -765,24 +765,19 @@ fi
 # 先にセッションを作成してサーバーを起動し、その後にグローバルオプションを設定する。
 
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-    # neosaitama: main セッション + multiagent セッション（両方先に作成してからSSH送信）
-    # tmux 3.6a: SSH接続中に2つ目のセッション作成でサーバーがクラッシュするため
+    # neosaitama: main セッション
     # window 1: darkninja — SSH peer-hostname:2200 → Kyoto (plain SSH, manual tmux attach)
     # window 2: tortoise  — SSH peer-hostname:2200 → Kyoto (plain SSH, manual tmux attach)
     # window 3: crane     — ローカル master_crane
     log_war "👑 キョート接続ウィンドウ + クレイン・ホンジンをコンストラクト中...イヤーッ！"
-    # Phase 1: 全セッション・全ウィンドウ作成（SSH送信前 — tmux 3.6a crash回避）
-    # tmux 3.6a: SSH接続中にセッション/ウィンドウ操作するとサーバーがクラッシュする
+    # window 1: darkninja (SSH→Kyoto)
     tmux new-session -d -s main -n darkninja -x 200 -y 50 2>/dev/null || true
-    tmux new-session -d -s multiagent -n "agents" -x 200 -y 50 2>/dev/null || true
-    tmux new-window -t main -n tortoise
-    tmux new-window -t main -n crane
-    tmux new-window -t multiagent -n kyoto -b
-    # Phase 2: SSH送信（全ウィンドウ作成完了後）
     tmux send-keys -t main:darkninja "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST}" Enter
+    # window 2: tortoise (SSH→Kyoto)
+    tmux new-window -t main -n tortoise
     tmux send-keys -t main:tortoise "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST}" Enter
-    tmux send-keys -t multiagent:kyoto "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST}" Enter
-    # crane: ローカルシェル設定
+    # window 3: crane (local)
+    tmux new-window -t main -n crane
     CRANE_PROMPT=$(generate_prompt "crane" "cyan" "$SHELL_SETTING")
     tmux send-keys -t main:crane "cd \"$(pwd)\" && export PS1='${CRANE_PROMPT}' && clear" Enter
     tmux set-option -p -t main:crane @agent_id "master_crane"
@@ -809,10 +804,8 @@ else
     log_success "  └─ ラオモトのホンジン（darkninja + monitor）、コンストラクト完了！ワザマエ！"
 fi
 
-# ペイン分割前にaggressive-resizeを無効化（前回実行時の設定がサーバーに残留するため）
-# 分割完了後にSTEP 5.1.1で再有効化する
-tmux set-option -g window-size manual 2>/dev/null || true
-tmux set-option -g aggressive-resize off 2>/dev/null || true
+# NOTE: window-size latest + aggressive-resize on は全ペイン分割完了後に設定する（STEP 5.3）
+# 分割前に設定するとクライアントサイズ(132x40等)に縮小されno space for new paneが発生する
 echo ""
 
 # pane-base-index を取得（1 の環境ではペインは 1,2,... になる）
@@ -827,26 +820,27 @@ else
     log_war "⚔️ グレーターヤクザ・ヤクザ・ソウカイヤをジェネレート中…9名配備！"
 fi
 
-# neosaitama/mbp: multiagentセッションはSTEP 5で既に作成済み（tmux 3.6a crash回避）
-# kyoto: ここで作成
-if [[ "$MACHINE_ROLE" != "neosaitama" && "$MACHINE_ROLE" != "mbp" ]]; then
-    tmux kill-session -t multiagent 2>/dev/null || true
-    if ! tmux new-session -d -s multiagent -n "agents" -x 200 -y 50 2>/dev/null; then
-        echo "" >&2
-        echo "  ╔════════════════════════════════════════════════════════════╗" >&2
-        echo "  ║  グワーッ！multiagentセッション生成に失敗！              ║" >&2
-        echo "  ║  アイエエエ！既存セッションのゴーストが残留している！    ║" >&2
-        echo "  ╠════════════════════════════════════════════════════════════╣" >&2
-        echo "  ║  ジョウキョウ確認:  tmux ls                              ║" >&2
-        echo "  ║  爆発四散させる:   tmux kill-session -t multiagent       ║" >&2
-        echo "  ╚════════════════════════════════════════════════════════════╝" >&2
-        echo "" >&2
-        exit 1
-    fi
+# 最初のペイン作成
+if ! tmux new-session -d -s multiagent -n "agents" -x 200 -y 50 2>/dev/null; then
+    echo "" >&2
+    echo "  ╔════════════════════════════════════════════════════════════╗" >&2
+    echo "  ║  グワーッ！multiagentセッション生成に失敗！              ║" >&2
+    echo "  ║  アイエエエ！既存セッションのゴーストが残留している！    ║" >&2
+    echo "  ╠════════════════════════════════════════════════════════════╣" >&2
+    echo "  ║  ジョウキョウ確認:  tmux ls                              ║" >&2
+    echo "  ║  爆発四散させる:   tmux kill-session -t multiagent       ║" >&2
+    echo "  ╚════════════════════════════════════════════════════════════╝" >&2
+    echo "" >&2
+    exit 1
 fi
 
-# neosaitama: kyoto ウィンドウはSTEP 5 Phase 1で作成・SSH送信済み（tmux 3.6a crash回避）
+# neosaitama: "kyoto" ウィンドウ追加（SSH→Kyoto multiagent）
 # NOTE: "agents" → "neosaitama" のリネームは multiagent:agents の全操作完了後に実施（STEP 5.2後）
+if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+    # window "kyoto": SSH peer-hostname → Kyoto (plain SSH, manual tmux attach)
+    tmux new-window -t multiagent -n kyoto -b
+    tmux send-keys -t multiagent:kyoto "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST}" Enter
+fi
 
 # DISPLAY_MODE: shout (default) or silent (--silent flag)
 if [ "$SILENT_MODE" = true ]; then
