@@ -58,7 +58,7 @@ files:
 
 panes:
   gryakuza: "multiagent:kyoto.1"  # neosaitama: "multiagent:neosaitama.1"
-  self: "main:tortoise.1"  # NeoSaitama: different session layout
+  self: "main:monitor.1"   # kyoto tmuxでのtortoise pane (cmd_287でmonitorsウィンドウ廃止→main:monitor)
 
 inbox:
   write_script: "scripts/inbox_write.sh"
