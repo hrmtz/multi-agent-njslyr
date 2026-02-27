@@ -122,6 +122,16 @@ njslyr.sh（bashデーモン）が死活監視とエスカレーションを担�
 2. gryakuzaからredo指示が発行された（inbox経由で通知）
 3. エージェントのinboxに長時間未読が蓄積（tortoise経由で通知）
 
+### Slave Mode 違反チェック
+
+- **対象**: MACHINE_ROLE=neosaitama の gryakuza
+- **チェック内容**:
+  - 独自のcmd作成 (cmd_xxx.yaml) を queue/tasks/ に書き込んでいないか
+  - dashboard.md を直接更新していないか
+  - 独自のタスク分解 (複数subtaskを自律的に作成) をしていないか
+  - Slave Mode でのみ許可される操作: yakuza1-3へのtask_assigned, soukaiyaへのlocal QC依頼, ntfy経由のKyoto報告
+- **違反時の対応**: Kyoto gryakuza に即報告。P0 inbox_write。
+
 ### 分析フロー
 
 1. **ログ収集**: 該当エージェントの直前のtmux pane出力をキャプチャ

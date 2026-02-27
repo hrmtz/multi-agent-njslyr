@@ -80,6 +80,7 @@
 # Context README
 !context/
 !context/README.md
+!context/cross_machine_architecture.md
 
 # Scripts
 !scripts/
