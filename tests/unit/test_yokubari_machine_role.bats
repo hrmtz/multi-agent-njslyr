@@ -418,3 +418,23 @@ eval_active_mode_action() {
 @test "T-YK-NS-002: neosaitamaブロックにresize-window -x 220 -y 55の実装が存在する" {
     grep -q 'resize-window.*-x 220.*-y 55' "$PROJECT_ROOT/yokubari.sh"
 }
+
+# =============================================================================
+# cmd_293 subtask_293a テスト: neosaitama main session 修正確認
+# T-YK-293-001: master_tortoiseウィンドウが作成される（monitor→master_tortoise）
+# T-YK-293-002: darknijaのSSHにtmux attach -t main:darkninjaが含まれる
+# T-YK-293-003: master_tortoiseのSSHにtmux attach -t main:monitorが含まれる
+# =============================================================================
+
+@test "T-YK-293-001: neosaitamaブロックにmain:master_tortoiseウィンドウ作成が存在する（monitor→master_tortoise）" {
+    # '-n master_tortoise' が neosaitamaブロック内に存在すること
+    grep -q '\-n master_tortoise' "$PROJECT_ROOT/yokubari.sh"
+}
+
+@test "T-YK-293-002: neosaitamaブロックのdarkninja SSHにtmux attach -t main:darkninjaが含まれる" {
+    grep -q "tmux attach -t main:darkninja" "$PROJECT_ROOT/yokubari.sh"
+}
+
+@test "T-YK-293-003: neosaitamaブロックのmaster_tortoise SSHにtmux attach -t main:monitorが含まれる" {
+    grep -q "tmux attach -t main:monitor" "$PROJECT_ROOT/yokubari.sh"
+}
