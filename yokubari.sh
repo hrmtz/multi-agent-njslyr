@@ -771,14 +771,17 @@ if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
     # window 2: tortoise  — SSH peer-hostname:2200 → Kyoto (plain SSH, manual tmux attach)
     # window 3: crane     — ローカル master_crane
     log_war "👑 キョート接続ウィンドウ + クレイン・ホンジンをコンストラクト中...イヤーッ！"
-    # Phase 1: 両セッション作成（SSH送信前 — tmux 3.6a crash回避）
+    # Phase 1: 全セッション・全ウィンドウ作成（SSH送信前 — tmux 3.6a crash回避）
+    # tmux 3.6a: SSH接続中にセッション/ウィンドウ操作するとサーバーがクラッシュする
     tmux new-session -d -s main -n darkninja -x 200 -y 50 2>/dev/null || true
     tmux new-session -d -s multiagent -n "agents" -x 200 -y 50 2>/dev/null || true
     tmux new-window -t main -n tortoise
     tmux new-window -t main -n crane
-    # Phase 2: SSH送信（セッション作成完了後）
+    tmux new-window -t multiagent -n kyoto -b
+    # Phase 2: SSH送信（全ウィンドウ作成完了後）
     tmux send-keys -t main:darkninja "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST}" Enter
     tmux send-keys -t main:tortoise "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST}" Enter
+    tmux send-keys -t multiagent:kyoto "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST}" Enter
     # crane: ローカルシェル設定
     CRANE_PROMPT=$(generate_prompt "crane" "cyan" "$SHELL_SETTING")
     tmux send-keys -t main:crane "cd \"$(pwd)\" && export PS1='${CRANE_PROMPT}' && clear" Enter
@@ -842,13 +845,8 @@ if [[ "$MACHINE_ROLE" != "neosaitama" && "$MACHINE_ROLE" != "mbp" ]]; then
     fi
 fi
 
-# neosaitama: "kyoto" ウィンドウ追加（SSH→Kyoto multiagent）
+# neosaitama: kyoto ウィンドウはSTEP 5 Phase 1で作成・SSH送信済み（tmux 3.6a crash回避）
 # NOTE: "agents" → "neosaitama" のリネームは multiagent:agents の全操作完了後に実施（STEP 5.2後）
-if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-    # window "kyoto": SSH peer-hostname → Kyoto (plain SSH, manual tmux attach)
-    tmux new-window -t multiagent -n kyoto -b
-    tmux send-keys -t multiagent:kyoto "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST}" Enter
-fi
 
 # DISPLAY_MODE: shout (default) or silent (--silent flag)
 if [ "$SILENT_MODE" = true ]; then
