@@ -79,7 +79,8 @@ MOCK
 
     # Extract function definitions from ntfy_listener.sh
     # Range: from parse_message_fields() to just before 'trap cleanup' line
-    sed -n '/^parse_message_fields()/,/^trap cleanup/{/^trap cleanup/d;p}' \
+    # Use awk for macOS/BSD sed compatibility (BSD sed rejects {cmd;cmd} syntax)
+    awk '/^parse_message_fields\(\)/{started=1} started && /^trap cleanup/{exit} started{print}' \
         "$NTFY_LISTENER" > "$TEST_TMP/functions.sh"
     # shellcheck source=/dev/null
     source "$TEST_TMP/functions.sh"
@@ -712,4 +713,82 @@ YAML
 
     # active_machine.yaml が更新されているか確認
     grep -q "active_machine: neosaitama" "$MOCK_PROJECT/queue/active_machine.yaml"
+}
+
+# =============================================================================
+# handle_suriken: クロスマシンnudge中継テスト (cmd_297)
+# =============================================================================
+
+# --- T-NL-SRK-001: handle_suriken 正常処理 → njslyr_cmd.sh suriken が呼ばれる ---
+
+@test "T-NL-SRK-001: handle_suriken relays valid agent_id to njslyr_cmd.sh" {
+    NJSLYR_CMD_LOG="$TEST_TMP/njslyr_cmd_calls.log"
+    export NJSLYR_CMD_LOG
+    cat > "$MOCK_PROJECT/njslyr_cmd.sh" << 'MOCK'
+#!/bin/bash
+echo "$@" >> "${NJSLYR_CMD_LOG}"
+MOCK
+    chmod +x "$MOCK_PROJECT/njslyr_cmd.sh"
+
+    run call_with_stderr handle_suriken "yakuza3:2"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"suriken: relaying to local agent: yakuza3"* ]]
+
+    # njslyr_cmd.sh suriken yakuza3 が呼ばれたこと
+    [ -f "$NJSLYR_CMD_LOG" ]
+    grep -q "suriken yakuza3" "$NJSLYR_CMD_LOG"
+}
+
+# --- T-NL-SRK-002: handle_suriken 不正agent_id → return 1, WARNING, njslyr_cmd.sh未呼び出し ---
+
+@test "T-NL-SRK-002: handle_suriken rejects invalid agent_id with semicolon" {
+    NJSLYR_CMD_LOG="$TEST_TMP/njslyr_cmd_calls.log"
+    export NJSLYR_CMD_LOG
+    cat > "$MOCK_PROJECT/njslyr_cmd.sh" << 'MOCK'
+#!/bin/bash
+echo "$@" >> "${NJSLYR_CMD_LOG}"
+MOCK
+    chmod +x "$MOCK_PROJECT/njslyr_cmd.sh"
+
+    run call_with_stderr handle_suriken "evil;agent:1"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"WARNING: suriken: invalid agent_id"* ]]
+
+    # njslyr_cmd.sh が呼ばれていないこと
+    [ ! -f "$NJSLYR_CMD_LOG" ]
+}
+
+# --- T-NL-SRK-003: handle_suriken njslyr_cmd.sh 失敗 → WARNING のみ、クラッシュしない ---
+
+@test "T-NL-SRK-003: handle_suriken logs WARNING when njslyr_cmd.sh fails, no crash" {
+    cat > "$MOCK_PROJECT/njslyr_cmd.sh" << 'MOCK'
+#!/bin/bash
+exit 1
+MOCK
+    chmod +x "$MOCK_PROJECT/njslyr_cmd.sh"
+
+    run call_with_stderr handle_suriken "yakuza1:1"
+    # njslyr_cmd.sh 失敗でもクラッシュしない（return 0）
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"WARNING: suriken: local relay failed for yakuza1"* ]]
+}
+
+# --- T-NL-SRK-004: route_message suriken: → return 2 (ntfy_inbox記録スキップ) ---
+
+@test "T-NL-SRK-004: route_message dispatches suriken: and returns 2 (skip ntfy_inbox)" {
+    NJSLYR_CMD_LOG="$TEST_TMP/njslyr_cmd_calls.log"
+    export NJSLYR_CMD_LOG
+    cat > "$MOCK_PROJECT/njslyr_cmd.sh" << 'MOCK'
+#!/bin/bash
+echo "$@" >> "${NJSLYR_CMD_LOG}"
+MOCK
+    chmod +x "$MOCK_PROJECT/njslyr_cmd.sh"
+
+    run call_with_stderr route_message "suriken:yakuza5:3" ""
+    # return 2 = handled, ntfy_inbox記録スキップ
+    [ "$status" -eq 2 ]
+
+    # njslyr_cmd.sh suriken yakuza5 が呼ばれたこと
+    [ -f "$NJSLYR_CMD_LOG" ]
+    grep -q "suriken yakuza5" "$NJSLYR_CMD_LOG"
 }

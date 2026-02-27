@@ -566,6 +566,27 @@ except Exception:
         report_received ntfy_listener "$task_file"
 }
 
+# suriken:{agent_id}:{unread_count} → local agent へのnudge中継（クロスマシン対応）
+# リモートマシンからntfy経由で届いたsurikenをローカルエージェントに転送する
+handle_suriken() {
+    local payload="$1"
+    # payload format: agent_id:unread_count
+    local agent_id="${payload%%:*}"
+
+    # Validate agent_id (alphanumeric + underscore only)
+    if [[ ! "$agent_id" =~ ^[a-zA-Z0-9_]+$ ]]; then
+        echo "[$(date)] [ntfy_listener] WARNING: suriken: invalid agent_id: '${agent_id:0:50}'" >&2
+        return 1
+    fi
+
+    echo "[$(date)] [ntfy_listener] suriken: relaying to local agent: $agent_id" >&2
+
+    # ローカルsurikenをnjslyr_cmd.sh経由で実行
+    bash "$SCRIPT_DIR/njslyr_cmd.sh" suriken "$agent_id" || {
+        echo "[$(date)] [ntfy_listener] WARNING: suriken: local relay failed for $agent_id" >&2
+    }
+}
+
 # Route message by prefix. Returns 0 if handled, 1 if fallback needed.
 # Return code 2 means: handled but skip ntfy_inbox recording (e.g. ping:).
 route_message() {
@@ -609,6 +630,11 @@ route_message() {
         ping)
             # ping: handled — skip ntfy_inbox recording (return 2)
             handle_ping "$payload"
+            return 2
+            ;;
+        suriken)
+            # suriken: クロスマシンnudge中継 — skip ntfy_inbox recording (return 2)
+            handle_suriken "$payload"
             return 2
             ;;
         dispatch)
