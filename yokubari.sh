@@ -767,15 +767,15 @@ fi
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
     # neosaitama: main セッション
     # window 1: darkninja     — SSH peer-hostname:2200 → Kyoto darkninja pane
-    # window 2: master_tortoise — SSH peer-hostname:2200 → Kyoto master_tortoise pane
-    # window 3: crane          — ローカル master_crane
+    # window 2: tortoise — SSH peer-hostname:2200 → Kyoto master_tortoise pane
+    # window 3: crane    — ローカル master_crane
     log_war "👑 キョート接続ウィンドウ + クレイン・ホンジンをコンストラクト中...イヤーッ！"
     # window 1: darkninja (SSH→Kyoto)
     tmux new-session -d -s main -n darkninja -x 200 -y 50 2>/dev/null || true
     tmux send-keys -t main:darkninja "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST} -t 'tmux attach -t main:darkninja'" Enter
-    # window 2: master_tortoise (SSH→Kyoto)
-    tmux new-window -t main -n master_tortoise
-    tmux send-keys -t main:master_tortoise "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST} -t 'tmux attach -t main:monitor'" Enter
+    # window 2: tortoise (SSH→Kyoto)
+    tmux new-window -t main -n tortoise
+    tmux send-keys -t main:tortoise "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST} -t 'tmux attach -t main:monitor'" Enter
     # window 3: crane (local)
     tmux new-window -t main -n crane
     CRANE_PROMPT=$(generate_prompt "crane" "cyan" "$SHELL_SETTING")
@@ -784,7 +784,7 @@ if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
     tmux set-option -p -t main:crane @model_name "Sonnet"
     tmux set-option -p -t main:crane @current_task ""
     MONITOR_PANE="main:crane"
-    log_success "  └─ キョート接続(darkninja/monitor) + クレイン・ホンジン、コンストラクト完了！ワザマエ！"
+    log_success "  └─ キョート接続(darkninja/tortoise) + クレイン・ホンジン、コンストラクト完了！ワザマエ！"
 else
     # kyoto: main セッション、window "darkninja" にラオモト本体、window "monitor" にmaster_tortoise
     log_war "👑 ラオモトのホンジンをコンストラクト中...イヤーッ！"
