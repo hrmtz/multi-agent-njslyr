@@ -402,3 +402,19 @@ eval_active_mode_action() {
 @test "T-YK-AM-006: yokubari.shにsimultaneous mode分岐が存在することを確認（FIX-005）" {
     grep -q 'ACTIVE_MODE.*==.*simultaneous' "$PROJECT_ROOT/yokubari.sh"
 }
+
+@test "T-YK-NS-001: neosaitamaブロックでresize-windowがsplit-windowより前に位置する（132x40対応）" {
+    # neosaitamaブロック内のtmux resize-windowの行番号
+    resize_line=$(grep -n 'resize-window.*multiagent:agents' "$PROJECT_ROOT/yokubari.sh" | head -1 | cut -d: -f1)
+    # neosaitamaブロック内の最初のsplit-window（split-window -h -t multiagent:agents）の行番号
+    split_line=$(grep -n 'split-window.*multiagent:agents' "$PROJECT_ROOT/yokubari.sh" | head -1 | cut -d: -f1)
+    # 両行が存在すること
+    [ -n "$resize_line" ]
+    [ -n "$split_line" ]
+    # resize-windowがsplit-windowより前（行番号が小さい）こと
+    [ "$resize_line" -lt "$split_line" ]
+}
+
+@test "T-YK-NS-002: neosaitamaブロックにresize-window -x 220 -y 55の実装が存在する" {
+    grep -q 'resize-window.*-x 220.*-y 55' "$PROJECT_ROOT/yokubari.sh"
+}

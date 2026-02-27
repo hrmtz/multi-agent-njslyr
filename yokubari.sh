@@ -866,6 +866,10 @@ if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
         MODEL_NAMES=("Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus")
     fi
 
+    # 小型ターミナル（132x40）対応: ペイン分割前に仮想サイズを強制設定
+    # window-size latest + aggressive-resize により物理端末サイズに縮小される場合があるため
+    tmux resize-window -t "multiagent:agents" -x 220 -y 55
+
     # 3x3グリッド作成（合計9ペイン）
     tmux split-window -h -t "multiagent:agents"
     tmux split-window -h -t "multiagent:agents"
