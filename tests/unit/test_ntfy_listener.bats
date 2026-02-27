@@ -438,7 +438,7 @@ status: completed
 
 # --- T-NL-DSP-001: dispatch: 正常処理 ---
 
-@test "T-NL-DSP-001: handle_task_dispatch writes YAML and notifies worker inbox" {
+@test "T-NL-DSP-001: handle_task_dispatch writes YAML and notifies gryakuza inbox (FIX-004)" {
     local valid_yaml
     valid_yaml="task:
   task_id: subtask_test_dsp
@@ -459,10 +459,10 @@ status: completed
     grep -q "task_id: subtask_test_dsp" "$task_file"
     grep -q "parent_cmd: cmd_278" "$task_file"
 
-    # yakuza3 inbox_write が呼ばれたか確認
+    # FIX-004: gryakuza inbox_write が呼ばれたか確認（workerへの直接通知ではない）
     [ -f "$INBOX_WRITE_LOG" ]
-    grep -q "yakuza3" "$INBOX_WRITE_LOG"
-    grep -q "task_assigned" "$INBOX_WRITE_LOG"
+    grep -q "gryakuza" "$INBOX_WRITE_LOG"
+    grep -q "report_received" "$INBOX_WRITE_LOG"
 }
 
 # --- T-NL-DSP-002: dispatch: 不正base64 → エラーログ・ファイル未作成 ---
@@ -542,4 +542,174 @@ status: completed
 
     # タスクファイルが作成されているか確認
     [ -f "$MOCK_PROJECT/queue/tasks/yakuza4_subtask_route_test.yaml" ]
+}
+
+# ═══════════════════════════════════════════════════════════════
+# FIX-006: dispatch: 既存ファイル上書き保護テスト (cmd_278i)
+# ═══════════════════════════════════════════════════════════════
+
+# --- T-NL-DSP-006: dispatch: 既存ファイル上書き保護 → return 1, ファイル不変 ---
+
+@test "T-NL-DSP-006: handle_task_dispatch skips when task file already exists" {
+    local valid_yaml
+    valid_yaml="task:
+  task_id: subtask_overwrite_test
+  parent_cmd: cmd_278
+  assigned_to: yakuza5
+  status: assigned
+"
+    local payload
+    payload=$(printf '%s' "$valid_yaml" | base64 | tr -d '\n')
+
+    # 1回目: 正常作成
+    run call_with_stderr handle_task_dispatch "$payload"
+    [ "$status" -eq 0 ]
+    local task_file="$MOCK_PROJECT/queue/tasks/yakuza5_subtask_overwrite_test.yaml"
+    [ -f "$task_file" ]
+
+    # 元ファイルのmd5を記録
+    local original_md5
+    original_md5=$(md5sum "$task_file" | awk '{print $1}')
+
+    # 2回目: 上書き保護 → return 1, WARNING出力
+    run call_with_stderr handle_task_dispatch "$payload"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Task file already exists"* ]]
+    [[ "$output" == *"skipping to prevent overwrite"* ]]
+
+    # ファイル内容が変わっていないこと
+    local new_md5
+    new_md5=$(md5sum "$task_file" | awk '{print $1}')
+    [ "$original_md5" = "$new_md5" ]
+}
+
+# --- T-NL-DSP-007: dispatch: 上書き保護時 inbox_write が呼ばれないこと ---
+
+@test "T-NL-DSP-007: handle_task_dispatch does not notify worker when file exists" {
+    local valid_yaml
+    valid_yaml="task:
+  task_id: subtask_nonotify_test
+  parent_cmd: cmd_278
+  assigned_to: yakuza6
+  status: assigned
+"
+    local payload
+    payload=$(printf '%s' "$valid_yaml" | base64 | tr -d '\n')
+
+    # 1回目: 正常
+    run call_with_stderr handle_task_dispatch "$payload"
+    [ "$status" -eq 0 ]
+
+    # inbox_write ログをリセット
+    rm -f "$INBOX_WRITE_LOG"
+
+    # 2回目: 上書き保護 → inbox_write 呼ばれない
+    run call_with_stderr handle_task_dispatch "$payload"
+    [ "$status" -eq 1 ]
+
+    # inbox_write が呼ばれていないこと
+    [ ! -f "$INBOX_WRITE_LOG" ]
+}
+
+# =============================================================================
+# FIX-004: dispatch通知先 → gryakuza (cmd_278 subtask_278j)
+# =============================================================================
+
+@test "T-NL-FIX004-001: handle_task_dispatch notifies gryakuza not worker directly" {
+    # FIX-004: dispatch受信時はgryakuzaに通知（§2.3アーキテクチャ準拠）
+    local valid_yaml
+    valid_yaml="task:
+  task_id: subtask_fix004_test
+  parent_cmd: cmd_278
+  assigned_to: yakuza3
+  status: assigned
+"
+    local payload
+    payload=$(printf '%s' "$valid_yaml" | base64 | tr -d '\n')
+
+    run call_with_stderr handle_task_dispatch "$payload"
+    [ "$status" -eq 0 ]
+
+    # gryakuzaへの通知確認
+    [ -f "$INBOX_WRITE_LOG" ]
+    grep -q "gryakuza" "$INBOX_WRITE_LOG"
+    grep -q "report_received" "$INBOX_WRITE_LOG"
+
+    # workerへの直接通知がないこと
+    ! grep -q "yakuza3" "$INBOX_WRITE_LOG"
+    ! grep -q "task_assigned" "$INBOX_WRITE_LOG"
+}
+
+@test "T-NL-FIX004-002: handle_task_dispatch inbox message contains task_id and path" {
+    # FIX-004: gryakuzaへの通知メッセージにtask_idとファイルパスが含まれること
+    local valid_yaml
+    valid_yaml="task:
+  task_id: subtask_fix004_msg
+  parent_cmd: cmd_278
+  assigned_to: yakuza4
+  status: assigned
+"
+    local payload
+    payload=$(printf '%s' "$valid_yaml" | base64 | tr -d '\n')
+
+    run call_with_stderr handle_task_dispatch "$payload"
+    [ "$status" -eq 0 ]
+
+    [ -f "$INBOX_WRITE_LOG" ]
+    grep -q "subtask_fix004_msg" "$INBOX_WRITE_LOG"
+}
+
+# =============================================================================
+# FIX-009: handover simultaneous mode拒否 (cmd_278 subtask_278j)
+# =============================================================================
+
+@test "T-NL-FIX009-001: handle_handover rejects when mode is simultaneous" {
+    # FIX-009: simultaneous mode中はhandoverを拒否してlog_warnを出す
+    cat > "$MOCK_PROJECT/queue/active_machine.yaml" << 'YAML'
+mode: simultaneous
+primary: kyoto
+secondary: neosaitama
+since: "2026-02-27T00:00:00+09:00"
+activated_by: laomoto
+YAML
+    run call_with_stderr handle_handover "kyoto"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"handover rejected"* ]]
+    [[ "$output" == *"simultaneous mode"* ]]
+
+    # active_machine.yaml が変更されていないこと（primary: kyoto のまま）
+    grep -q "mode: simultaneous" "$MOCK_PROJECT/queue/active_machine.yaml"
+}
+
+@test "T-NL-FIX009-002: handle_handover succeeds when mode is exclusive" {
+    # FIX-009: exclusive mode中はhandover可能
+    cat > "$MOCK_PROJECT/queue/active_machine.yaml" << 'YAML'
+mode: exclusive
+active_machine: kyoto
+since: "2026-02-27T00:00:00+09:00"
+handover_by: laomoto
+YAML
+    run call_with_stderr handle_handover "neosaitama"
+    [ "$status" -eq 0 ]
+
+    # active_machine.yaml が更新されているか確認
+    grep -q "active_machine: neosaitama" "$MOCK_PROJECT/queue/active_machine.yaml"
+
+    # gryakuza inbox通知が送られているか確認
+    [ -f "$INBOX_WRITE_LOG" ]
+    grep -q "gryakuza" "$INBOX_WRITE_LOG"
+    grep -q "handover受信" "$INBOX_WRITE_LOG"
+}
+
+@test "T-NL-FIX009-003: handle_handover succeeds when active_machine.yaml has no mode field" {
+    # FIX-009: mode フィールドなし（legacy形式）→ exclusive扱いでhandover許可
+    cat > "$MOCK_PROJECT/queue/active_machine.yaml" << 'YAML'
+active_machine: kyoto
+since: "2026-02-27T00:00:00+09:00"
+YAML
+    run call_with_stderr handle_handover "neosaitama"
+    [ "$status" -eq 0 ]
+
+    # active_machine.yaml が更新されているか確認
+    grep -q "active_machine: neosaitama" "$MOCK_PROJECT/queue/active_machine.yaml"
 }

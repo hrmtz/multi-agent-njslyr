@@ -88,6 +88,8 @@ awk '/role:/{print $2}' config/settings.yaml
 | dashboard.md更新 | ✗ | ステータスはKyoto経由 |
 | active_machine.yaml更新 | ✗ | Master exclusive |
 
+**F002例外（Slave Mode限定）**: Slave Mode（role=neosaitama）において、Kyoto gryakuza への完了報告は `ntfy_send_report.sh` 経由が許可される。これはF002（「直接通信禁止＝darkninja/ダッシュボードバイパス禁止」）の対象外。ntfy経由の報告はKyoto側ntfy_listenerが受信しgryakuza inboxに通知するため、正規のレポートフローに合流する。
+
 ### Master Mode（role=kyoto, ryzen, または未設定の場合）
 
 通常動作。すべての権限が有効。

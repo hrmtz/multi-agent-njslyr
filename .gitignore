@@ -101,6 +101,8 @@
 !scripts/test_inbox_write.sh
 !scripts/inbox_archive.sh
 !scripts/cross_sync.sh
+!scripts/ntfy_send_dispatch.sh
+!scripts/ntfy_send_report.sh
 
 
 # SayTask (sample template only, not actual data)

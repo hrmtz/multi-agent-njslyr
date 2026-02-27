@@ -263,6 +263,13 @@ handle_handover() {
         return 1
     fi
     local am_file="$SCRIPT_DIR/queue/active_machine.yaml"
+    # FIX-009: simultaneous mode中はhandover拒否
+    local current_mode
+    current_mode=$(awk '/^mode:/{print $2}' "$am_file" 2>/dev/null)
+    if [[ "$current_mode" == "simultaneous" ]]; then
+        echo "[$(date)] [ntfy_listener] WARN: handover rejected: simultaneous mode active — use ntfy 'set_mode:exclusive' first" >&2
+        return 1
+    fi
     local ts tz_len
     ts=$(date "+%Y-%m-%dT%H:%M:%S%z")
     tz_len=${#ts}
@@ -534,6 +541,13 @@ except Exception:
     local tasks_dir="$SCRIPT_DIR/queue/tasks"
     mkdir -p "$tasks_dir"
     local task_file="${tasks_dir}/${worker_id}_${task_id}.yaml"
+
+    # FIX-006: 既存ファイル上書き保護（handle_report()と統一）
+    if [[ -f "$task_file" ]]; then
+        echo "[$(date)] [ntfy_listener] WARNING: Task file already exists: $task_file — skipping to prevent overwrite" >&2
+        return 1
+    fi
+
     local tmp_file
     tmp_file=$(mktemp "${tasks_dir}/${worker_id}_${task_id}.yaml.XXXXXX")
     printf '%s\n' "$decoded" > "$tmp_file"
@@ -541,10 +555,10 @@ except Exception:
 
     echo "[$(date)] [ntfy_listener] dispatch: task_id=$task_id worker=$worker_id → $task_file" >&2
 
-    # Notify worker via inbox_write.sh
-    bash "$SCRIPT_DIR/scripts/inbox_write.sh" "$worker_id" \
-        "タスク受信 (dispatch経由): $task_id ($parent_cmd)。タスクYAML読んで即着手せよ。" \
-        task_assigned ntfy_listener "$task_file"
+    # FIX-004: gryakuzaに通知（dispatch受信を報告 → gryakuzaがworkerに割り当て）
+    bash "$SCRIPT_DIR/scripts/inbox_write.sh" gryakuza \
+        "ntfy dispatch受信: $task_id → $task_file 保存済み。確認して割り当てよ。" \
+        report_received ntfy_listener "$task_file"
 }
 
 # Route message by prefix. Returns 0 if handled, 1 if fallback needed.
@@ -640,13 +654,10 @@ while true; do
     # Stream new messages from multiple topics (long-lived connection)
     curl -s --no-buffer "${AUTH_ARGS[@]}" "https://ntfy.sh/$SUBSCRIBE_TOPICS/json${_since_param}" 2>/dev/null | while IFS= read -r line; do
         # Parse all needed fields in a single python3 call (including topic)
-        IFS=$'\x1f' read -r EVENT TAGS MSG MSG_ID MSG_TOPIC < <(parse_message_fields <<< "$line")
+        IFS=$'\x1f' read -r EVENT _ MSG MSG_ID MSG_TOPIC < <(parse_message_fields <<< "$line")
 
         # Skip keepalive pings and non-message events
         [[ "$EVENT" != "message" ]] && continue
-
-        # Skip outbound messages (sent by our own scripts/ntfy.sh)
-        [[ "$TAGS" == *outbound* ]] && continue
 
         # Skip empty messages
         [[ -z "$MSG" ]] && continue

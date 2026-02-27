@@ -500,25 +500,27 @@ echo ""
 # STEP 0.5: 起動時auto-sync（state pullのみ。handoverはntfy経由のラオモト明示的指示で実行）
 # ═══════════════════════════════════════════════════════════════════════════════
 if [[ -f queue/active_machine.yaml ]]; then
-    # NOTE: simultaneous mode (mode: simultaneous) の場合、active_machine:フィールドが存在しないため
-    # ACTIVE_MACHINEは空になり、このauto-syncブロックはスキップされる（両マシンがアクティブ）。
-    # exclusive mode (mode: exclusive または modeなし) の場合のみ、active_machine:を参照して動作する。
-    ACTIVE_MACHINE=$(awk '/active_machine:/{print $2}' queue/active_machine.yaml 2>/dev/null)
-    if [[ -n "$ACTIVE_MACHINE" && "$ACTIVE_MACHINE" != "$MACHINE_ROLE" ]]; then
-        # NOTE: active_machine.yamlは更新しない。排他稼働切り替えはntfy handover:{target}のみ。
-        log_info "🔄 別マシン(${ACTIVE_MACHINE})がアクティブ。最新状態をpull中..."
-        current_branch=$(git branch --show-current 2>/dev/null)
-        if [[ -n "$current_branch" ]]; then
-            git pull --ff-only origin "$current_branch" 2>/dev/null || {
-                log_war "  └─ git pull失敗。手動マージが必要かもしれない。"
-            }
-        else
-            log_war "  └─ detached HEAD状態のためgit pullスキップ。ブランチを確認せよ。"
+    ACTIVE_MODE=$(awk '/^mode:/{print $2}' queue/active_machine.yaml 2>/dev/null)
+    if [[ "$ACTIVE_MODE" == "simultaneous" ]]; then
+        log_info "🔄 simultaneous mode — 両マシン同時稼働。auto-syncスキップ"
+    elif [[ "$ACTIVE_MODE" == "exclusive" || -z "$ACTIVE_MODE" ]]; then
+        ACTIVE_MACHINE=$(awk '/active_machine:/{print $2}' queue/active_machine.yaml 2>/dev/null)
+        if [[ -n "$ACTIVE_MACHINE" && "$ACTIVE_MACHINE" != "$MACHINE_ROLE" ]]; then
+            # NOTE: active_machine.yamlは更新しない。排他稼働切り替えはntfy handover:{target}のみ。
+            log_info "🔄 別マシン(${ACTIVE_MACHINE})がアクティブ。最新状態をpull中..."
+            current_branch=$(git branch --show-current 2>/dev/null)
+            if [[ -n "$current_branch" ]]; then
+                git pull --ff-only origin "$current_branch" 2>/dev/null || {
+                    log_war "  └─ git pull失敗。手動マージが必要かもしれない。"
+                }
+            else
+                log_war "  └─ detached HEAD状態のためgit pullスキップ。ブランチを確認せよ。"
+            fi
+            if [[ -x scripts/cross_sync.sh ]]; then
+                bash scripts/cross_sync.sh pull 2>/dev/null || true
+            fi
+            log_success "  └─ state pull完了。handoverが必要ならntfyで 'handover:${MACHINE_ROLE}' を送信せよ。"
         fi
-        if [[ -x scripts/cross_sync.sh ]]; then
-            bash scripts/cross_sync.sh pull 2>/dev/null || true
-        fi
-        log_success "  └─ state pull完了。handoverが必要ならntfyで 'handover:${MACHINE_ROLE}' を送信せよ。"
     fi
 fi
 
@@ -1269,8 +1271,9 @@ fi
 # STEP 6.8: ntfy入力リスナー起動
 # ═══════════════════════════════════════════════════════════════════════════════
 # NTFY_TOPIC は起動時の settings.yaml 読み込みで取得済み（grep|awk|tr → 0 fork）
-# ntfy_listener起動: kyotoのみ（neosaitama側は別途対応）。PIDチェックで二重起動防止。
-if [ -n "$NTFY_TOPIC" ] && [[ "$MACHINE_ROLE" == "kyoto" || "$MACHINE_ROLE" == "ryzen" ]]; then
+# ntfy_listener起動: kyoto/neosaitama両方で起動。購読トピックはMACHINE_ROLEに基づきntfy_listener.sh内で決定。
+# PIDチェックで二重起動防止。
+if [ -n "$NTFY_TOPIC" ] && [[ "$MACHINE_ROLE" == "kyoto" || "$MACHINE_ROLE" == "ryzen" || "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
     [ ! -f ./queue/ntfy_inbox.yaml ] && echo "inbox:" > ./queue/ntfy_inbox.yaml
     if pgrep -f "ntfy_listener.sh" > /dev/null 2>&1; then
         log_info "📱 ntfyリスナー既に起動中。二重起動スキップ (topic: ${NTFY_TOPIC:0:8}...)"
@@ -1288,7 +1291,7 @@ if [ -n "$NTFY_TOPIC" ] && [[ "$MACHINE_ROLE" == "kyoto" || "$MACHINE_ROLE" == "
         log_info "📱 ntfy_listener supervisor起動 (クラッシュ時30秒以内に自動再起動)"
     fi
 elif [ -n "$NTFY_TOPIC" ]; then
-    log_info "📱 neosaitama構成: ntfyリスナーはneosaitama側で起動。kyotoスキップ"
+    log_info "📱 未知のマシンロール(${MACHINE_ROLE}): ntfyリスナー起動スキップ"
 else
     log_info "📱 ntfy未設定。ラオモトのスマホ回線は未接続…ナムアミダブツ"
 fi

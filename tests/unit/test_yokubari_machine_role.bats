@@ -252,22 +252,22 @@ YAML
 # T-YK-NTFY-005: ntfy_topic未設定 → 起動しない
 # =============================================================================
 
-# ヘルパー: yokubari.sh STEP6.8のntfy起動条件を評価
-# 引数: machine_role ntfy_topic
-# 出力: "start" | "skip_pid" | "skip_neosaitama" | "skip_notopic"
+# ヘルパー: yokubari.sh STEP6.8のntfy起動条件を評価（FIX-002反映: neosaitama/mbp対応）
+# 引数: machine_role ntfy_topic [already_running]
+# 出力: "start" | "skip_pid" | "skip_unknown_role" | "skip_notopic"
 eval_ntfy_startup_condition() {
     local machine_role="$1"
     local ntfy_topic="$2"
     local already_running="${3:-false}"
 
-    if [ -n "$ntfy_topic" ] && [[ "$machine_role" == "kyoto" || "$machine_role" == "ryzen" ]]; then
+    if [ -n "$ntfy_topic" ] && [[ "$machine_role" == "kyoto" || "$machine_role" == "ryzen" || "$machine_role" == "neosaitama" || "$machine_role" == "mbp" ]]; then
         if [[ "$already_running" == "true" ]]; then
             echo "skip_pid"
         else
             echo "start"
         fi
     elif [ -n "$ntfy_topic" ]; then
-        echo "skip_neosaitama"
+        echo "skip_unknown_role"
     else
         echo "skip_notopic"
     fi
@@ -279,10 +279,11 @@ eval_ntfy_startup_condition() {
     [ "$result" = "start" ]
 }
 
-@test "T-YK-NTFY-002: neosaitama + ntfy_topic設定 → neosaitama側スキップ" {
+@test "T-YK-NTFY-002: neosaitama + ntfy_topic設定 → 起動条件が真（FIX-002）" {
+    # FIX-002: neosaitamaでもntfy_listenerが起動するよう修正
     local result
     result=$(eval_ntfy_startup_condition "neosaitama" "test-topic-xyz")
-    [ "$result" = "skip_neosaitama" ]
+    [ "$result" = "start" ]
 }
 
 @test "T-YK-NTFY-003: kyoto + 既に起動中 → PIDチェックでスキップ" {
@@ -321,4 +322,83 @@ eval_ntfy_startup_condition() {
     ntfy_block=$(sed -n '/STEP 6.8/,/STEP 7/p' "$PROJECT_ROOT/yokubari.sh")
     # pkillが含まれていないことを確認
     ! echo "$ntfy_block" | grep -q 'pkill.*ntfy_listener'
+}
+
+# =============================================================================
+# FIX-002追加テスト: neosaitama/mbpでのntfy_listener起動
+# =============================================================================
+
+@test "T-YK-NTFY-009: neosaitama + ntfy_topic設定 + 未起動 → 起動実行（FIX-002）" {
+    local result
+    result=$(eval_ntfy_startup_condition "neosaitama" "test-topic-xyz" "false")
+    [ "$result" = "start" ]
+}
+
+@test "T-YK-NTFY-010: mbp(legacy) + ntfy_topic設定 → 起動実行（FIX-002後方互換）" {
+    local result
+    result=$(eval_ntfy_startup_condition "mbp" "test-topic-xyz")
+    [ "$result" = "start" ]
+}
+
+@test "T-YK-NTFY-011: yokubari.shにneosaitama条件が存在することを確認（FIX-002）" {
+    grep -q 'MACHINE_ROLE.*==.*neosaitama' "$PROJECT_ROOT/yokubari.sh"
+}
+
+# =============================================================================
+# FIX-005テスト: active_machine.yaml mode:フィールド明示チェック
+# =============================================================================
+
+# ヘルパー: yokubari.sh STEP0.5のactive_machine.yaml mode:判定ロジックを評価
+# 引数: mode active_machine current_machine
+# 出力: "simultaneous_skip" | "sync_needed" | "no_sync"
+eval_active_mode_action() {
+    local mode="$1"
+    local active_machine="$2"
+    local current_machine="$3"
+
+    if [[ "$mode" == "simultaneous" ]]; then
+        echo "simultaneous_skip"
+    elif [[ "$mode" == "exclusive" || -z "$mode" ]]; then
+        if [[ -n "$active_machine" && "$active_machine" != "$current_machine" ]]; then
+            echo "sync_needed"
+        else
+            echo "no_sync"
+        fi
+    else
+        echo "unknown_mode"
+    fi
+}
+
+@test "T-YK-AM-001: mode=simultaneous → auto-syncスキップ（FIX-005）" {
+    # simultaneous mode では両マシン同時稼働のためauto-syncをスキップ
+    local result
+    result=$(eval_active_mode_action "simultaneous" "" "kyoto")
+    [ "$result" = "simultaneous_skip" ]
+}
+
+@test "T-YK-AM-002: mode=exclusive + 別マシンがactive → sync_needed（FIX-005）" {
+    local result
+    result=$(eval_active_mode_action "exclusive" "neosaitama" "kyoto")
+    [ "$result" = "sync_needed" ]
+}
+
+@test "T-YK-AM-003: mode=exclusive + 自マシンがactive → no_sync（FIX-005）" {
+    local result
+    result=$(eval_active_mode_action "exclusive" "kyoto" "kyoto")
+    [ "$result" = "no_sync" ]
+}
+
+@test "T-YK-AM-004: mode未設定 → exclusive扱い（FIX-005後方互換）" {
+    # modeフィールドが存在しない場合はexclusive相当として動作
+    local result
+    result=$(eval_active_mode_action "" "neosaitama" "kyoto")
+    [ "$result" = "sync_needed" ]
+}
+
+@test "T-YK-AM-005: yokubari.shにmode:明示チェック実装が存在することを確認（FIX-005）" {
+    grep -q 'ACTIVE_MODE.*awk.*mode:' "$PROJECT_ROOT/yokubari.sh"
+}
+
+@test "T-YK-AM-006: yokubari.shにsimultaneous mode分岐が存在することを確認（FIX-005）" {
+    grep -q 'ACTIVE_MODE.*==.*simultaneous' "$PROJECT_ROOT/yokubari.sh"
 }
