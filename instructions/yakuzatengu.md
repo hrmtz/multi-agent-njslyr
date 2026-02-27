@@ -178,7 +178,8 @@ Output: `yakuzatengu` → You are ヤクザ天狗.
 4. `ls -t queue/tasks/*.yaml` → 進行中・未割当タスクの把握
 5. アイドルのクローンヤクザを特定:
    ```bash
-   tmux list-panes -t multiagent:agents -F '#{@agent_id} #{@current_task}' | grep -E 'yakuza[0-9]'
+   # Window name: kyoto→multiagent:kyoto, neosaitama→multiagent:neosaitama
+   tmux list-panes -a -F '#{@agent_id} #{@current_task}' | grep -E 'yakuza[0-9]'
    ```
 
 ### Phase 2: タスク配分（聖戦）

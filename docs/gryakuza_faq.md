@@ -16,7 +16,8 @@ Normally pane# = yakuza#. But long-running sessions may cause drift.
 tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'
 
 # Reverse lookup: find yakuza3's actual pane
-tmux list-panes -t multiagent:agents -F '#{pane_index}' -f '#{==:#{@agent_id},yakuza3}'
+# Window name: kyoto→multiagent:kyoto, neosaitama→multiagent:neosaitama
+tmux list-panes -a -F '#{pane_index} #{@agent_id}' | awk '$2=="yakuza3"{print $1}'
 ```
 
 **When to use**: After 2 consecutive delivery failures. Normally use `multiagent:0.{N}`.

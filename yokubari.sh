@@ -1006,7 +1006,7 @@ tmux set-option -g aggressive-resize on 2>/dev/null || true
 #   （kyoto: main:tortoise, neosaitama: main:crane）
 # ═══════════════════════════════════════════════════════════════════════════════
 tmux select-window -t multiagent:agents
-# neosaitama: "agents" → "neosaitama" リネームは全agent起動完了後に実施（STEP 6.7）
+# "agents" → "kyoto"/"neosaitama" リネームは全agent起動完了後に実施（STEP 6.8）
 # ここでリネームするとSTEP 6のlaunch_agent "multiagent:agents.N" が全て空振りする
 log_success "  └─ ${MONITOR_AGENT} 監視陣、コンストラクト完了！（${MONITOR_PANE}）ワザマエ！"
 echo ""
@@ -1273,16 +1273,19 @@ NINJA_EOF
     echo ""
 
     # ═══════════════════════════════════════════════════════════════════
-    # STEP 6.8: neosaitama ウィンドウリネーム（全agent起動・watcher完了後）
+    # STEP 6.8: multiagent:agents → マシン名にリネーム（全agent起動・watcher完了後）
     # NOTE: STEP 5.2で先にリネームするとlaunch_agent "multiagent:agents.N" が空振りする
     # ═══════════════════════════════════════════════════════════════════
     if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-        tmux rename-window -t multiagent:agents "neosaitama"
-        # client-resizedフックもリネーム後の名前に更新
-        tmux set-hook -t multiagent client-resized \
-            'resize-window -A -t multiagent:neosaitama ; select-layout -t multiagent:neosaitama tiled'
-        log_info "  └─ multiagent:agents → multiagent:neosaitama リネーム完了"
+        _agents_new_name="neosaitama"
+    else
+        _agents_new_name="kyoto"
     fi
+    tmux rename-window -t multiagent:agents "$_agents_new_name"
+    # client-resizedフックもリネーム後の名前に更新
+    tmux set-hook -t multiagent client-resized \
+        "resize-window -A -t multiagent:${_agents_new_name} ; select-layout -t multiagent:${_agents_new_name} tiled"
+    log_info "  └─ multiagent:agents → multiagent:${_agents_new_name} リネーム完了"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1401,7 +1404,7 @@ else
 fi
 echo ""
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-    echo "     【multiagent:agents】neosaitama フル構成（9ペイン）"
+    echo "     【multiagent:neosaitama】ローカル構成（9ペイン）"
     echo "     ┌──────────┬─────────┬─────────┐"
     echo "     │ gryakuza │ yakuza3 │ yakuza6 │"
     echo "     │(GrYakuza)│  (Y3)   │  (Y6)   │"
@@ -1413,7 +1416,7 @@ if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
     echo "     │   (Y2)   │  (Y5)   │(Soukaiya)│"
     echo "     └──────────┴─────────┴─────────┘"
 else
-    echo "     【multiagent:agents】kyotoフル構成（9ペイン）"
+    echo "     【multiagent:kyoto】フル構成（9ペイン）"
     echo "     ┌──────────┬─────────┬─────────┐"
     echo "     │ gryakuza │ yakuza3 │ yakuza6 │"
     echo "     │(GrYakuza)│  (Y3)   │  (Y6)   │"
@@ -1446,7 +1449,7 @@ if [ "$SETUP_ONLY" = true ]; then
     echo "  │                                                          │"
     echo "  │  # グレーターヤクザ・ヤクザを一斉ショウカン                                  │"
     echo "  │  for p in \$(seq $PANE_BASE $((PANE_BASE+8))); do                                 │"
-    echo "  │      tmux send-keys -t multiagent:agents.\$p \\            │"
+    echo "  │      tmux send-keys -t multiagent:${_agents_new_name:-agents}.\$p \\            │"
     echo "  │      'claude --dangerously-skip-permissions' Enter       │"
     echo "  │  done                                                    │"
     echo "  └──────────────────────────────────────────────────────────┘"
