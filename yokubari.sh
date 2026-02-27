@@ -822,6 +822,9 @@ else
     log_war "⚔️ グレーターヤクザ・ヤクザ・ソウカイヤをジェネレート中…9名配備！"
 fi
 
+# 安全策: multiagentセッションが残留していた場合に備えて直前にも削除
+tmux kill-session -t multiagent 2>/dev/null || true
+
 # 最初のペイン作成
 if ! tmux new-session -d -s multiagent -n "agents" -x 200 -y 50 2>/dev/null; then
     echo "" >&2
