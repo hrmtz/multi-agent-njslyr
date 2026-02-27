@@ -804,9 +804,8 @@ else
     log_success "  └─ ラオモトのホンジン（darkninja + monitor）、コンストラクト完了！ワザマエ！"
 fi
 
-# サーバー起動後にグローバルオプション設定（セッション作成でサーバーが起動済み）
-tmux set-option -g window-size latest 2>/dev/null || true
-tmux set-option -g aggressive-resize on 2>/dev/null || true
+# NOTE: window-size latest + aggressive-resize on は全ペイン分割完了後に設定する（STEP 5.3）
+# 分割前に設定するとクライアントサイズ(132x40等)に縮小されno space for new paneが発生する
 echo ""
 
 # pane-base-index を取得（1 の環境ではペインは 1,2,... になる）
@@ -1007,6 +1006,13 @@ tmux set-hook -t multiagent client-resized 'resize-window -A -t multiagent:agent
 
 log_success "  └─ グレーターヤクザ・ヤクザ・ソウカイヤのジン、コンストラクト完了！ワザマエ！"
 echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 5.1.1: グローバルオプション設定（全ペイン分割完了後）
+#   分割前に設定するとクライアントサイズに縮小されno space for new paneが発生する
+# ═══════════════════════════════════════════════════════════════════════════════
+tmux set-option -g window-size latest 2>/dev/null || true
+tmux set-option -g aggressive-resize on 2>/dev/null || true
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 5.2: multiagent:agents ウィンドウをアクティブに戻す
