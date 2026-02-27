@@ -838,9 +838,9 @@ fi
 # neosaitama: "kyoto" ウィンドウ追加（SSH→Kyoto multiagent）
 # NOTE: "agents" → "neosaitama" のリネームは multiagent:agents の全操作完了後に実施（STEP 5.2後）
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-    # window "kyoto": SSH peer-hostname → Kyoto の multiagent session（-b で最前に挿入）
+    # window "kyoto": SSH peer-hostname → Kyoto (plain SSH, manual tmux attach)
     tmux new-window -t multiagent -n kyoto -b
-    tmux send-keys -t multiagent:kyoto "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST} -t 'tmux attach -t multiagent'" Enter
+    tmux send-keys -t multiagent:kyoto "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST}" Enter
 fi
 
 # DISPLAY_MODE: shout (default) or silent (--silent flag)
