@@ -826,7 +826,7 @@ fi
 tmux kill-session -t multiagent 2>/dev/null || true
 
 # 最初のペイン作成
-if ! tmux new-session -d -s multiagent -n "agents" -x 200 -y 50 2>/dev/null; then
+if ! tmux new-session -d -s multiagent -n "agents" -x 200 -y 50; then
     echo "" >&2
     echo "  ╔════════════════════════════════════════════════════════════╗" >&2
     echo "  ║  グワーッ！multiagentセッション生成に失敗！              ║" >&2
