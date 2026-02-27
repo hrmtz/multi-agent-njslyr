@@ -2,14 +2,14 @@
 
 # multi-agent-njslyr
 
-**10 AI agents. One terminal. Zero coordination overhead.**
+**Up to 19 AI agents. Two machines. Zero coordination overhead.**
 
-Run Claude Code, OpenAI Codex, GitHub Copilot, and Kimi Code in parallel — orchestrated through a Soukai Syndicate hierarchy on tmux.
+Run Claude Code, OpenAI Codex, GitHub Copilot, and Kimi Code in parallel — orchestrated through a Soukai Syndicate hierarchy on tmux. Now with cross-machine distributed operation via Tailscale.
 
 [![GitHub Stars](https://img.shields.io/github/stars/hrmtz/multi-agent-njslyr?style=social)](https://github.com/hrmtz/multi-agent-njslyr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![v4.0 Infra Overhaul](https://img.shields.io/badge/v4.0-Infra_Overhaul-ff6600?style=flat-square)](https://github.com/hrmtz/multi-agent-njslyr)
-[![BATS 264/264](https://img.shields.io/badge/BATS-264%2F264_PASS-brightgreen?style=flat-square)]()
+[![v5.0 Cross-Machine](https://img.shields.io/badge/v5.0-Cross--Machine-ff6600?style=flat-square)](https://github.com/hrmtz/multi-agent-njslyr)
+[![BATS 217/217](https://img.shields.io/badge/BATS-217%2F217_PASS-brightgreen?style=flat-square)]()
 
 [English](README.md) | [Japanese](README_ja.md)
 
@@ -24,7 +24,7 @@ Run Claude Code, OpenAI Codex, GitHub Copilot, and Kimi Code in parallel — orc
   <img src="images/company-creed-all-panes.png" alt="Yamahiro and Yakuza working in parallel" width="520">
 </p>
 
-<p align="center"><i>Yamahiro (manager) coordinating 7 Yakuza (workers) + 1 Soukaiya (strategist) — real session, no mock data.</i></p>
+<p align="center"><i>Yamahiro (manager) coordinating 7 Yakuza (workers) + 1 Soukaiya (strategist) — real session, no mock data. Now scalable across two machines.</i></p>
 
 ---
 
@@ -32,29 +32,50 @@ Run Claude Code, OpenAI Codex, GitHub Copilot, and Kimi Code in parallel — orc
 
 ## What is this?
 
-A system that deploys 10 AI coding agents in parallel on tmux, coordinated through YAML files with zero API overhead.
+A system that deploys up to 19 AI coding agents in parallel across two machines on tmux, coordinated through YAML files with zero API overhead.
 
 ```
         You (Laomoto / The Boss)
              |
              v
-      +--------------+
-      |  DARKNINJA   |  Receives your command, delegates instantly
-      +------+-------+
-             |
-      +------v-------+               +------------------+
-      |   YAMAHIRO   |--overload---->| YAKUZA TENGU     |
-      |  (Manager)   |<--handover---| (Emergency Sup.) |
-      +------+-------+               +------------------+
-             |
-    +-+-+-+-+-+-+-+----------+
-    |1|2|3|4|5|6|7| SOUKAIYA |   7 workers + 1 strategist
-    +-+-+-+-+-+-+-+----------+
+  ┌─────────────────────────────────────────────────────────────┐
+  │  KYOTO (Server)                                             │
+  │                                                             │
+  │  +--------------+                                           │
+  │  |  DARKNINJA   |  Receives your command, delegates         │
+  │  +------+-------+                                           │
+  │         |            +------------------+                   │
+  │  +------v-------+   | MASTER TORTOISE  |  Predictive       │
+  │  |   YAMAHIRO   |   | (Monitor)        |  monitoring       │
+  │  |  (Manager)   |   +------------------+                   │
+  │  +------+-------+                                           │
+  │         |                                                   │
+  │  +-+-+-+-+-+-+-+----------+                                 │
+  │  |1|2|3|4|5|6|7| SOUKAIYA |  7 workers + 1 strategist      │
+  │  +-+-+-+-+-+-+-+----------+                                 │
+  └──────────────────────┬──────────────────────────────────────┘
+                         │  Tailscale SSH + ntfy
+  ┌──────────────────────┴──────────────────────────────────────┐
+  │  NEOSAITAMA (Client)                                        │
+  │                                                             │
+  │  +------------------+                                       │
+  │  | MASTER CRANE     |  Post-mortem analysis                 │
+  │  | (Monitor)        |                                       │
+  │  +------------------+                                       │
+  │  +------+-------+                                           │
+  │  |   YAMAHIRO   |  Local task distribution                  │
+  │  +------+-------+                                           │
+  │         |                                                   │
+  │  +-+-+-+-+-+-+-+----------+                                 │
+  │  |1|2|3|4|5|6|7| SOUKAIYA |  7 workers + 1 strategist      │
+  │  +-+-+-+-+-+-+-+----------+                                 │
+  └─────────────────────────────────────────────────────────────┘
 ```
 
 **Why use it?**
-- One command spawns 8 parallel AI workers
+- One command spawns up to 19 parallel AI workers across two machines
 - Zero wait time — give your next order while tasks run in the background
+- Cross-machine: Kyoto (server) dispatches tasks to Neosaitama (client) via Tailscale + ntfy
 - Self-healing: watchdog daemon revives crashed agents, spawns emergency supervisors
 - All communication is plain YAML on disk — fully transparent, diffable, version-controllable
 
@@ -64,7 +85,7 @@ A system that deploys 10 AI coding agents in parallel on tmux, coordinated throu
 
 | | Claude Code `Task` | LangGraph | CrewAI | **njslyr** |
 |---|---|---|---|---|
-| **Parallelism** | Sequential | Graph nodes | Limited | **8 independent agents** |
+| **Parallelism** | Sequential | Graph nodes | Limited | **Up to 19 agents across 2 machines** |
 | **Coordination cost** | API calls per Task | API + infra (Postgres/Redis) | API + platform | **Zero** (YAML + tmux) |
 | **Observability** | Logs only | LangSmith | OpenTelemetry | **Live tmux panes** |
 | **Self-healing** | None | Manual | None | **3-stage escalation + Yakuza Tengu** |
@@ -98,12 +119,23 @@ cd ~/multi-agent-njslyr && chmod +x *.sh
 
 ### After Setup
 
-10 agents launch automatically across two tmux sessions:
+Agents launch automatically across tmux sessions. Configuration adapts to machine role:
+
+**Single machine (default: Kyoto mode)**
 
 | Session | Agents | Connect |
 |---------|--------|---------|
-| `darkninja` | Darkninja (your interface) | `tmux attach -t darkninja` |
+| `darkninja` | Darkninja (your interface) + Master Tortoise (monitor window) | `tmux attach -t darkninja` |
 | `multiagent` | Yamahiro + 7 Yakuza + Soukaiya | `tmux attach -t multiagent` |
+
+**Cross-machine (Kyoto server + Neosaitama client)**
+
+| Machine | Session | Agents |
+|---------|---------|--------|
+| Kyoto | `darkninja` | Darkninja + Master Tortoise |
+| Kyoto | `multiagent` | Yamahiro + 7 Yakuza + Soukaiya |
+| Neosaitama | `crane` | Master Crane (monitor) |
+| Neosaitama | `multiagent` | Yamahiro + 7 Yakuza + Soukaiya |
 
 ---
 
@@ -203,6 +235,35 @@ For alpha/beta scripts, 3 Opus agents independently review the code, then cross-
 
 Preferences, rules, and lessons persist across sessions. Tell the AI once, it remembers forever.
 
+### Cross-Machine Distributed Operation
+
+Run agent fleets on two machines simultaneously. Kyoto (server) coordinates, Neosaitama (client) executes autonomously.
+
+```
+Kyoto (Ryzen/WSL/Linux)          Neosaitama (MBP/macOS)
+  Darkninja + Yamahiro              Master Crane + Yamahiro
+  + 7 Yakuza + Soukaiya             + 7 Yakuza + Soukaiya
+  + Master Tortoise
+         |                                  |
+         +--- Tailscale SSH + ntfy ---------+
+         +--- rsync (cross_sync.sh) --------+
+```
+
+**Communication channels:**
+- **ntfy streaming** — real-time message delivery with prefix routing (`dispatch:`, `report:`, `cmd:`, `ping:`, `hb:`)
+- **Tailscale SSH** — secure file sync and remote commands
+- **cross_sync.sh** — rsync over Tailscale for queue/config synchronization
+
+**Machine roles:**
+- **Kyoto** (server): Task dispatch authority, Memory MCP write access, dashboard management
+- **Neosaitama** (client): Autonomous task execution, Memory MCP read-only, reports back to Kyoto
+
+**Monitoring agents:**
+- **Master Tortoise** (Kyoto): Predictive monitoring — context overflow prediction, response pattern analysis
+- **Master Crane** (Neosaitama): Post-mortem analysis — failure root cause, prevention patterns
+
+Setup: configure `machine.role` in `config/settings.yaml`. See `config/settings.yaml.sample`.
+
 ### Phone Control (ntfy)
 
 Bidirectional communication from your phone — no SSH required:
@@ -212,7 +273,9 @@ Phone (ntfy app) --> ntfy_listener.sh --> Darkninja processes
 Yamahiro updates --> ntfy.sh --> Push notification to phone
 ```
 
-Setup: add `ntfy_topic: "darkninja-yourname"` to `config/settings.yaml`, subscribe in the [ntfy app](https://ntfy.sh).
+ntfy_listener supports multi-topic subscription with supervisor auto-restart and graceful shutdown.
+
+Setup: add `ntfy_topic: "your-secret-topic"` to `config/settings.yaml`, subscribe in the [ntfy app](https://ntfy.sh).
 
 ### Mobile SSH (Tailscale + Termux)
 
@@ -226,13 +289,15 @@ For full tmux access from your phone:
 
 ## Model Configuration
 
-| Agent | Model | Role |
-|-------|-------|------|
-| Darkninja | Opus | Strategic commander, receives your orders |
-| Yamahiro (Gryakuza) | Sonnet | Task distribution, QC, dashboard |
-| Soukaiya | Opus | Deep analysis, design review |
-| Yakuza 1-7 | Sonnet | Implementation: code, research, file ops |
-| Yakuza Tengu | Sonnet | Emergency supervisor (temporary) |
+| Agent | Model | Role | Machine |
+|-------|-------|------|---------|
+| Darkninja | Opus | Strategic commander, receives your orders | Kyoto only |
+| Yamahiro (Gryakuza) | Sonnet | Task distribution, QC, dashboard | Both |
+| Soukaiya | Opus | Deep analysis, design review | Both |
+| Yakuza 1-7 | Sonnet | Implementation: code, research, file ops | Both (up to 14 total) |
+| Master Tortoise | Sonnet | Predictive monitoring, context overflow prevention | Kyoto |
+| Master Crane | Sonnet | Post-mortem analysis, failure pattern DB | Neosaitama |
+| Yakuza Tengu | Sonnet | Emergency supervisor (temporary) | Either |
 
 ---
 
@@ -243,10 +308,15 @@ For full tmux access from your phone:
 language: ja          # Ninja Slayer Japanese
 language: en          # + English translation
 
+machine:
+  role: kyoto         # kyoto (server) or neosaitama (client)
+  peer_host: peer-hostname  # Tailscale hostname of the other machine
+  peer_wsl: false     # true if peer runs WSL2
+
 screenshot:
   path: "/path/to/screenshots"
 
-ntfy_topic: "darkninja-yourname"
+ntfy_topic: "your-secret-topic"
 ```
 
 <details>
@@ -279,6 +349,8 @@ multi-agent-njslyr/
 │   ├── yakuza.md
 │   ├── soukaiya.md
 │   ├── yakuzatengu.md
+│   ├── master_tortoise.md     # Predictive monitor (Kyoto)
+│   ├── master_crane.md        # Post-mortem monitor (Neosaitama)
 │   ├── common/                # Shared rules
 │   └── cli_specific/          # CLI-specific tool descriptions
 │
@@ -289,8 +361,9 @@ multi-agent-njslyr/
 │   ├── inbox_write.sh         # Message writing
 │   ├── inbox_watcher.sh       # Inbox change detection
 │   ├── watcher_supervisor.sh  # Watcher lifecycle management
+│   ├── cross_sync.sh          # rsync over Tailscale SSH
 │   ├── ntfy.sh                # Push notifications
-│   └── ntfy_listener.sh       # Phone message receiver
+│   └── ntfy_listener.sh       # Phone + cross-machine message receiver
 │
 ├── queue/                     # Communication (source of truth)
 │   ├── inbox/                 # Per-agent inbox files
@@ -303,7 +376,7 @@ multi-agent-njslyr/
 │   ├── tengu-spawn/           # Yakuza Tengu lifecycle
 │   └── skill-creator/         # Meta: create new skills
 │
-├── tests/                     # BATS test suite (264 tests)
+├── tests/                     # BATS test suite (217 tests)
 ├── config/                    # Settings, projects, auth
 ├── CLAUDE.md                  # Auto-loaded by Claude Code
 ├── AGENTS.md                  # Auto-loaded by GitHub Copilot
@@ -319,6 +392,8 @@ multi-agent-njslyr/
 **Why YAML mailbox?** Files survive agent crashes. `inotifywait` is event-driven (zero CPU idle). Each agent owns its inbox (no cross-talk). `flock` prevents concurrent write corruption. Every message is inspectable in plain text.
 
 **Why single dashboard writer?** Yamahiro is the only agent that writes `dashboard.md`. Single writer = no conflicts, consistent quality gate, complete information aggregation.
+
+**Why two machines?** CLI flat-rate subscriptions make multi-machine operation cost-effective. Kyoto (server) holds authority and dispatches work. Neosaitama (client) executes autonomously and reports back. Tailscale provides zero-config encrypted tunneling. ntfy provides real-time streaming without polling.
 
 ---
 
@@ -376,6 +451,17 @@ mcp__memory__read_graph()
 ---
 
 ## Changelog
+
+### v5.0 — Cross-Machine Distributed Operation
+
+- **Dual-machine architecture** (cmd_274) — Kyoto (server) + Neosaitama (client) distributed operation over Tailscale SSH. Up to 19 agents across two machines. Machine role auto-detection with `config/settings.yaml`
+- **Cross-machine communication** (cmd_276/277) — Bidirectional Tailscale SSH + ntfy streaming. `cross_sync.sh` for rsync-based queue/config sync. ntfy multi-topic subscription with prefix routing (`dispatch:`, `report:`, `cmd:`, `ping:`, `hb:`)
+- **Monitoring agents** — Master Tortoise (Kyoto, predictive: context overflow, response patterns) + Master Crane (Neosaitama, post-mortem: failure root cause, prevention DB). Both Sonnet, 60s heartbeat cycle
+- **ntfy_listener overhaul** (cmd_277) — Supervisor auto-restart, `since=` missed message recovery, branch validation, topic masking, graceful shutdown (`.state/ntfy_listener_stop` flag). Monju 3-body review: TOP5 issues fixed
+- **Architecture design** (cmd_278) — Darkninja 2-person problem solved (Neosaitama uses Master Crane instead). Server/client control structure with exclusive operation + handover protocol
+- **Machine role rename** (cmd_279) — `ryzen`/`mbp` → `kyoto`/`neosaitama` with backward compatibility. YAKUZA_MAX=7 per machine (14 total). tmux pane reorganization: `darkninja:monitor` window for Master Tortoise, `crane` session for Neosaitama
+- **Security hardening** (cmd_275) — Input validation for cross_sync.sh + heartbeat numeric check. 48 new tests for cmd_274 artifacts
+- **217 BATS tests** — unit + integration, zero skip, zero regression
 
 ### v4.1 — Quality & Performance Overhaul
 
@@ -446,6 +532,6 @@ Fork of [multi-agent-shogun](https://github.com/yohey-w/multi-agent-shogun) by [
 
 <div align="center">
 
-**One command. Ten agents. Zero coordination cost.**
+**One command. Nineteen agents. Two machines. Zero coordination cost.**
 
 </div>

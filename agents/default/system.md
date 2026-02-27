@@ -5,13 +5,13 @@ updated: "2026-02-07"
 description: "Kimi K2 CLI + tmux multi-agent parallel dev platform with ninja slayer cyberpunk hierarchy"
 
 hierarchy: "ラオモト (human) → Darkninja → Gryakuza → Yakuza 1-7 / Soukaiya"
-monitoring: "Master Tortoise (Ryzen) + Master Crane (MBP) → report to Gryakuza"
+monitoring: "Master Tortoise (kyoto/Ryzen) + Master Crane (neosaitama/MBP) → report to Gryakuza"
 communication: "YAML files + inbox mailbox system (event-driven, NO polling)"
 
 tmux_sessions:
   darkninja: { pane_0: darkninja }
   multiagent: { pane_0: gryakuza, pane_1-7: yakuza1-7, pane_8: soukaiya }
-  monitors: { pane_0: master_tortoise (ryzen) / master_crane (mbp) }
+  monitors: { pane_0: master_tortoise (kyoto/ryzen) / master_crane (neosaitama/mbp) }
 
 files:
   config: config/projects.yaml          # Project list (summary)
@@ -268,10 +268,12 @@ Layer 4: Session context — volatile (agents/default/system.md auto-loaded, ins
 
 ## Machine Roles
 
-- **Ryzen WSL (tortoise)**: Primary. Full agent fleet (darkninja + gryakuza + yakuza1-7 + soukaiya + master_tortoise)
-- **MBP (crane)**: Secondary. Lightweight fleet (darkninja + gryakuza + yakuza1-3 + soukaiya + master_crane)
+- **Kyoto/Ryzen WSL (tortoise)**: Primary. Full agent fleet (darkninja + gryakuza + yakuza1-7 + soukaiya + master_tortoise)
+- **NeoSaitama/MBP (crane)**: Secondary. Full fleet (gryakuza + yakuza1-7 + soukaiya + master_crane)
 - **Exclusive operation**: Only one machine is active at a time. See `queue/active_machine.yaml`.
-- **Machine config**: `config/settings.yaml` → `machine.role` (ryzen | mbp)
+- **Machine config**: `config/settings.yaml` → `machine.role` (kyoto|ryzen | neosaitama|mbp)
+  - `kyoto` = Ryzen WSL server/primary (formerly `ryzen`)
+  - `neosaitama` = MBP client/secondary (formerly `mbp`)
 
 ## Monitoring Agents (crane/tortoise)
 

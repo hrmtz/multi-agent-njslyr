@@ -38,9 +38,13 @@ _cleanup() {
 }
 trap _cleanup EXIT INT TERM
 
-# macOS (Darwin): GNU coreutils via Homebrew gnubin
+# macOS (Darwin): GNU coreutils via Homebrew gnubin + Claude Code CLI
 if [[ "$(uname -s)" == "Darwin" ]]; then
-    export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
+    export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:/opt/homebrew/bin:$HOME/.local/bin:$PATH"
+fi
+# Linux/WSL: Claude Code CLI (~/.local/bin)
+if [[ "$(uname -s)" == "Linux" ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
 fi
 
 # 言語・シェル設定を読み取り（設定ファイル1回読み・fork 0で全キー抽出）
@@ -748,14 +752,14 @@ fi
 #   neosaitama: crane セッション（main: master_crane）
 # ═══════════════════════════════════════════════════════════════════════════════
 # スマホ等の小画面クライアント対策: aggressive-resize + latest
-tmux set-option -g window-size latest
-tmux set-option -g aggressive-resize on
+# NOTE: tmuxサーバー不在時（全セッション破棄後）はset-optionが失敗する。
+# 先にセッションを作成してサーバーを起動し、その後にグローバルオプションを設定する。
 
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
     # neosaitama: crane セッションにmaster_crane常駐
     log_war "🦢 クレイン・ホンジンをコンストラクト中...イヤーッ！"
-    # TOCTOU防止: 直接作成を試みる
-    tmux new-session -d -s crane -n main 2>/dev/null || true
+    # TOCTOU防止: 直接作成を試みる（-x/-y でSSH等クライアント未接続時のサイズ確保）
+    tmux new-session -d -s crane -n main -x 200 -y 50 2>/dev/null || true
     CRANE_PROMPT=$(generate_prompt "crane" "cyan" "$SHELL_SETTING")
     tmux send-keys -t crane:main "cd \"$(pwd)\" && export PS1='${CRANE_PROMPT}' && clear" Enter
     tmux set-option -p -t crane:main @agent_id "master_crane"
@@ -767,7 +771,7 @@ else
     # kyoto: darkninja セッション（main: ラオモト本体, monitor: master_tortoise）
     log_war "👑 ラオモトのホンジンをコンストラクト中...イヤーッ！"
     # window 0 のみ作成し -n main で名前付け。TOCTOU防止: 直接作成を試みる
-    tmux new-session -d -s darkninja -n main 2>/dev/null || true
+    tmux new-session -d -s darkninja -n main -x 200 -y 50 2>/dev/null || true
     SHOGUN_PROMPT=$(generate_prompt "ラオモト" "magenta" "$SHELL_SETTING")
     tmux send-keys -t darkninja:main "cd \"$(pwd)\" && export PS1='${SHOGUN_PROMPT}' && clear" Enter
     tmux select-pane -t darkninja:main -P 'bg=#001520'  # ダークニンジャの Dark Blue
@@ -782,6 +786,10 @@ else
     MONITOR_PANE="darkninja:monitor"
     log_success "  └─ ラオモトのホンジン（main + monitor）、コンストラクト完了！ワザマエ！"
 fi
+
+# サーバー起動後にグローバルオプション設定（セッション作成でサーバーが起動済み）
+tmux set-option -g window-size latest 2>/dev/null || true
+tmux set-option -g aggressive-resize on 2>/dev/null || true
 echo ""
 
 # pane-base-index を取得（1 の環境ではペインは 1,2,... になる）
@@ -797,7 +805,7 @@ else
 fi
 
 # 最初のペイン作成
-if ! tmux new-session -d -s multiagent -n "agents" 2>/dev/null; then
+if ! tmux new-session -d -s multiagent -n "agents" -x 200 -y 50 2>/dev/null; then
     echo "" >&2
     echo "  ╔════════════════════════════════════════════════════════════╗" >&2
     echo "  ║  グワーッ！multiagentセッション生成に失敗！              ║" >&2
@@ -1126,11 +1134,17 @@ NINJA_EOF
     echo -e "                               \033[0;36m[ASCII Art: syntax-samurai/ryu - CC0 1.0 Public Domain]\033[0m"
     echo ""
 
-    echo "  ◆電脳空間同期待機◆ ラオモトのニンジャソウル起動を待機中（最大10秒）..."
+    # エージェント起動確認（最大10秒待機）【Phase 1高速化: 30秒→10秒】
+    if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+        _wait_pane="crane:main"
+        echo "  ◆電脳空間同期待機◆ マスター・クレインのニンジャソウル起動を待機中（最大10秒）..."
+    else
+        _wait_pane="darkninja:main"
+        echo "  ◆電脳空間同期待機◆ ラオモトのニンジャソウル起動を待機中（最大10秒）..."
+    fi
 
-    # ダークニンジャの起動を確認（最大10秒待機）【Phase 1高速化: 30秒→10秒】
     for i in {1..10}; do
-        if tmux capture-pane -t darkninja:main -p | grep -q "bypass permissions"; then
+        if tmux capture-pane -t "$_wait_pane" -p 2>/dev/null | grep -q "bypass permissions"; then
             echo "  └─ 電脳IRC空間起動確認！（${i}秒）ニンジャソウル覚醒！ワザマエ！ワッショイ！"
             break
         fi
