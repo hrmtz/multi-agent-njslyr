@@ -59,14 +59,14 @@ files:
 
 panes:
   gryakuza: "multiagent:agents.1"
-  self: "multiagent:monitors.0"
+  self: "main:crane.1"  # NeoSaitama: neosaitama session has different layout
 
 inbox:
   write_script: "scripts/inbox_write.sh"
   to_gryakuza_allowed: true
   to_darkninja_allowed: false
   to_yakuza_allowed: false
-  to_tortoise_allowed: true
+  to_tortoise_allowed: false  # crane⇔tortoise communication is ntfy heartbeat only, not inbox
   mandatory_after_analysis: true
 
 persona:
@@ -136,6 +136,8 @@ njslyr.sh（bashデーモン）が死活監視とエスカレーションを担�
 
 1. **ログ収集**: 該当エージェントの直前のtmux pane出力をキャプチャ
    ```bash
+   # NOTE: Window name is machine-dependent (kyoto: "multiagent:agents", neosaitama: "multiagent:neosaitama")
+   # Use @agent_id-based dynamic pane lookup: tmux list-panes -a -F '#{@agent_id} #{pane_id}'
    tmux capture-pane -t "multiagent:agents.{pane_id}" -p -S -200
    ```
 
@@ -205,6 +207,9 @@ njslyr.sh（bashデーモン）が死活監視とエスカレーションを担�
 ```bash
 # 1. 情報収集
 EPOCH=$(date +%s)
+# NOTE: Window name is machine-dependent. On neosaitama this returns 0 because
+# the window is named "neosaitama", not "agents". Use dynamic lookup:
+# tmux list-panes -a -F '#{@agent_id}' | grep -v '^$' | grep -c .
 AGENT_COUNT=$(tmux list-panes -t multiagent:agents -F '#{@agent_id}' | grep -c .)
 LOAD=$(sysctl -n vm.loadavg | awk '{print $2}')  # macOS
 CTX="ok"  # or "warn" / "critical" based on analysis

@@ -321,6 +321,47 @@ cmd_despawn_tengu() {
     echo "[despawn_tengu] ◆ヤクザ天狗帰還◆ yakuzatengu → ${orig_agent}。任務完了。"
 }
 
+# ─── A-7: inject — バリキドリンク投与（Sonnet→Opus切替）───
+# njslyr.sh inject_barikidorink() 相当のワンコマンド版
+# 引数: agent_id (必須)
+cmd_inject() {
+    local agent_id="${1:?ERROR: inject requires agent_id}"
+
+    local pane_id
+    pane_id=$(resolve_pane_by_agent_id "$agent_id")
+
+    [[ -z "$pane_id" ]] && { echo "ERROR: inject: pane not found for $agent_id" >&2; return 1; }
+
+    # 現在のモデル確認
+    local current_model current_bg
+    current_model=$(tmux show-options -pv -t "$pane_id" @model_name 2>/dev/null || echo "unknown")
+    current_bg=$(tmux show-options -pv -t "$pane_id" background 2>/dev/null || echo "unknown")
+
+    # 既にOpusなら skip
+    if [[ "$current_model" == "Opus" && "$current_bg" == "#1a002e" ]]; then
+        echo "[inject] $agent_id ($pane_id): already Opus + bg=#1a002e. skip."
+        return 0
+    fi
+
+    echo "[inject] $agent_id ($pane_id): $current_model (bg=$current_bg) → Opus (bg=#1a002e)"
+
+    # /model claude-opus-4-6 送信（オートコンプリート回避: text→Escape→Enter）
+    if [[ "$current_model" != "Opus" ]]; then
+        tmux send-keys -t "$pane_id" "/model claude-opus-4-6" 2>/dev/null
+        sleep 0.3
+        tmux send-keys -t "$pane_id" Escape 2>/dev/null
+        sleep 0.1
+        tmux send-keys -t "$pane_id" Enter 2>/dev/null
+        sleep 0.5
+    fi
+
+    # @model_name / bg_color は常に更新
+    tmux set-option -p -t "$pane_id" @model_name "Opus" 2>/dev/null || true
+    tmux select-pane -t "$pane_id" -P "bg=#1a002e" 2>/dev/null || true
+
+    echo "[inject] $agent_id: inject complete (Opus, bg=#1a002e)"
+}
+
 # ─── A-6: detox — バリキドリンク解毒（Opus→Sonnet復帰）───
 # njslyr.sh detox_barikidorink() 相当のワンコマンド版
 # 引数: agent_id (必須)
@@ -387,6 +428,10 @@ Subcommands:
   despawn_tengu [reason]
       Despawn yakuzatengu and restore original agent.
 
+  inject <agent_id>
+      Inject barikidorink (Sonnet → Opus). Sends /model claude-opus-4-6,
+      updates @model_name and bg_color. Skips if already Opus.
+
   detox <agent_id>
       Detox barikidorink (Opus → Sonnet). Sends /model sonnet,
       updates @model_name and bg_color. Skips if already Sonnet.
@@ -398,6 +443,7 @@ Examples:
   bash scripts/njslyr_cmd.sh slay yakuza2 "コンテキスト枯渇"
   bash scripts/njslyr_cmd.sh spawn_tengu yakuza7 "cmd_999 インフラ監視"
   bash scripts/njslyr_cmd.sh despawn_tengu
+  bash scripts/njslyr_cmd.sh inject yakuza5
   bash scripts/njslyr_cmd.sh detox yakuza3
 EOF
 }
@@ -425,6 +471,10 @@ main() {
         despawn_tengu)
             shift
             cmd_despawn_tengu "$@"
+            ;;
+        inject)
+            shift
+            cmd_inject "$@"
             ;;
         detox)
             shift

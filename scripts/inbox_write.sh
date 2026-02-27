@@ -88,13 +88,17 @@ while [ $attempt -lt $max_attempts ]; do
 
         # Add message via python3 (unified YAML handling)
         # Pass user-controlled strings via env vars to avoid shell injection
-        INBOX_CONTENT="$CONTENT" INBOX_TASK_YAML="$TASK_YAML_PATH" \
+        INBOX_PATH="$INBOX" INBOX_CONTENT="$CONTENT" INBOX_TASK_YAML="$TASK_YAML_PATH" \
+        INBOX_MSG_ID="$MSG_ID" INBOX_FROM="$FROM" INBOX_TIMESTAMP="$TIMESTAMP" \
+        INBOX_TYPE="$TYPE" INBOX_PRIORITY="$PRIORITY" \
         python3 -c "
-import yaml, sys, os
+import yaml, sys, os, tempfile
 
 try:
+    inbox_path = os.environ['INBOX_PATH']
+
     # Load existing inbox
-    with open('$INBOX') as f:
+    with open(inbox_path) as f:
         data = yaml.safe_load(f)
 
     # Initialize if needed
@@ -103,13 +107,13 @@ try:
     if not data.get('messages'):
         data['messages'] = []
 
-    # Add new message (content/task_yaml via env vars — safe from shell injection)
+    # Add new message (all fields via env vars — safe from shell injection)
     new_msg = {
-        'id': '$MSG_ID',
-        'from': '$FROM',
-        'timestamp': '$TIMESTAMP',
-        'type': '$TYPE',
-        'priority': '$PRIORITY',
+        'id': os.environ['INBOX_MSG_ID'],
+        'from': os.environ['INBOX_FROM'],
+        'timestamp': os.environ['INBOX_TIMESTAMP'],
+        'type': os.environ['INBOX_TYPE'],
+        'priority': os.environ['INBOX_PRIORITY'],
         'content': os.environ['INBOX_CONTENT'],
         'read': False
     }
@@ -128,12 +132,11 @@ try:
         data['messages'] = unread + read[-30:]
 
     # Atomic write: tmp file + rename (prevents partial reads)
-    import tempfile, os
-    tmp_fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname('$INBOX'), suffix='.tmp')
+    tmp_fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(inbox_path), suffix='.tmp')
     try:
         with os.fdopen(tmp_fd, 'w') as f:
             yaml.dump(data, f, default_flow_style=False, allow_unicode=True, indent=2)
-        os.replace(tmp_path, '$INBOX')
+        os.replace(tmp_path, inbox_path)
     except:
         os.unlink(tmp_path)
         raise

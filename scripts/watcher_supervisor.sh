@@ -16,8 +16,32 @@ cd "$SCRIPT_DIR"
 PROJECT_ROOT="$SCRIPT_DIR"
 STATE_DIR="$PROJECT_ROOT/.state"
 RESCAN_FILE="$STATE_DIR/rescan_watchers"
+RESTART_LOG="${RESTART_LOG:-$STATE_DIR/watcher_restart.log}"
 
 mkdir -p logs queue/inbox "$STATE_DIR"
+
+# Per-agent backoff state: consecutive restart count and next-allowed-restart timestamp
+declare -A RESTART_COUNT
+declare -A BACKOFF_UNTIL
+
+# Return backoff wait seconds based on consecutive restart count.
+# Schedule: 1st→5s, 2nd→10s, 3rd→30s, 4th+→60s (cap)
+backoff_seconds() {
+    local count="$1"
+    if   (( count <= 1 )); then echo 5
+    elif (( count == 2 )); then echo 10
+    elif (( count == 3 )); then echo 30
+    else                        echo 60
+    fi
+}
+
+# Append a restart event to RESTART_LOG.
+# Format: <ISO8601> agent=<name> attempt=<n>
+log_restart() {
+    local agent="$1" count="$2"
+    printf '%s agent=%s attempt=%d\n' \
+        "$(date '+%Y-%m-%dT%H:%M:%S')" "$agent" "$count" >> "$RESTART_LOG"
+}
 
 ensure_inbox_file() {
     local agent="$1"
@@ -46,12 +70,32 @@ start_watcher_if_missing() {
         return 0
     fi
 
-    if pgrep -f "scripts/inbox_watcher.sh ${agent} " >/dev/null 2>&1; then
+    # FIX-024: Use [%] anchor to avoid partial match (yakuza1 matching yakuza10 etc.)
+    if pgrep -f "scripts/inbox_watcher.sh ${agent} [%]" >/dev/null 2>&1; then
+        # Running: reset consecutive restart count on stable recovery
+        RESTART_COUNT[$agent]=0
         return 0
     fi
 
+    # Not running: check backoff window
+    local now
+    now=${EPOCHSECONDS:-$(date +%s)}
+    local backoff_until=${BACKOFF_UNTIL[$agent]:-0}
+    if (( now < backoff_until )); then
+        return 0
+    fi
+
+    # Restart with backoff tracking
+    local count delay
+    count=$(( ${RESTART_COUNT[$agent]:-0} + 1 ))
+    RESTART_COUNT[$agent]=$count
+    log_restart "$agent" "$count"
+    delay=$(backoff_seconds "$count")
+    BACKOFF_UNTIL[$agent]=$(( now + delay ))
+
     cli=$(tmux show-options -p -t "$pane" -v @agent_cli 2>/dev/null); cli=${cli:-claude}
     nohup bash scripts/inbox_watcher.sh "$agent" "$pane" "$cli" >> "$log_file" 2>&1 &
+    echo "[watcher_supervisor] started inbox_watcher for $agent (attempt=${count}, next_backoff=${delay}s)"
 }
 
 # For all agents except darkninja: dynamically resolve pane_id from @agent_id.
@@ -76,32 +120,63 @@ start_watcher_for_agent() {
 
     # UNIFIED-MED-005: [%] matches the literal % prefix of pane_id (e.g. %42)
     if pgrep -f "scripts/inbox_watcher.sh ${agent} [%]" >/dev/null 2>&1; then
+        # Running: reset consecutive restart count on stable recovery
+        RESTART_COUNT[$agent]=0
         return 0
     fi
+
+    # Not running: check backoff window
+    local now
+    now=${EPOCHSECONDS:-$(date +%s)}
+    local backoff_until=${BACKOFF_UNTIL[$agent]:-0}
+    if (( now < backoff_until )); then
+        return 0
+    fi
+
+    # Restart with backoff tracking
+    local count delay
+    count=$(( ${RESTART_COUNT[$agent]:-0} + 1 ))
+    RESTART_COUNT[$agent]=$count
+    log_restart "$agent" "$count"
+    delay=$(backoff_seconds "$count")
+    BACKOFF_UNTIL[$agent]=$(( now + delay ))
 
     local cli
     cli=$(tmux show-options -p -t "$pane_id" -v @agent_cli 2>/dev/null); cli=${cli:-claude}
     nohup bash scripts/inbox_watcher.sh "$agent" "$pane_id" "$cli" >> "$log_file" 2>&1 &
-    echo "[watcher_supervisor] started inbox_watcher for $agent → $pane_id"
+    echo "[watcher_supervisor] started inbox_watcher for $agent → $pane_id (attempt=${count}, next_backoff=${delay}s)"
 }
 
 # Scan all agents and ensure their inbox_watchers are running.
 # Called from main loop (periodic) and on RESCAN_FILE signal (immediate).
 scan_all_agents() {
-    # darkninja: fixed session target (separate dedicated session)
-    start_watcher_if_missing "darkninja" "darkninja:main.0" "logs/inbox_watcher_darkninja.log"
+    # FIX-005: darkninja — correct session target (main:darkninja, not darkninja:main)
+    # neosaitama does not have darkninja, so skip based on machine role
+    local _machine_role
+    _machine_role=$(awk '/^  role:/ {print $2; exit}' "$SCRIPT_DIR/config/settings.yaml" 2>/dev/null)
+    _machine_role="${_machine_role:-kyoto}"
+    case "$_machine_role" in mbp) _machine_role="neosaitama" ;; ryzen) _machine_role="kyoto" ;; esac
+    if [[ "$_machine_role" == "kyoto" ]]; then
+        start_watcher_if_missing "darkninja" "main:darkninja.0" "logs/inbox_watcher_darkninja.log"
+    fi
 
     # Cache full pane map once to avoid N tmux calls per agent (N+1 → 1).
     local pane_map
     pane_map=$(tmux list-panes -a -F '#{@agent_id} #{pane_id}' 2>/dev/null)
 
-    # All agents in multiagent:agents window: detect dynamically by @agent_id.
+    # FIX-004: Dynamic agents window name (agents on kyoto, neosaitama on neosaitama)
+    local _agents_window
+    _agents_window=$(tmux list-windows -t multiagent -F '#{window_name}' 2>/dev/null \
+        | grep -E '^(agents|neosaitama|kyoto)$' | head -1)
+    _agents_window="${_agents_window:-agents}"
+
+    # All agents in multiagent:{agents_window}: detect dynamically by @agent_id.
     # Handles yakuzatengu spawn/despawn transparently.
     # awk replaces grep -v '^$' | sort -u (one process instead of two).
     while IFS= read -r agent; do
         [[ -z "$agent" || "$agent" == "darkninja" ]] && continue
         start_watcher_for_agent "$agent" "logs/inbox_watcher_${agent}.log" "$pane_map"
-    done < <(tmux list-panes -t multiagent:agents -F '#{@agent_id}' 2>/dev/null \
+    done < <(tmux list-panes -t "multiagent:${_agents_window}" -F '#{@agent_id}' 2>/dev/null \
         | awk 'NF && !seen[$0]++')
 }
 

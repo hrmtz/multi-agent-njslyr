@@ -55,6 +55,32 @@ REFRESH_INTERVAL=14400     # 4 hours: long-running refresh interval (B-4)
     exit 1
 }
 
+# ─── Dynamic tmux window/pane resolution (FIX-002/FIX-003) ───
+SETTINGS_YAML="$PROJECT_ROOT/config/settings.yaml"
+
+# get_agents_window: neosaitamaリネーム対応 — agents/neosaitama/kyotoを動的検出
+get_agents_window() {
+    tmux list-windows -t multiagent -F '#{window_name}' 2>/dev/null \
+        | grep -E '^(agents|neosaitama|kyoto)$' | head -1
+}
+
+# get_monitor_window: machine roleに応じてmonitorウィンドウを返す
+# kyoto → main:monitor / neosaitama → main:crane
+get_monitor_window() {
+    local role
+    role=$(awk '/^  role:/ {print $2; exit}' "$SETTINGS_YAML" 2>/dev/null)
+    role="${role:-kyoto}"
+    # Legacy role normalization
+    case "$role" in
+        mbp)   role="neosaitama" ;;
+        ryzen) role="kyoto" ;;
+    esac
+    case "$role" in
+        neosaitama) echo "main:crane" ;;
+        *)          echo "main:monitor" ;;
+    esac
+}
+
 # ─── Session mode (default: once) ───
 # "once" = single execution (for cron/tmux timer)
 # "continuous" = infinite loop with 15-minute sleep (for daemon mode)
@@ -240,7 +266,7 @@ update_dashboard() {
         if grep -q "^## 🚨ヨウタイオウ" "$DASHBOARD"; then
             local temp_file
             temp_file=$(TMPDIR="$CACHE_DIR" mktemp)
-            awk -v msg="$message" '
+            if awk -v msg="$message" '
                 /^## 🚨ヨウタイオウ/ {
                     print
                     print ""
@@ -253,7 +279,11 @@ update_dashboard() {
                     next
                 }
                 {print}
-            ' "$DASHBOARD" > "$temp_file" && mv "$temp_file" "$DASHBOARD" || rm -f "$temp_file"
+            ' "$DASHBOARD" > "$temp_file"; then
+                mv "$temp_file" "$DASHBOARD" || rm -f "$temp_file"
+            else
+                rm -f "$temp_file"
+            fi
         else
             {
                 echo ""
@@ -349,10 +379,13 @@ detox_barikidorink() {
 # 検知した場合はダッシュボードへ警告を記録してダークニンジャに通知する。
 validate_agent_ids() {
     local suspicious_panes
+    local agents_win monitor_win
+    agents_win=$(get_agents_window)
+    monitor_win=$(get_monitor_window)
     suspicious_panes=$(
         {
-            tmux list-panes -t multiagent:agents -F '#{pane_index} #{@agent_id}' 2>/dev/null
-            tmux list-panes -t multiagent:monitors -F 'monitors:#{pane_index} #{@agent_id}' 2>/dev/null
+            [[ -n "$agents_win" ]] && tmux list-panes -t "multiagent:${agents_win}" -F '#{pane_index} #{@agent_id}' 2>/dev/null
+            [[ -n "$monitor_win" ]] && tmux list-panes -t "${monitor_win}" -F 'monitor:#{pane_index} #{@agent_id}' 2>/dev/null
         } | awk '$2 == "darkninja" {print $1}' || true
     )
 
@@ -368,12 +401,15 @@ validate_agent_ids() {
 
 # ─── Get all monitored agents ───
 get_monitored_agents() {
-    # Dynamically detect agents from yokubari.sh process list
+    # Dynamically detect agents from tmux pane @agent_id
     # Exclude darkninja (human agent)
-    # Check both agents and monitors windows (crane/tortoise cross-machine monitoring)
+    # Check agents window (dynamic name) + monitor window (machine-role-dependent)
+    local agents_win monitor_win
+    agents_win=$(get_agents_window)
+    monitor_win=$(get_monitor_window)
     {
-        tmux list-panes -t multiagent:agents -F '#{@agent_id}' 2>/dev/null
-        tmux list-panes -t multiagent:monitors -F '#{@agent_id}' 2>/dev/null
+        [[ -n "$agents_win" ]] && tmux list-panes -t "multiagent:${agents_win}" -F '#{@agent_id}' 2>/dev/null
+        [[ -n "$monitor_win" ]] && tmux list-panes -t "${monitor_win}" -F '#{@agent_id}' 2>/dev/null
     } | grep -v '^$' | \
         grep -v '^darkninja$' | \
         sort -u || true
@@ -424,17 +460,23 @@ get_task_status() {
 # ─── Get pane target for agent ───
 get_pane_target() {
     local agent_id="$1"
-    local result
-    # Find pane with matching @agent_id in agents window first (BUG-2 fix: use named window)
-    result=$(tmux list-panes -t multiagent:agents -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
-        awk -v id="$agent_id" '$2 == id {print "multiagent:agents." $1; exit}')
-    if [[ -n "$result" ]]; then
-        echo "$result"
-        return 0
+    local result agents_win monitor_win
+    agents_win=$(get_agents_window)
+    monitor_win=$(get_monitor_window)
+    # Find pane with matching @agent_id in agents window first (dynamic name)
+    if [[ -n "$agents_win" ]]; then
+        result=$(tmux list-panes -t "multiagent:${agents_win}" -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
+            awk -v id="$agent_id" -v win="$agents_win" '$2 == id {print "multiagent:" win "." $1; exit}')
+        if [[ -n "$result" ]]; then
+            echo "$result"
+            return 0
+        fi
     fi
-    # Fallback: check monitors window (crane/tortoise agents)
-    tmux list-panes -t multiagent:monitors -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
-        awk -v id="$agent_id" '$2 == id {print "multiagent:monitors." $1; exit}'
+    # Fallback: check monitor window (main:monitor or main:crane)
+    if [[ -n "$monitor_win" ]]; then
+        tmux list-panes -t "${monitor_win}" -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
+            awk -v id="$agent_id" -v win="$monitor_win" '$2 == id {print win "." $1; exit}'
+    fi
 }
 
 # ─── Agent busy detection (from inbox_watcher.sh pattern) ───
@@ -920,8 +962,9 @@ spawn_yakuzatengu() {
     touch "$STATE_DIR/yakuzatengu_active"
     echo "$orig_agent" > "$STATE_DIR/yakuzatengu_original_agent_id"
     # BUG-T5 fix: pane_id（%N形式）を保存（pane_indexはペイン追加削除でズレる可能性あり）
-    local orig_pane_id
-    orig_pane_id=$(tmux list-panes -t multiagent:agents -F '#{pane_index} #{pane_id} #{@agent_id}' 2>/dev/null | \
+    local orig_pane_id agents_win_spawn
+    agents_win_spawn=$(get_agents_window)
+    orig_pane_id=$([[ -n "$agents_win_spawn" ]] && tmux list-panes -t "multiagent:${agents_win_spawn}" -F '#{pane_index} #{pane_id} #{@agent_id}' 2>/dev/null | \
         awk -v id="$orig_agent" '$3 == id {print $2; exit}')
     echo "${orig_pane_id:-$pane_target}" > "$STATE_DIR/yakuzatengu_original_pane"
     echo "$orig_model" > "$STATE_DIR/yakuzatengu_original_model"

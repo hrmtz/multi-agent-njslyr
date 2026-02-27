@@ -364,11 +364,12 @@ EOF
     source "$TEST_NJSLYR"
 
     # check_agent関数でgryakuzaをテスト（Stage 2にエスカレートせずスキップされるはず）
-    run check_agent "gryakuza"
+    # Capture stderr where check_agent logs its decisions
+    run bash -c 'source "'"$TEST_NJSLYR"'"; check_agent "gryakuza" 2>&1'
     [ "$status" -eq 0 ]  # スキップ（健全扱い）
 
-    # ログにStage 2スキップメッセージが記録されていることを確認
-    grep -q "gryakuza is limited to Stage 1" "$TEST_NJSLYR" 2>/dev/null || true
+    # ログ出力にStage 1制限メッセージが含まれることを確認
+    echo "$output" | grep -q "limited to Stage 1\|Stage 1 only\|gryakuza.*skip"
 }
 
 # =============================================================================

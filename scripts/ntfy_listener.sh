@@ -25,6 +25,11 @@ SETTINGS="$SCRIPT_DIR/config/settings.yaml"
 TOPIC=$(awk '/ntfy_topic:/ {gsub(/"/, ""); print $2; exit}' "$SETTINGS")
 MACHINE_ROLE=$(awk '/^  role:/ {print $2; exit}' "$SETTINGS")
 MACHINE_ROLE="${MACHINE_ROLE:-kyoto}"
+# FIX-006: Legacy role name normalization (cmd_274 rename: mbp→neosaitama, ryzen→kyoto)
+case "$MACHINE_ROLE" in
+  mbp)   MACHINE_ROLE="neosaitama" ;;
+  ryzen) MACHINE_ROLE="kyoto" ;;
+esac
 INBOX="$SCRIPT_DIR/queue/ntfy_inbox.yaml"
 LOCKFILE="${INBOX}.lock"
 CORRUPT_DIR="$SCRIPT_DIR/logs/ntfy_inbox_corrupt"
@@ -652,7 +657,8 @@ while true; do
     fi
 
     # Stream new messages from multiple topics (long-lived connection)
-    curl -s --no-buffer "${AUTH_ARGS[@]}" "https://ntfy.sh/$SUBSCRIBE_TOPICS/json${_since_param}" 2>/dev/null | while IFS= read -r line; do
+    # FIX-022: Use -sS (show errors on stderr) instead of suppressing all stderr with 2>/dev/null
+    curl -sS --no-buffer "${AUTH_ARGS[@]}" "https://ntfy.sh/$SUBSCRIBE_TOPICS/json${_since_param}" 2>> "$SCRIPT_DIR/logs/ntfy_listener_curl.log" | while IFS= read -r line; do
         # Parse all needed fields in a single python3 call (including topic)
         IFS=$'\x1f' read -r EVENT _ MSG MSG_ID MSG_TOPIC < <(parse_message_fields <<< "$line")
 

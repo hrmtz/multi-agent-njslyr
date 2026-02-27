@@ -10,6 +10,13 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SETTINGS="$SCRIPT_DIR/config/settings.yaml"
+
+# FIX-012: settings.yaml存在チェック（ntfy_send_dispatch.shと統一）
+if [[ ! -f "$SETTINGS" ]]; then
+    echo "[ntfy_send_report] ERROR: settings.yaml not found: $SETTINGS" >&2
+    exit 1
+fi
+
 TOPIC=$(awk '/ntfy_topic:/ {gsub(/"/, ""); print $2; exit}' "$SETTINGS")
 
 # shellcheck source=../lib/ntfy_auth.sh

@@ -104,7 +104,7 @@ Step1の結果を必ず信用し、このファイルの指示に従え。
 グレーターヤクザ: OK/NG判断 → 次タスク配分
 ```
 
-**注意**: yakuza8は廃止。soukaiyaがpane 8を使用。settings.yamlのyakuza8設定は残存するが、ペインは存在しない。
+**注意**: yakuza8は廃止済み（settings.yaml.sampleにも未記載）。soukaiyaがpane 8を使用。
 
 ## Language
 

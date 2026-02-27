@@ -59,8 +59,14 @@ while IFS= read -r line; do
     [[ -n "$line" ]] && AUTH_ARGS+=("$line")
 done < <(ntfy_get_auth_args "$SCRIPT_DIR/config/ntfy_auth.env")
 
-# ntfy送信: ネオサイタマ(MBP)宛トピックへ
-DISPATCH_TOPIC="${TOPIC}-neosaitama"
+# FIX-010: dispatch送信先をmachine.roleに基づいて動的決定（双方向対応）
+MY_ROLE=$(awk '/^  role:/ {print $2; exit}' "$SETTINGS")
+MY_ROLE="${MY_ROLE:-kyoto}"
+case "$MY_ROLE" in
+  kyoto|ryzen)    DISPATCH_TOPIC="${TOPIC}-neosaitama" ;;
+  neosaitama|mbp) DISPATCH_TOPIC="${TOPIC}-kyoto" ;;
+  *)              DISPATCH_TOPIC="${TOPIC}-neosaitama" ;;  # fallback
+esac
 HTTP_STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "https://ntfy.sh/${DISPATCH_TOPIC}" \
     "${AUTH_ARGS[@]}" \
     -H 'Content-Type: text/plain' \
