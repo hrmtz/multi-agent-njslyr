@@ -570,8 +570,11 @@ except Exception:
 # リモートマシンからntfy経由で届いたsurikenをローカルエージェントに転送する
 handle_suriken() {
     local payload="$1"
-    # payload format: agent_id:unread_count
+    # payload format: agent_id or agent_id:unread_count
     local agent_id="${payload%%:*}"
+    local unread_count="${payload#*:}"
+    # If no colon in payload, unread_count equals agent_id — normalize to empty
+    [[ "$unread_count" == "$agent_id" ]] && unread_count=""
 
     # Validate agent_id (alphanumeric + underscore only)
     if [[ ! "$agent_id" =~ ^[a-zA-Z0-9_]+$ ]]; then
@@ -579,12 +582,13 @@ handle_suriken() {
         return 1
     fi
 
-    echo "[$(date)] [ntfy_listener] suriken: relaying to local agent: $agent_id" >&2
+    echo "[$(date)] [ntfy_listener] suriken: relaying to local agent: $agent_id${unread_count:+ (unread: $unread_count)}" >&2
 
-    # ローカルsurikenをnjslyr_cmd.sh経由で実行
-    bash "$SCRIPT_DIR/njslyr_cmd.sh" suriken "$agent_id" || {
+    # FIX: correct path — scripts/ prefix was missing (monju-A review)
+    if ! bash "$SCRIPT_DIR/scripts/njslyr_cmd.sh" suriken "$agent_id"; then
         echo "[$(date)] [ntfy_listener] WARNING: suriken: local relay failed for $agent_id" >&2
-    }
+        return 1
+    fi
 }
 
 # Route message by prefix. Returns 0 if handled, 1 if fallback needed.

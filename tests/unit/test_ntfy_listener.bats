@@ -724,15 +724,18 @@ YAML
 @test "T-NL-SRK-001: handle_suriken relays valid agent_id to njslyr_cmd.sh" {
     NJSLYR_CMD_LOG="$TEST_TMP/njslyr_cmd_calls.log"
     export NJSLYR_CMD_LOG
-    cat > "$MOCK_PROJECT/njslyr_cmd.sh" << 'MOCK'
+    # FIX: correct path is scripts/njslyr_cmd.sh (monju-A review)
+    cat > "$MOCK_PROJECT/scripts/njslyr_cmd.sh" << 'MOCK'
 #!/bin/bash
 echo "$@" >> "${NJSLYR_CMD_LOG}"
 MOCK
-    chmod +x "$MOCK_PROJECT/njslyr_cmd.sh"
+    chmod +x "$MOCK_PROJECT/scripts/njslyr_cmd.sh"
 
     run call_with_stderr handle_suriken "yakuza3:2"
     [ "$status" -eq 0 ]
     [[ "$output" == *"suriken: relaying to local agent: yakuza3"* ]]
+    # unread_count が出力に含まれること
+    [[ "$output" == *"(unread: 2)"* ]]
 
     # njslyr_cmd.sh suriken yakuza3 が呼ばれたこと
     [ -f "$NJSLYR_CMD_LOG" ]
@@ -744,11 +747,11 @@ MOCK
 @test "T-NL-SRK-002: handle_suriken rejects invalid agent_id with semicolon" {
     NJSLYR_CMD_LOG="$TEST_TMP/njslyr_cmd_calls.log"
     export NJSLYR_CMD_LOG
-    cat > "$MOCK_PROJECT/njslyr_cmd.sh" << 'MOCK'
+    cat > "$MOCK_PROJECT/scripts/njslyr_cmd.sh" << 'MOCK'
 #!/bin/bash
 echo "$@" >> "${NJSLYR_CMD_LOG}"
 MOCK
-    chmod +x "$MOCK_PROJECT/njslyr_cmd.sh"
+    chmod +x "$MOCK_PROJECT/scripts/njslyr_cmd.sh"
 
     run call_with_stderr handle_suriken "evil;agent:1"
     [ "$status" -eq 1 ]
@@ -758,18 +761,18 @@ MOCK
     [ ! -f "$NJSLYR_CMD_LOG" ]
 }
 
-# --- T-NL-SRK-003: handle_suriken njslyr_cmd.sh 失敗 → WARNING のみ、クラッシュしない ---
+# --- T-NL-SRK-003: handle_suriken njslyr_cmd.sh 失敗 → return 1 + WARNING ---
 
-@test "T-NL-SRK-003: handle_suriken logs WARNING when njslyr_cmd.sh fails, no crash" {
-    cat > "$MOCK_PROJECT/njslyr_cmd.sh" << 'MOCK'
+@test "T-NL-SRK-003: handle_suriken returns 1 and logs WARNING when njslyr_cmd.sh fails" {
+    cat > "$MOCK_PROJECT/scripts/njslyr_cmd.sh" << 'MOCK'
 #!/bin/bash
 exit 1
 MOCK
-    chmod +x "$MOCK_PROJECT/njslyr_cmd.sh"
+    chmod +x "$MOCK_PROJECT/scripts/njslyr_cmd.sh"
 
     run call_with_stderr handle_suriken "yakuza1:1"
-    # njslyr_cmd.sh 失敗でもクラッシュしない（return 0）
-    [ "$status" -eq 0 ]
+    # njslyr_cmd.sh 失敗 → return 1 (relay failure propagated)
+    [ "$status" -eq 1 ]
     [[ "$output" == *"WARNING: suriken: local relay failed for yakuza1"* ]]
 }
 
@@ -778,17 +781,39 @@ MOCK
 @test "T-NL-SRK-004: route_message dispatches suriken: and returns 2 (skip ntfy_inbox)" {
     NJSLYR_CMD_LOG="$TEST_TMP/njslyr_cmd_calls.log"
     export NJSLYR_CMD_LOG
-    cat > "$MOCK_PROJECT/njslyr_cmd.sh" << 'MOCK'
+    cat > "$MOCK_PROJECT/scripts/njslyr_cmd.sh" << 'MOCK'
 #!/bin/bash
 echo "$@" >> "${NJSLYR_CMD_LOG}"
 MOCK
-    chmod +x "$MOCK_PROJECT/njslyr_cmd.sh"
+    chmod +x "$MOCK_PROJECT/scripts/njslyr_cmd.sh"
 
     run call_with_stderr route_message "suriken:yakuza5:3" ""
-    # return 2 = handled, ntfy_inbox記録スキップ
+    # return 2 = handled, ntfy_inbox記録スキップ (regardless of handle_suriken result)
     [ "$status" -eq 2 ]
 
     # njslyr_cmd.sh suriken yakuza5 が呼ばれたこと
     [ -f "$NJSLYR_CMD_LOG" ]
     grep -q "suriken yakuza5" "$NJSLYR_CMD_LOG"
+}
+
+# --- T-NL-SRK-005: handle_suriken agent_idのみ（unread_countなし）でも正常動作 ---
+
+@test "T-NL-SRK-005: handle_suriken works with agent_id only (no unread_count)" {
+    NJSLYR_CMD_LOG="$TEST_TMP/njslyr_cmd_calls.log"
+    export NJSLYR_CMD_LOG
+    cat > "$MOCK_PROJECT/scripts/njslyr_cmd.sh" << 'MOCK'
+#!/bin/bash
+echo "$@" >> "${NJSLYR_CMD_LOG}"
+MOCK
+    chmod +x "$MOCK_PROJECT/scripts/njslyr_cmd.sh"
+
+    # コロンなし — agent_idのみ
+    run call_with_stderr handle_suriken "gryakuza"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"suriken: relaying to local agent: gryakuza"* ]]
+    # unread_countがないので "(unread: ...)" は出力されない
+    [[ "$output" != *"(unread:"* ]]
+
+    [ -f "$NJSLYR_CMD_LOG" ]
+    grep -q "suriken gryakuza" "$NJSLYR_CMD_LOG"
 }
