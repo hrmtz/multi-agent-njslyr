@@ -71,6 +71,10 @@ if [ -f "./config/settings.yaml" ]; then
 fi
 MACHINE_ROLE="${MACHINE_ROLE:-kyoto}"
 
+# neosaitama: Kyoto SSH接続設定（cmd_287）
+KYOTO_SSH_PORT="${KYOTO_SSH_PORT:-2222}"
+KYOTO_HOST="${KYOTO_HOST:-peer-hostname}"
+
 # マシンロール依存の早期定義（CLEAN_MODEブロックで使用されるため、STEP 5より前に必要）
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
     YAKUZA_MAX=7
@@ -753,16 +757,26 @@ fi
 # 先にセッションを作成してサーバーを起動し、その後にグローバルオプションを設定する。
 
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-    # neosaitama: main セッション、window "crane" にmaster_crane常駐
-    log_war "🦢 クレイン・ホンジンをコンストラクト中...イヤーッ！"
-    tmux new-session -d -s main -n crane -x 200 -y 50 2>/dev/null || true
+    # neosaitama: main セッション
+    # window 1: darkninja — SSH peer-hostname:2222 → Kyoto darkninja pane
+    # window 2: monitor  — SSH peer-hostname:2222 → Kyoto master_tortoise pane
+    # window 3: crane    — ローカル master_crane
+    log_war "👑 キョート接続ウィンドウ + クレイン・ホンジンをコンストラクト中...イヤーッ！"
+    # window 1: darkninja (SSH→Kyoto)
+    tmux new-session -d -s main -n darkninja -x 200 -y 50 2>/dev/null || true
+    tmux send-keys -t main:darkninja "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST}" Enter
+    # window 2: monitor (SSH→Kyoto)
+    tmux new-window -t main -n monitor
+    tmux send-keys -t main:monitor "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST}" Enter
+    # window 3: crane (local)
+    tmux new-window -t main -n crane
     CRANE_PROMPT=$(generate_prompt "crane" "cyan" "$SHELL_SETTING")
     tmux send-keys -t main:crane "cd \"$(pwd)\" && export PS1='${CRANE_PROMPT}' && clear" Enter
     tmux set-option -p -t main:crane @agent_id "master_crane"
     tmux set-option -p -t main:crane @model_name "Sonnet"
     tmux set-option -p -t main:crane @current_task ""
     MONITOR_PANE="main:crane"
-    log_success "  └─ クレイン・ホンジン、コンストラクト完了！ワザマエ！"
+    log_success "  └─ キョート接続(darkninja/monitor) + クレイン・ホンジン、コンストラクト完了！ワザマエ！"
 else
     # kyoto: main セッション、window "darkninja" にラオモト本体、window "monitor" にmaster_tortoise
     log_war "👑 ラオモトのホンジンをコンストラクト中...イヤーッ！"
@@ -811,6 +825,14 @@ if ! tmux new-session -d -s multiagent -n "agents" -x 200 -y 50 2>/dev/null; the
     echo "  ╚════════════════════════════════════════════════════════════╝" >&2
     echo "" >&2
     exit 1
+fi
+
+# neosaitama: "kyoto" ウィンドウ追加（SSH→Kyoto multiagent）
+# NOTE: "agents" → "neosaitama" のリネームは multiagent:agents の全操作完了後に実施（STEP 5.2後）
+if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+    # window "kyoto": SSH peer-hostname → Kyoto の multiagent session（-b で最前に挿入）
+    tmux new-window -t multiagent -n kyoto -b
+    tmux send-keys -t multiagent:kyoto "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST} -t 'tmux attach -t multiagent'" Enter
 fi
 
 # DISPLAY_MODE: shout (default) or silent (--silent flag)
@@ -980,6 +1002,10 @@ echo ""
 #   （kyoto: main:monitor, neosaitama: main:crane）
 # ═══════════════════════════════════════════════════════════════════════════════
 tmux select-window -t multiagent:agents
+# neosaitama: "agents" → "neosaitama" リネーム（全 multiagent:agents 操作完了後）
+if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+    tmux rename-window -t multiagent:agents "neosaitama"
+fi
 log_success "  └─ ${MONITOR_AGENT} 監視陣、コンストラクト完了！（${MONITOR_PANE}）ワザマエ！"
 echo ""
 
