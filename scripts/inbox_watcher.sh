@@ -524,7 +524,7 @@ send_cli_command() {
                 timeout 5 tmux send-keys -t "$PANE_TARGET" "/new" 2>/dev/null
                 sleep 0.3
                 timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
-                sleep 3
+                sleep 1
                 return 0
             fi
             if [[ "$cmd" == /model* ]]; then
@@ -541,7 +541,7 @@ send_cli_command() {
                 timeout 5 tmux send-keys -t "$PANE_TARGET" "copilot --yolo" 2>/dev/null
                 sleep 0.3
                 timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
-                sleep 3
+                sleep 1
                 return 0
             fi
             if [[ "$cmd" == /model* ]]; then
@@ -557,7 +557,7 @@ send_cli_command() {
     # Codex CLI: C-c when idle causes CLI to exit — skip it
     if [[ "$effective_cli" != "codex" ]]; then
         timeout 5 tmux send-keys -t "$PANE_TARGET" C-c 2>/dev/null
-        sleep 0.5
+        sleep 0.2
     fi
     if [[ "$effective_cli" == "codex" ]]; then
         # Codex TUI: text and Enter must be separated (TUI compatibility)
@@ -575,9 +575,9 @@ send_cli_command() {
 
     # /clear needs extra wait time before follow-up
     if [[ "$actual_cmd" == "/clear" ]]; then
-        sleep 3
-    else
         sleep 1
+    else
+        sleep 0.5
     fi
 }
 
@@ -630,18 +630,8 @@ send_context_reset() {
         timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
     fi
 
-    # Poll until agent becomes idle (prompt ready) instead of fixed sleep.
-    # Max 15s (3 attempts × 5s). If still busy after 15s, proceed anyway.
-    local attempt
-    for attempt in 1 2 3; do
-        sleep 5
-        if ! agent_is_busy; then
-            echo "[$(date)] [CONTEXT-RESET] $AGENT_ID idle after ${attempt}×5s — ready for スリケン" >&2
-            return 0
-        fi
-        echo "[$(date)] [CONTEXT-RESET] $AGENT_ID still busy after ${attempt}×5s — retrying" >&2
-    done
-    echo "[$(date)] [CONTEXT-RESET] $AGENT_ID still busy after 15s — proceeding with スリケン anyway" >&2
+    # FIX-003: Fixed 2s wait after /clear (polling abolished — 15s dead time eliminated)
+    sleep 2
 }
 
 # ─── Cross-platform file change wait ───
@@ -931,20 +921,18 @@ process_unread() {
     # P1-2: fast-path expansion — skip full read when unread=0, regardless of trigger type
     # (previously limited to timeout trigger only; now applies to event trigger as well)
     if [ "$fast_count" -eq 0 ] 2>/dev/null; then
-        # unread=0 → no full inbox read needed (saves ~30ms YAML parsing)
+        # FIX-008: unread=0 → early return. No agent_is_busy() call (saves 140 forks/min).
+        # C-u only on transition from unread>0 to unread=0 (one-time cleanup).
         if [ "$FIRST_UNREAD_SEEN" -ne 0 ]; then
             echo "[$(date)] All messages read for $AGENT_ID — escalation reset (fast-path)" >&2
-        fi
-        FIRST_UNREAD_SEEN=0
-        NEW_CONTEXT_SENT=0
-        if ! agent_is_busy; then
-            # Darkninja: only clear input when pane is not active (Lord is away)
             if [ "$AGENT_ID" = "darkninja" ] && pane_is_active; then
                 : # Lord may be typing — skip C-u
             else
                 timeout 2 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
             fi
         fi
+        FIRST_UNREAD_SEEN=0
+        NEW_CONTEXT_SENT=0
         return 0
     fi
 
@@ -1059,7 +1047,19 @@ process_unread() {
             send_wakeup_with_escape "$normal_count"
         else
             # Phase 3 (4+ min): /clear (throttled to once per 5 min)
-            if [ "$LAST_CLEAR_TS" -lt "$((now - ESCALATE_COOLDOWN))" ]; then
+            # FIX-004: darkninja向けは/clear送信不可(send_cli_commandがSKIP)のため
+            # FIRST_UNREAD_SEENリセットしない。リセットするとPhase1に戻り無限ループする。
+            if [ "$AGENT_ID" = "darkninja" ]; then
+                echo "[$(date)] ESCALATION Phase 3: darkninja — /clear suppressed (human-controlled). ${normal_count} unread, ${age}s." >&2
+                # Alert記録（gryakuza集約用）
+                mkdir -p "${STATE_DIR}/alerts" 2>/dev/null || true
+                printf 'agent_id: darkninja\ntimestamp: "%s"\nunread_count: %s\nage_sec: %s\naction: phase3_suppressed\n' \
+                    "$(date -Iseconds)" "$normal_count" "$age" > "${STATE_DIR}/alerts/darkninja_undeliverable.yaml"
+                # tmux通知（5秒表示）
+                timeout 2 tmux display-message -d 5000 "ALERT: inbox ${normal_count} unread for darkninja (${age}s)" 2>/dev/null || true
+                # Phase2スリケンを継続（ループに入らない）
+                send_wakeup_with_escape "$normal_count"
+            elif [ "$LAST_CLEAR_TS" -lt "$((now - ESCALATE_COOLDOWN))" ]; then
                 local effective_cli
                 effective_cli=$(get_effective_cli_type)
                 if [[ "$effective_cli" == "codex" ]]; then
@@ -1084,21 +1084,17 @@ process_unread() {
         fi
     else
         # No unread messages — reset escalation tracker
+        # FIX-008: C-u only on transition, no agent_is_busy() call
         if [ "$FIRST_UNREAD_SEEN" -ne 0 ]; then
             echo "[$(date)] All messages read for $AGENT_ID — escalation reset" >&2
-        fi
-        FIRST_UNREAD_SEEN=0
-        NEW_CONTEXT_SENT=0
-        # Clear stale nudge text from input field (Codex CLI prefills last input on idle).
-        # Only send C-u when agent is idle — during Working it would be disruptive.
-        if ! agent_is_busy; then
-            # Darkninja: only clear input when pane is not active (Lord is away)
             if [ "$AGENT_ID" = "darkninja" ] && pane_is_active; then
                 : # Lord may be typing — skip C-u
             else
                 timeout 2 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
             fi
         fi
+        FIRST_UNREAD_SEEN=0
+        NEW_CONTEXT_SENT=0
     fi
 }
 
@@ -1113,9 +1109,9 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
 process_unread_once
 
 # ─── Main loop: event-driven via inotifywait ───
-# Timeout 10s: WSL2 /mnt/c/ can miss inotify events. Shorter timeout = faster escalation retry.
+# Timeout 5s: WSL2 /mnt/c/ can miss inotify events. Shorter timeout = faster escalation retry.
 # Linux: dir監視 + moved_to イベントで atomic write (tmp→rename) に対応。
-INOTIFY_TIMEOUT="${INOTIFY_TIMEOUT:-10}"
+INOTIFY_TIMEOUT="${INOTIFY_TIMEOUT:-5}"
 
 while true; do
     # Orphan watcher check: paneが消失していたら自己終了（despawn_tengu後のゾンビwatcher防止）
@@ -1133,10 +1129,18 @@ while true; do
     set -e
 
     # rc=0: event fired (instant delivery — moved_to/close_write/modify)
-    # rc=1: watch invalidated — rare on dir-watch, but treated as event, re-watch next loop.
-    # rc=2: timeout (10s safety net for WSL2 inotify gaps)
+    # rc=1: watch invalidated — Claude Code uses atomic write (tmp+rename),
+    #        which replaces the inode. inotifywait sees DELETE_SELF → rc=1.
+    #        File still exists with new inode. Treat as event, re-watch next loop.
+    # rc=2: timeout (5s safety net for WSL2 inotify gaps)
     # All cases: check for unread, then loop back to inotifywait (re-watches new inode)
-    sleep 0.3
+
+    # FIX-001: Capture mtime before processing to detect gap-window writes
+    if [[ "$_UNAME_S" == "Darwin" ]]; then
+        _mtime_before=$(/usr/bin/stat -f %m "$INBOX" 2>/dev/null || echo 0)
+    else
+        _mtime_before=$(stat -c %Y "$INBOX" 2>/dev/null || echo 0)
+    fi
 
     if [ "$rc" -eq 2 ]; then
         if [ "${ASW_PROCESS_TIMEOUT:-1}" = "1" ]; then
@@ -1145,6 +1149,14 @@ while true; do
     else
         process_unread "event"
     fi
+
+    # FIX-001: Recheck mtime — if inbox was modified during processing, skip wait and re-loop
+    if [[ "$_UNAME_S" == "Darwin" ]]; then
+        _mtime_after=$(/usr/bin/stat -f %m "$INBOX" 2>/dev/null || echo 0)
+    else
+        _mtime_after=$(stat -c %Y "$INBOX" 2>/dev/null || echo 0)
+    fi
+    [[ "$_mtime_before" != "$_mtime_after" ]] && continue
 done
 
 fi  # end testing guard
