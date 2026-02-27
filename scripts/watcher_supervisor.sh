@@ -167,7 +167,7 @@ scan_all_agents() {
     # FIX-004: Dynamic agents window name (agents on kyoto, neosaitama on neosaitama)
     local _agents_window
     _agents_window=$(tmux list-windows -t multiagent -F '#{window_name}' 2>/dev/null \
-        | grep -E '^(agents|neosaitama|kyoto)$' | head -1)
+        | grep -E '^(agents|neosaitama|kyoto)$' | head -1 || true)
     _agents_window="${_agents_window:-agents}"
 
     # All agents in multiagent:{agents_window}: detect dynamically by @agent_id.

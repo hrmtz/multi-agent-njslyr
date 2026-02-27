@@ -46,7 +46,7 @@ fi
 
 # ─── resolve_pane_by_agent_id ───
 # @agent_id から全セッション横断でpane_idを解決する
-# njslyr.sh の get_pane_target() は multiagent:agents限定だが、
+# njslyr.sh の get_pane_target() は get_agents_window()で動的ウィンドウ名を解決するが、
 # こちらは -a フラグで全セッションを対象にする（yakuzatengu対応）
 resolve_pane_by_agent_id() {
     local agent_id="$1"

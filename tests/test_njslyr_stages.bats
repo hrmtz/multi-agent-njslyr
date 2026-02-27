@@ -145,6 +145,11 @@ case "$1" in
             cat "${TEST_TMPDIR}/mock_panes.txt"
         fi
         ;;
+    list-windows)
+        echo "tmux list-windows $*" >> "${TEST_TMPDIR}/tmux_calls.log"
+        # Return mock window name for get_agents_window()
+        echo "kyoto"
+        ;;
     *)
         echo "tmux $*" >> "${TEST_TMPDIR}/tmux_calls.log"
         ;;
@@ -456,17 +461,17 @@ EOF
     # tmuxモック使用
     export PATH="$MOCK_TMUX_DIR:$PATH"
 
-    # yakuza3のペインターゲット取得 (BUG-2 fix: multiagent:agents.N format)
+    # yakuza3のペインターゲット取得 (BUG-2 fix: multiagent:kyoto.N format)
     result=$(get_pane_target "yakuza3")
-    [ "$result" = "multiagent:agents.3" ]
+    [ "$result" = "multiagent:kyoto.3" ]
 
     # gryakuzaのペインターゲット取得
     result=$(get_pane_target "gryakuza")
-    [ "$result" = "multiagent:agents.0" ]
+    [ "$result" = "multiagent:kyoto.0" ]
 
     # soukaiyaのペインターゲット取得
     result=$(get_pane_target "soukaiya")
-    [ "$result" = "multiagent:agents.8" ]
+    [ "$result" = "multiagent:kyoto.8" ]
 
     # 存在しないエージェント → 空文字
     result=$(get_pane_target "nonexistent_agent")
@@ -497,7 +502,7 @@ EOF
     > "$TEST_TMPDIR/tmux_calls.log"
 
     # yakuza3のslay → sonnetモデルで再起動
-    stage3_slay "yakuza3" "test_reason" "multiagent:agents.3"
+    stage3_slay "yakuza3" "test_reason" "multiagent:kyoto.3"
 
     # tmux respawn-paneがsonnetモデルで呼ばれたことを確認
     grep -q 'respawn-pane.*--model sonnet' "$TEST_TMPDIR/tmux_calls.log"
@@ -507,7 +512,7 @@ EOF
 
     # soukaiyaのslay → opusモデルで再起動
     rm -f "$TEST_METRICS_DIR/njslyr_restarts_soukaiya.yaml"
-    stage3_slay "soukaiya" "test_reason" "multiagent:agents.8"
+    stage3_slay "soukaiya" "test_reason" "multiagent:kyoto.8"
 
     # tmux respawn-paneがopusモデルで呼ばれたことを確認
     grep -q 'respawn-pane.*--model opus' "$TEST_TMPDIR/tmux_calls.log"
@@ -570,7 +575,7 @@ exit 0
 MOCK_EOF
         chmod +x "$MOCK_TMUX_DIR/tmux"
 
-        run agent_is_busy "multiagent:agents.2"
+        run agent_is_busy "multiagent:kyoto.2"
         [ "$status" -eq 0 ] || {
             echo "FAIL: pattern '$pattern' not detected by agent_is_busy"
             false
@@ -606,7 +611,7 @@ exit 0
 MOCK_EOF
         chmod +x "$MOCK_TMUX_DIR/tmux"
 
-        run agent_is_thinking "multiagent:agents.2"
+        run agent_is_thinking "multiagent:kyoto.2"
         [ "$status" -eq 0 ] || {
             echo "FAIL: thinking pattern '$pattern' not detected"
             false
@@ -637,7 +642,7 @@ exit 0
 MOCK_EOF
         chmod +x "$MOCK_TMUX_DIR/tmux"
 
-        run agent_is_thinking "multiagent:agents.2"
+        run agent_is_thinking "multiagent:kyoto.2"
         [ "$status" -ne 0 ] || {
             echo "FAIL: non-thinking pattern '$pattern' wrongly detected as thinking"
             false
@@ -889,7 +894,7 @@ EOF
     export PATH="$MOCK_TMUX_DIR:$PATH"
     > "$TEST_TMPDIR/tmux_calls.log"
 
-    run stage3_slay "yakuza3" "test_reason" "multiagent:agents.3"
+    run stage3_slay "yakuza3" "test_reason" "multiagent:kyoto.3"
     [ "$status" -eq 0 ]
 
     # respawn-pane should use opus model
@@ -922,7 +927,7 @@ EOF
 
     # yakuza3: should default to sonnet
     > "$TEST_TMPDIR/tmux_calls.log"
-    run stage3_slay "yakuza3" "test_reason" "multiagent:agents.3"
+    run stage3_slay "yakuza3" "test_reason" "multiagent:kyoto.3"
     [ "$status" -eq 0 ]
     grep -q 'respawn-pane.*--model sonnet' "$TEST_TMPDIR/tmux_calls.log"
     grep -q 'select-pane.*bg=default' "$TEST_TMPDIR/tmux_calls.log"
@@ -930,16 +935,16 @@ EOF
     # soukaiya: should default to opus
     > "$TEST_TMPDIR/tmux_calls.log"
     rm -f "$TEST_METRICS_DIR/njslyr_restarts_soukaiya.yaml"
-    run stage3_slay "soukaiya" "test_reason" "multiagent:agents.8"
+    run stage3_slay "soukaiya" "test_reason" "multiagent:kyoto.8"
     [ "$status" -eq 0 ]
     grep -q 'respawn-pane.*--model opus' "$TEST_TMPDIR/tmux_calls.log"
 }
 
 # =============================================================================
-# TC-S15: get_pane_target returns multiagent:agents.N format (BUG-2 fix)
+# TC-S15: get_pane_target returns multiagent:kyoto.N format (BUG-2 fix)
 # =============================================================================
 
-@test "TC-S15: get_pane_target returns multiagent:agents.N format" {
+@test "TC-S15: get_pane_target returns multiagent:kyoto.N format" {
     # Mock panes with various agents
     cat > "$TEST_TMPDIR/mock_panes.txt" << 'EOF'
 0 gryakuza
@@ -950,19 +955,19 @@ EOF
 
     export PATH="$MOCK_TMUX_DIR:$PATH"
 
-    # Verify multiagent:agents.N format (not multiagent:1.N)
+    # Verify multiagent:kyoto.N format (not multiagent:1.N)
     result=$(get_pane_target "yakuza1")
-    [ "$result" = "multiagent:agents.1" ]
+    [ "$result" = "multiagent:kyoto.1" ]
     [[ "$result" != *"multiagent:1."* ]]
 
     result=$(get_pane_target "yakuza5")
-    [ "$result" = "multiagent:agents.5" ]
+    [ "$result" = "multiagent:kyoto.5" ]
 
     result=$(get_pane_target "gryakuza")
-    [ "$result" = "multiagent:agents.0" ]
+    [ "$result" = "multiagent:kyoto.0" ]
 
     result=$(get_pane_target "soukaiya")
-    [ "$result" = "multiagent:agents.8" ]
+    [ "$result" = "multiagent:kyoto.8" ]
 }
 
 # =============================================================================
@@ -984,7 +989,7 @@ EOF
     export PATH="$MOCK_TMUX_DIR:$PATH"
     > "$TEST_TMPDIR/tmux_calls.log"
 
-    run stage3_slay "yakuza2" "test_reason" "multiagent:agents.2"
+    run stage3_slay "yakuza2" "test_reason" "multiagent:kyoto.2"
     [ "$status" -eq 0 ]
 
     # respawn-pane should use sonnet model
@@ -1223,7 +1228,7 @@ EOF
     # 全STATEファイルを作成
     touch "$TEST_STATE_DIR/yakuzatengu_active"
     echo "yakuza1" > "$TEST_STATE_DIR/yakuzatengu_original_agent_id"
-    echo "multiagent:agents.1" > "$TEST_STATE_DIR/yakuzatengu_original_pane"
+    echo "multiagent:kyoto.1" > "$TEST_STATE_DIR/yakuzatengu_original_pane"
     echo "Sonnet" > "$TEST_STATE_DIR/yakuzatengu_original_model"
     echo "12345" > "$TEST_STATE_DIR/yakuzatengu_spawn_time"
     touch "$TEST_STATE_DIR/yakuzatengu_despawn_pending"
@@ -1423,7 +1428,7 @@ FAIL_MOCK
     # STATE設定
     touch "$TEST_STATE_DIR/yakuzatengu_active"
     echo "yakuza3" > "$TEST_STATE_DIR/yakuzatengu_original_agent_id"
-    echo "multiagent:agents.3" > "$TEST_STATE_DIR/yakuzatengu_original_pane"
+    echo "multiagent:kyoto.3" > "$TEST_STATE_DIR/yakuzatengu_original_pane"
     echo "Sonnet" > "$TEST_STATE_DIR/yakuzatengu_original_model"
     echo "$(($(date +%s) - 600))" > "$TEST_STATE_DIR/yakuzatengu_spawn_time"
 

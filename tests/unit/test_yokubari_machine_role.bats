@@ -314,12 +314,12 @@ eval_ntfy_startup_condition() {
     grep -q 'MACHINE_ROLE.*==.*kyoto' "$PROJECT_ROOT/yokubari.sh"
 }
 
-@test "T-YK-NTFY-008: yokubari.sh STEP6.8でpkill無条件kill削除を確認" {
+@test "T-YK-NTFY-008: yokubari.sh STEP6.9でpkill無条件kill削除を確認" {
     # 旧実装: pkill -f "ntfy_listener.sh" が無条件に実行されていた
     # 新実装: PIDチェック後のみ起動 → pkillによる強制killは削除
     # ntfy起動ブロック内に無条件pkillがないことを確認
     local ntfy_block
-    ntfy_block=$(sed -n '/STEP 6.8/,/STEP 7/p' "$PROJECT_ROOT/yokubari.sh")
+    ntfy_block=$(sed -n '/STEP 6.9/,/STEP 7/p' "$PROJECT_ROOT/yokubari.sh")
     # pkillが含まれていないことを確認
     ! echo "$ntfy_block" | grep -q 'pkill.*ntfy_listener'
 }
@@ -417,6 +417,44 @@ eval_active_mode_action() {
 
 @test "T-YK-NS-002: neosaitamaブロックにresize-window -x 220 -y 55の実装が存在する" {
     grep -q 'resize-window.*-x 220.*-y 55' "$PROJECT_ROOT/yokubari.sh"
+}
+
+# =============================================================================
+# FIX-T004: STEP 6.8 multiagent:agents → kyoto/neosaitama リネームテスト
+# T-YK-STEP68-001: kyotoリネーム確認
+# T-YK-STEP68-002: neosaitamaリネーム確認
+# T-YK-STEP68-003: client-resizedフック更新確認
+# =============================================================================
+
+@test "T-YK-STEP68-001: kyotoモードでSTEP6.8がmultiagent:agents→kyotoにリネームする" {
+    # kyoto (else分岐) で _agents_new_name="kyoto" が設定されることを確認
+    grep -q '_agents_new_name="kyoto"' "$PROJECT_ROOT/yokubari.sh"
+    # rename-windowコマンドが存在し、multiagent:agentsから$_agents_new_nameにリネームすることを確認
+    grep -q 'tmux rename-window -t multiagent:agents "$_agents_new_name"' "$PROJECT_ROOT/yokubari.sh"
+}
+
+@test "T-YK-STEP68-002: neosaitamaモードでSTEP6.8がmultiagent:agents→neosaitamaにリネームする" {
+    # neosaitama/mbp分岐で _agents_new_name="neosaitama" が設定されることを確認
+    grep -q '_agents_new_name="neosaitama"' "$PROJECT_ROOT/yokubari.sh"
+    # MACHINE_ROLE条件にneosaitamaが含まれることを確認
+    grep -q 'MACHINE_ROLE.*==.*neosaitama.*_agents_new_name="neosaitama"' "$PROJECT_ROOT/yokubari.sh" \
+        || {
+            # 分岐が複数行にまたがるため、ブロック全体で検証
+            local step68_block
+            step68_block=$(sed -n '/STEP 6.8.*multiagent:agents/,/rename-window/p' "$PROJECT_ROOT/yokubari.sh")
+            echo "$step68_block" | grep -q 'neosaitama'
+            echo "$step68_block" | grep -q '_agents_new_name="neosaitama"'
+        }
+}
+
+@test "T-YK-STEP68-003: STEP6.8後にclient-resizedフックがリネーム後のwindow名を使用する" {
+    # client-resizedフックが _agents_new_name 変数を参照していることを確認
+    # (リネーム後のwindow名が動的に反映される)
+    # grep -F で固定文字列マッチ（${} がregexメタキャラクタのため）
+    grep -Fq 'multiagent:${_agents_new_name}' "$PROJECT_ROOT/yokubari.sh"
+    # resize-windowとselect-layoutの両方が新window名を使用することを確認
+    grep -Fq 'resize-window -A -t multiagent:${_agents_new_name}' "$PROJECT_ROOT/yokubari.sh"
+    grep -Fq 'select-layout -t multiagent:${_agents_new_name}' "$PROJECT_ROOT/yokubari.sh"
 }
 
 # =============================================================================

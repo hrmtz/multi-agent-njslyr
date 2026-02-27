@@ -61,7 +61,7 @@ SETTINGS_YAML="$PROJECT_ROOT/config/settings.yaml"
 # get_agents_window: neosaitamaリネーム対応 — agents/neosaitama/kyotoを動的検出
 get_agents_window() {
     tmux list-windows -t multiagent -F '#{window_name}' 2>/dev/null \
-        | grep -E '^(agents|neosaitama|kyoto)$' | head -1
+        | grep -E '^(agents|neosaitama|kyoto)$' | head -1 || true
 }
 
 # get_monitor_window: machine roleに応じてmonitorウィンドウを返す

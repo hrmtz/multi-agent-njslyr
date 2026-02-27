@@ -59,8 +59,15 @@ MOCKEOF
 
 args="$*"
 
-# list-panes -t multiagent:agents
-if [[ "$args" == *"list-panes"*"multiagent:agents"* ]]; then
+# list-windows -t multiagent (get_agents_window用)
+if [[ "$args" == *"list-windows"*"multiagent"* ]]; then
+    echo "${MOCK_TMUX_WINDOW_NAME:-kyoto}"
+    exit 0
+fi
+
+# list-panes for agents window (dynamic: agents/kyoto/neosaitama)
+if [[ "$args" == *"list-panes"* ]] && \
+   [[ "$args" == *"multiagent:agents"* || "$args" == *"multiagent:kyoto"* || "$args" == *"multiagent:neosaitama"* ]]; then
     if [[ -n "${MOCK_TMUX_AGENTS_OUTPUT:-}" ]]; then
         echo "$MOCK_TMUX_AGENTS_OUTPUT"
     fi
@@ -83,6 +90,7 @@ SCRIPT
 
 # ヘルパー: njslyr.shから対象関数を抽出して定義
 # (set -euo pipefail + mkdir等をスキップ)
+# FIX-T002: get_agents_window()による動的ウィンドウ名解決に対応（njslyr.sh現行実装準拠）
 load_njslyr_functions() {
     # sedi関数（njslyr.sh冒頭で定義）
     sedi() {
@@ -93,37 +101,62 @@ load_njslyr_functions() {
         fi
     }
 
-    # get_monitored_agents (L370-380)
+    # get_agents_window: agents/neosaitama/kyotoを動的検出（njslyr.sh L62-65準拠）
+    get_agents_window() {
+        tmux list-windows -t multiagent -F '#{window_name}' 2>/dev/null \
+            | grep -E '^(agents|neosaitama|kyoto)$' | head -1 || true
+    }
+
+    # get_monitor_window: テスト用スタブ（monitorsウィンドウ固定）
+    # 実際のnjslyr.shではSETTINGS_YAMLからmachine roleを読んでmain:tortoise/main:craneを返す。
+    # テストモックはmultiagent:monitorsをハンドルするためこの値を返す。
+    get_monitor_window() {
+        echo "multiagent:monitors"
+    }
+
+    # get_monitored_agents (njslyr.sh L403-416準拠)
     get_monitored_agents() {
+        local agents_win monitor_win
+        agents_win=$(get_agents_window)
+        monitor_win=$(get_monitor_window)
         {
-            tmux list-panes -t multiagent:agents -F '#{@agent_id}' 2>/dev/null
-            tmux list-panes -t multiagent:monitors -F '#{@agent_id}' 2>/dev/null
+            [[ -n "$agents_win" ]] && tmux list-panes -t "multiagent:${agents_win}" -F '#{@agent_id}' 2>/dev/null
+            [[ -n "$monitor_win" ]] && tmux list-panes -t "${monitor_win}" -F '#{@agent_id}' 2>/dev/null
         } | grep -v '^$' | \
             grep -v '^darkninja$' | \
             sort -u || true
     }
 
-    # get_pane_target (L425-438)
+    # get_pane_target (njslyr.sh L461-480準拠)
     get_pane_target() {
         local agent_id="$1"
-        local result
-        result=$(tmux list-panes -t multiagent:agents -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
-            awk -v id="$agent_id" '$2 == id {print "multiagent:agents." $1; exit}')
-        if [[ -n "$result" ]]; then
-            echo "$result"
-            return 0
+        local result agents_win monitor_win
+        agents_win=$(get_agents_window)
+        monitor_win=$(get_monitor_window)
+        if [[ -n "$agents_win" ]]; then
+            result=$(tmux list-panes -t "multiagent:${agents_win}" -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
+                awk -v id="$agent_id" -v win="$agents_win" '$2 == id {print "multiagent:" win "." $1; exit}')
+            if [[ -n "$result" ]]; then
+                echo "$result"
+                return 0
+            fi
         fi
-        tmux list-panes -t multiagent:monitors -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
-            awk -v id="$agent_id" '$2 == id {print "multiagent:monitors." $1; exit}'
+        if [[ -n "$monitor_win" ]]; then
+            tmux list-panes -t "${monitor_win}" -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
+                awk -v id="$agent_id" -v win="$monitor_win" '$2 == id {print win "." $1; exit}'
+        fi
     }
 
-    # validate_agent_ids (L350-367)
+    # validate_agent_ids (njslyr.sh L380-400準拠)
     validate_agent_ids() {
         local suspicious_panes
+        local agents_win monitor_win
+        agents_win=$(get_agents_window)
+        monitor_win=$(get_monitor_window)
         suspicious_panes=$(
             {
-                tmux list-panes -t multiagent:agents -F '#{pane_index} #{@agent_id}' 2>/dev/null
-                tmux list-panes -t multiagent:monitors -F 'monitors:#{pane_index} #{@agent_id}' 2>/dev/null
+                [[ -n "$agents_win" ]] && tmux list-panes -t "multiagent:${agents_win}" -F '#{pane_index} #{@agent_id}' 2>/dev/null
+                [[ -n "$monitor_win" ]] && tmux list-panes -t "${monitor_win}" -F 'monitor:#{pane_index} #{@agent_id}' 2>/dev/null
             } | awk '$2 == "darkninja" {print $1}' || true
         )
 
@@ -250,10 +283,11 @@ soukaiya"
 # T-NJ-MON-003: get_pane_target agents→monitors fallback
 # =============================================================================
 
-@test "T-NJ-MON-003a: agentsウィンドウで見つかる → multiagent:agents.N" {
+@test "T-NJ-MON-003a: agentsウィンドウで見つかる → multiagent:{window}.N (動的)" {
     create_tmux_mock
     load_njslyr_functions
 
+    export MOCK_TMUX_WINDOW_NAME="kyoto"
     export MOCK_TMUX_AGENTS_OUTPUT="0 gryakuza
 1 yakuza1
 2 yakuza2"
@@ -261,7 +295,7 @@ soukaiya"
 
     PATH="${MOCK_BIN}:$PATH" run get_pane_target "yakuza1"
     [ "$status" -eq 0 ]
-    [ "$output" = "multiagent:agents.1" ]
+    [ "$output" = "multiagent:kyoto.1" ]
 }
 
 @test "T-NJ-MON-003b: agentsに不在→monitorsウィンドウにfallback" {

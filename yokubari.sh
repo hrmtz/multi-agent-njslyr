@@ -1347,7 +1347,7 @@ print(f'{len(old)}件退避 {len(recent)}件保持')
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 6.8: ntfy入力リスナー起動
+# STEP 6.9: ntfy入力リスナー起動
 # ═══════════════════════════════════════════════════════════════════════════════
 # NTFY_TOPIC は起動時の settings.yaml 読み込みで取得済み（grep|awk|tr → 0 fork）
 # ntfy_listener起動: kyoto/neosaitama両方で起動。購読トピックはMACHINE_ROLEに基づきntfy_listener.sh内で決定。
