@@ -585,7 +585,8 @@ handle_suriken() {
     echo "[$(date)] [ntfy_listener] suriken: relaying to local agent: $agent_id${unread_count:+ (unread: $unread_count)}" >&2
 
     # FIX: correct path — scripts/ prefix was missing (monju-A review)
-    if ! bash "$SCRIPT_DIR/scripts/njslyr_cmd.sh" suriken "$agent_id"; then
+    # NJSLYR_VIA_NTFY=1: ntfy経由で届いたsurikenは再度ntfy送信しない（無限ループ防止）
+    if ! NJSLYR_VIA_NTFY=1 bash "$SCRIPT_DIR/scripts/njslyr_cmd.sh" suriken "$agent_id"; then
         echo "[$(date)] [ntfy_listener] WARNING: suriken: local relay failed for $agent_id" >&2
         return 1
     fi

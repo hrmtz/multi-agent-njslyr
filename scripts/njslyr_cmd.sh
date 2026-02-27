@@ -134,13 +134,19 @@ cmd_suriken() {
     fi
 
     # ─── STAGE 2: ntfy cross-machine suriken ───
+    # ntfy経由で届いたsuriken（NJSLYR_VIA_NTFY=1）の場合、再ntfy送信をスキップ（無限ループ防止）
+    # → Stage 3（SSH）に直行する
+    if [[ "${NJSLYR_VIA_NTFY:-0}" == "1" ]]; then
+        echo "[suriken] skipping ntfy Stage 2 (via_ntfy=1, loop prevention) → trying SSH..." >&2
+    fi
+
     local peer_topic=""
     case "$my_role" in
         neosaitama) peer_topic="${topic}-kyoto" ;;
         kyoto)      peer_topic="${topic}-neosaitama" ;;
     esac
 
-    if [[ -n "$topic" && -n "$peer_topic" ]]; then
+    if [[ "${NJSLYR_VIA_NTFY:-0}" != "1" && -n "$topic" && -n "$peer_topic" ]]; then
         # ntfy 認証引数取得（設定がなければ空）
         local auth_args=()
         if [[ -f "$PROJECT_ROOT/lib/ntfy_auth.sh" && -f "$PROJECT_ROOT/config/ntfy_auth.env" ]]; then
