@@ -72,7 +72,7 @@ fi
 MACHINE_ROLE="${MACHINE_ROLE:-kyoto}"
 
 # neosaitama: Kyoto SSH接続設定（cmd_287）
-KYOTO_SSH_PORT="${KYOTO_SSH_PORT:-2222}"
+KYOTO_SSH_PORT="${KYOTO_SSH_PORT:-2200}"
 KYOTO_HOST="${KYOTO_HOST:-peer-hostname}"
 
 # マシンロール依存の早期定義（CLEAN_MODEブロックで使用されるため、STEP 5より前に必要）
@@ -766,8 +766,8 @@ fi
 
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
     # neosaitama: main セッション
-    # window 1: darkninja     — SSH peer-hostname:2222 → Kyoto darkninja pane
-    # window 2: master_tortoise — SSH peer-hostname:2222 → Kyoto master_tortoise pane
+    # window 1: darkninja     — SSH peer-hostname:2200 → Kyoto darkninja pane
+    # window 2: master_tortoise — SSH peer-hostname:2200 → Kyoto master_tortoise pane
     # window 3: crane          — ローカル master_crane
     log_war "👑 キョート接続ウィンドウ + クレイン・ホンジンをコンストラクト中...イヤーッ！"
     # window 1: darkninja (SSH→Kyoto)
