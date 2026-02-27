@@ -421,20 +421,15 @@ eval_active_mode_action() {
 
 # =============================================================================
 # cmd_293 subtask_293a テスト: neosaitama main session 修正確認
-# T-YK-293-001: master_tortoiseウィンドウが作成される（monitor→master_tortoise）
-# T-YK-293-002: darknijaのSSHにtmux attach -t main:darkninjaが含まれる
-# T-YK-293-003: master_tortoiseのSSHにtmux attach -t main:monitorが含まれる
+# T-YK-293-001: neosaitamaはローカルペインのみ（SSH窓なし）
+# T-YK-293-002: kyotoでmain:tortoiseウィンドウが作成される
 # =============================================================================
 
-@test "T-YK-293-001: neosaitamaブロックにmain:master_tortoiseウィンドウ作成が存在する（monitor→master_tortoise）" {
-    # '-n master_tortoise' が neosaitamaブロック内に存在すること
-    grep -q '\-n master_tortoise' "$PROJECT_ROOT/yokubari.sh"
+@test "T-YK-293-001: neosaitamaブロックにSSH窓(darkninja/tortoise)が存在しない" {
+    # neosaitama mainセッションにSSHコマンドが含まれないこと
+    ! grep -A5 'neosaitama: main セッション' "$PROJECT_ROOT/yokubari.sh" | grep -q "ssh -p"
 }
 
-@test "T-YK-293-002: neosaitamaブロックのdarkninja SSHにtmux attach -t main:darkninjaが含まれる" {
-    grep -q "tmux attach -t main:darkninja" "$PROJECT_ROOT/yokubari.sh"
-}
-
-@test "T-YK-293-003: neosaitamaブロックのmaster_tortoise SSHにtmux attach -t main:monitorが含まれる" {
-    grep -q "tmux attach -t main:monitor" "$PROJECT_ROOT/yokubari.sh"
+@test "T-YK-293-002: kyotoブロックにmain:tortoiseウィンドウ作成が存在する" {
+    grep -q '\-n tortoise' "$PROJECT_ROOT/yokubari.sh"
 }

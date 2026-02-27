@@ -58,7 +58,7 @@ files:
 
 panes:
   gryakuza: "multiagent:agents.1"
-  self: "main:monitor.1"  # NeoSaitama: different session layout
+  self: "main:tortoise.1"  # NeoSaitama: different session layout
 
 inbox:
   write_script: "scripts/inbox_write.sh"

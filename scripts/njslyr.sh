@@ -65,7 +65,7 @@ get_agents_window() {
 }
 
 # get_monitor_window: machine roleに応じてmonitorウィンドウを返す
-# kyoto → main:monitor / neosaitama → main:crane
+# kyoto → main:tortoise / neosaitama → main:crane
 get_monitor_window() {
     local role
     role=$(awk '/^  role:/ {print $2; exit}' "$SETTINGS_YAML" 2>/dev/null)
@@ -77,7 +77,7 @@ get_monitor_window() {
     esac
     case "$role" in
         neosaitama) echo "main:crane" ;;
-        *)          echo "main:monitor" ;;
+        *)          echo "main:tortoise" ;;
     esac
 }
 
@@ -472,7 +472,7 @@ get_pane_target() {
             return 0
         fi
     fi
-    # Fallback: check monitor window (main:monitor or main:crane)
+    # Fallback: check monitor window (main:tortoise or main:crane)
     if [[ -n "$monitor_win" ]]; then
         tmux list-panes -t "${monitor_win}" -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
             awk -v id="$agent_id" -v win="$monitor_win" '$2 == id {print win "." $1; exit}'

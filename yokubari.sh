@@ -251,8 +251,8 @@ while [[ $# -gt 0 ]]; do
             echo "  silent（--silent）:   echo表示なし（API節約）"
             echo ""
             echo "マシンロール (config/settings.yaml machine.role):"
-            echo "  kyoto（デフォルト）: フル構成（darkninja(main+monitor) + gryakuza + yakuza1-7 + soukaiya + master_tortoise）"
-            echo "  neosaitama:        フル構成（crane(master_crane) + gryakuza + yakuza1-7 + soukaiya）"
+            echo "  kyoto（デフォルト）: フル構成（darkninja(main+tortoise) + gryakuza + yakuza1-7 + soukaiya + master_tortoise）"
+            echo "  neosaitama:        ローカル構成（crane(master_crane) + gryakuza + yakuza1-7 + soukaiya）"
             echo ""
             echo "エイリアス:"
             echo "  csst  → cd /mnt/c/tools/multi-agent-njslyr && ./yokubari.sh"
@@ -757,34 +757,25 @@ fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 5: 本部セッション作成
-#   kyoto:      darkninja セッション（main: ラオモト本体, monitor: master_tortoise）
-#   neosaitama: crane セッション（main: master_crane）
+#   kyoto:      darkninja セッション（main: ラオモト本体, tortoise: master_tortoise）
+#   neosaitama: crane セッション（main: master_crane のみ。SSH窓なし）
 # ═══════════════════════════════════════════════════════════════════════════════
 # スマホ等の小画面クライアント対策: aggressive-resize + latest
 # NOTE: tmuxサーバー不在時（全セッション破棄後）はset-optionが失敗する。
 # 先にセッションを作成してサーバーを起動し、その後にグローバルオプションを設定する。
 
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-    # neosaitama: main セッション
-    # window 1: darkninja — SSH peer-hostname:2200 → Kyoto (plain SSH, manual tmux attach)
-    # window 2: tortoise  — SSH peer-hostname:2200 → Kyoto (plain SSH, manual tmux attach)
-    # window 3: crane     — ローカル master_crane
-    log_war "👑 キョート接続ウィンドウ + クレイン・ホンジンをコンストラクト中...イヤーッ！"
-    # window 1: darkninja (SSH→Kyoto)
-    tmux new-session -d -s main -n darkninja -x 200 -y 50 2>/dev/null || true
-    tmux send-keys -t main:darkninja "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST}" Enter
-    # window 2: tortoise (SSH→Kyoto)
-    tmux new-window -t main -n tortoise
-    tmux send-keys -t main:tortoise "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST}" Enter
-    # window 3: crane (local)
-    tmux new-window -t main -n crane
+    # neosaitama: main セッション（ローカルのみ。SSH窓なし）
+    # window 1: crane — ローカル master_crane
+    log_war "👑 クレイン・ホンジンをコンストラクト中...イヤーッ！"
+    tmux new-session -d -s main -n crane -x 200 -y 50 2>/dev/null || true
     CRANE_PROMPT=$(generate_prompt "crane" "cyan" "$SHELL_SETTING")
     tmux send-keys -t main:crane "cd \"$(pwd)\" && export PS1='${CRANE_PROMPT}' && clear" Enter
     tmux set-option -p -t main:crane @agent_id "master_crane"
     tmux set-option -p -t main:crane @model_name "Sonnet"
     tmux set-option -p -t main:crane @current_task ""
     MONITOR_PANE="main:crane"
-    log_success "  └─ キョート接続(darkninja/tortoise) + クレイン・ホンジン、コンストラクト完了！ワザマエ！"
+    log_success "  └─ クレイン・ホンジン、コンストラクト完了！ワザマエ！"
 else
     # kyoto: main セッション、window "darkninja" にラオモト本体、window "monitor" にmaster_tortoise
     log_war "👑 ラオモトのホンジンをコンストラクト中...イヤーッ！"
@@ -793,15 +784,15 @@ else
     tmux send-keys -t main:darkninja "cd \"$(pwd)\" && export PS1='${SHOGUN_PROMPT}' && clear" Enter
     tmux select-pane -t main:darkninja -P 'bg=#001520'  # ダークニンジャの Dark Blue
     tmux set-option -p -t main:darkninja @agent_id "darkninja"
-    # main:monitor ウィンドウ - master_tortoise監視
-    tmux new-window -t main -n monitor
+    # main:tortoise ウィンドウ - master_tortoise監視
+    tmux new-window -t main -n tortoise
     TORTOISE_PROMPT=$(generate_prompt "tortoise" "cyan" "$SHELL_SETTING")
-    tmux send-keys -t main:monitor "cd \"$(pwd)\" && export PS1='${TORTOISE_PROMPT}' && clear" Enter
-    tmux set-option -p -t main:monitor @agent_id "master_tortoise"
-    tmux set-option -p -t main:monitor @model_name "Sonnet"
-    tmux set-option -p -t main:monitor @current_task ""
-    MONITOR_PANE="main:monitor"
-    log_success "  └─ ラオモトのホンジン（darkninja + monitor）、コンストラクト完了！ワザマエ！"
+    tmux send-keys -t main:tortoise "cd \"$(pwd)\" && export PS1='${TORTOISE_PROMPT}' && clear" Enter
+    tmux set-option -p -t main:tortoise @agent_id "master_tortoise"
+    tmux set-option -p -t main:tortoise @model_name "Sonnet"
+    tmux set-option -p -t main:tortoise @current_task ""
+    MONITOR_PANE="main:tortoise"
+    log_success "  └─ ラオモトのホンジン（darkninja + tortoise）、コンストラクト完了！ワザマエ！"
 fi
 
 # NOTE: window-size latest + aggressive-resize on は全ペイン分割完了後に設定する（STEP 5.3）
@@ -834,13 +825,8 @@ if ! tmux new-session -d -s multiagent -n "agents" -x 200 -y 50 2>/dev/null; the
     exit 1
 fi
 
-# neosaitama: "kyoto" ウィンドウ追加（SSH→Kyoto multiagent）
 # NOTE: "agents" → "neosaitama" のリネームは multiagent:agents の全操作完了後に実施（STEP 5.2後）
-if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-    # window "kyoto": SSH peer-hostname → Kyoto (plain SSH, manual tmux attach)
-    tmux new-window -t multiagent -n kyoto -b
-    tmux send-keys -t multiagent:kyoto "ssh -p ${KYOTO_SSH_PORT} ${KYOTO_HOST}" Enter
-fi
+# SSH窓(kyoto)は廃止。ネオサイタマはローカルペインのみ。
 
 # DISPLAY_MODE: shout (default) or silent (--silent flag)
 if [ "$SILENT_MODE" = true ]; then
@@ -1017,7 +1003,7 @@ tmux set-option -g aggressive-resize on 2>/dev/null || true
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 5.2: multiagent:agents ウィンドウをアクティブに戻す
 #   監視エージェント配置は STEP 5 で完了済み
-#   （kyoto: main:monitor, neosaitama: main:crane）
+#   （kyoto: main:tortoise, neosaitama: main:crane）
 # ═══════════════════════════════════════════════════════════════════════════════
 tmux select-window -t multiagent:agents
 # neosaitama: "agents" → "neosaitama" リネーム（全 multiagent:agents 操作完了後）
@@ -1399,7 +1385,7 @@ if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
 else
     echo "     【mainセッション】ラオモトのホンジン"
     echo "     ┌──────────────┬────────────────────┐"
-    echo "     │ darkninja    │ monitor            │"
+    echo "     │ darkninja    │ tortoise           │"
     echo "     │ ラオモト(CEO) │ master_tortoise    │"
     echo "     └──────────────┴────────────────────┘"
 fi
