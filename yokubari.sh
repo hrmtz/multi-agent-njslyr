@@ -3,10 +3,10 @@
 # Daily Deployment Script for Multi-Agent Orchestration System
 #
 # 使用方法:
-#   ./shutsujin_departure.sh           # 全エージェント起動（前回の状態を維持）
-#   ./shutsujin_departure.sh -c        # キューをリセットして起動（クリーンスタート）
-#   ./shutsujin_departure.sh -s        # セットアップのみ（Claude起動なし）
-#   ./shutsujin_departure.sh -h        # ヘルプ表示
+#   ./yokubari.sh           # 全エージェント起動（前回の状態を維持）
+#   ./yokubari.sh -c        # キューをリセットして起動（クリーンスタート）
+#   ./yokubari.sh -s        # セットアップのみ（Claude起動なし）
+#   ./yokubari.sh -h        # ヘルプ表示
 
 set -e
 
@@ -255,7 +255,7 @@ while [[ $# -gt 0 ]]; do
             echo "  neosaitama:        フル構成（crane(master_crane) + gryakuza + yakuza1-7 + soukaiya）"
             echo ""
             echo "エイリアス:"
-            echo "  csst  → cd /mnt/c/tools/multi-agent-shogun && ./shutsujin_departure.sh"
+            echo "  csst  → cd /mnt/c/tools/multi-agent-njslyr && ./yokubari.sh"
             echo "  css   → tmux attach-session -t main"
             echo "  csm   → tmux attach-session -t multiagent"
             echo ""
@@ -585,9 +585,17 @@ fi
 if [[ "$(uname -s)" == "Darwin" ]]; then
     mkdir -p ./queue/inbox
 else
-    INBOX_LINUX_DIR="$HOME/.local/share/multi-agent-shogun/inbox"
+    INBOX_LINUX_DIR="$HOME/.local/share/multi-agent-njslyr/inbox"
+    _OLD_INBOX_LINUX_DIR="$HOME/.local/share/multi-agent-shogun/inbox"
     if [ ! -L ./queue/inbox ]; then
-        mkdir -p "$INBOX_LINUX_DIR"
+        # 旧パス（multi-agent-shogun）からのマイグレーション
+        if [ -d "$_OLD_INBOX_LINUX_DIR" ] && [ ! -d "$INBOX_LINUX_DIR" ]; then
+            mkdir -p "$(dirname "$INBOX_LINUX_DIR")"
+            mv "$_OLD_INBOX_LINUX_DIR" "$INBOX_LINUX_DIR"
+            log_info "  └─ inbox migrated: multi-agent-shogun → multi-agent-njslyr。インガオホー"
+        else
+            mkdir -p "$INBOX_LINUX_DIR"
+        fi
         [ -d ./queue/inbox ] && cp ./queue/inbox/*.yaml "$INBOX_LINUX_DIR/" 2>/dev/null && rm -rf ./queue/inbox
         ln -sf "$INBOX_LINUX_DIR" ./queue/inbox
         log_info "  └─ inbox → Linux FS ($INBOX_LINUX_DIR) にシンボリックリンク作成。ワザマエ"
@@ -1173,6 +1181,17 @@ NINJA_EOF
     done
 
     # ═══════════════════════════════════════════════════════════════════
+    # STEP 6.5.5: monitor エージェントへ Session Start 初期プロンプト送信
+    # 現状: launch_agent後はウェルカム画面で停止。inbox_write+surikenで起動トリガー。
+    # ═══════════════════════════════════════════════════════════════════
+    bash "$SCRIPT_DIR/scripts/inbox_write.sh" "$MONITOR_AGENT" \
+        "Session Start手順を実行せよ。instructions/${MONITOR_AGENT}.mdを読め。" \
+        task_assigned yokubari "" P0
+    bash "$SCRIPT_DIR/scripts/njslyr_cmd.sh" suriken "$MONITOR_AGENT"
+    log_info "  └─ ◆Session Start指示◆ ${MONITOR_AGENT}へ初期プロンプト送信完了！ワザマエ！"
+    echo ""
+
+    # ═══════════════════════════════════════════════════════════════════
     # STEP 6.6: inbox_watcher起動（全エージェント）
     # ═══════════════════════════════════════════════════════════════════
     log_info "📬 ◆IRC監視開始◆ コトダマ空間チャンネル監視プロセスをスタート…ニューロンに接続！"
@@ -1198,16 +1217,27 @@ NINJA_EOF
             "ASW_DISABLE_ESCALATION=1 ASW_PROCESS_TIMEOUT=0 ASW_DISABLE_NORMAL_NUDGE=0"
     fi
 
+    # FIX-016: pane_id（%N形式）でwatcher起動。INDEXベース廃止。
+    # @agent_id属性からpane_idを動的解決することでウィンドウ名変更時の不一致を防ぐ。
+    _watcher_pane_map=$(tmux list-panes -a -F '#{@agent_id} #{pane_id}' 2>/dev/null)
+    _get_watcher_pane_id() {
+        awk -v id="$1" '$1==id{print $2;exit}' <<< "$_watcher_pane_map"
+    }
+
     # グレーターヤクザ・ヤクザ・ソウカイヤのwatcher
-    launch_watcher "gryakuza" "multiagent:agents.${PANE_BASE}"
+    _pid=$(  _get_watcher_pane_id "gryakuza");   [[ -n "$_pid" ]] && launch_watcher "gryakuza" "$_pid"
     for ((i=1; i<=YAKUZA_MAX; i++)); do
-        launch_watcher "yakuza${i}" "multiagent:agents.$((PANE_BASE + i))"
+        _pid=$(_get_watcher_pane_id "yakuza${i}"); [[ -n "$_pid" ]] && launch_watcher "yakuza${i}" "$_pid"
     done
-    _soukaiya_idx=$((YAKUZA_MAX + 1))
-    launch_watcher "soukaiya" "multiagent:agents.$((PANE_BASE + _soukaiya_idx))"
+    _pid=$(  _get_watcher_pane_id "soukaiya");   [[ -n "$_pid" ]] && launch_watcher "soukaiya"  "$_pid"
 
     # 監視エージェントのwatcher
-    launch_watcher "$MONITOR_AGENT" "$MONITOR_PANE"
+    _pid=$(_get_watcher_pane_id "$MONITOR_AGENT")
+    if [[ -n "$_pid" ]]; then
+        launch_watcher "$MONITOR_AGENT" "$_pid"
+    else
+        launch_watcher "$MONITOR_AGENT" "$MONITOR_PANE"
+    fi
 
     # kyoto: darkninja + gryakuza + yakuzaN + soukaiya + monitor = YAKUZA_MAX + 4
     # neosaitama: gryakuza + yakuzaN + soukaiya + monitor = YAKUZA_MAX + 3
@@ -1217,6 +1247,20 @@ NINJA_EOF
         _total_watchers=$((YAKUZA_MAX + 4))
     fi
     log_success "  └─ ◆実際完了◆ ${_total_watchers}エージェント分のIRC監視起動完了！全チャンネル接続！ワザマエ！"
+
+    # ═══════════════════════════════════════════════════════════════════
+    # STEP 6.6.2: watcher_supervisor.sh起動（watcher自動復旧・FIX-007）
+    # ═══════════════════════════════════════════════════════════════════
+    log_info "🛡️  ◆Watcher監視開始◆ inbox_watcher自動復旧スーパーバイザー起動中…"
+
+    # Kill any existing supervisor before starting a new one
+    pkill -f "${SCRIPT_DIR}/scripts/watcher_supervisor.sh" 2>/dev/null || true
+    nohup bash "$SCRIPT_DIR/scripts/watcher_supervisor.sh" \
+        >> "$SCRIPT_DIR/logs/watcher_supervisor.log" 2>&1 &
+    WATCHER_SUPERVISOR_PID=$!
+
+    log_success "  └─ ◆実際完了◆ watcher_supervisor起動完了！PID=${WATCHER_SUPERVISOR_PID}。クラッシュ自動復旧ON。ワザマエ！"
+    echo ""
 
     # ═══════════════════════════════════════════════════════════════════
     # STEP 6.6.5: monitor_context.sh起動（コンテキスト監視・自動回復）
