@@ -19,7 +19,11 @@ setup_file() {
 }
 
 setup() {
-    export MOCK_DIR="$(mktemp -d "$BATS_TMPDIR/dispatch_test.XXXXXX")"
+    # pwd -P でシンボリックリンクを解決（macOS: /var/folders → /private/var/folders）
+    # これにより realpath の結果と一致し、path traversal チェックが正しく動作する
+    local _raw
+    _raw="$(mktemp -d "$BATS_TMPDIR/dispatch_test.XXXXXX")"
+    export MOCK_DIR="$(cd "$_raw" && pwd -P)"
 
     # モックプロジェクト構造を構築
     mkdir -p "$MOCK_DIR/config" "$MOCK_DIR/scripts" "$MOCK_DIR/lib" "$MOCK_DIR/queue/tasks"
@@ -54,12 +58,10 @@ echo -n "200"
 MOCK
     chmod +x "$MOCK_DIR/mock_curl"
 
-    # ntfy_send_dispatch.sh のモック版を作成（curlをモックに差し替え）
+    # ntfy_send_dispatch.sh のモック版を作成（SCRIPT_DIR上書き + curlモック差し替えを1パスで実行）
     sed \
-        "s|SCRIPT_DIR=\"\$(cd.*|SCRIPT_DIR=\"$MOCK_DIR\"|" \
+        "s|SCRIPT_DIR=\"\$(cd.*|SCRIPT_DIR=\"$MOCK_DIR\"|;s|curl -s |$MOCK_DIR/mock_curl -s |" \
         "$DISPATCH_SCRIPT" > "$MOCK_DIR/scripts/ntfy_send_dispatch.sh"
-    # curlをモックに差し替え
-    sed -i "s|curl -s |$MOCK_DIR/mock_curl -s |" "$MOCK_DIR/scripts/ntfy_send_dispatch.sh"
     chmod +x "$MOCK_DIR/scripts/ntfy_send_dispatch.sh"
 }
 
@@ -89,7 +91,9 @@ teardown() {
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"ERROR"* ]]
-    [[ "$output" == *"not found"* ]]
+    # macOS: realpath fails for non-existent files → "Cannot resolve path"
+    # Linux: realpath succeeds on parent → proceeds to "not found" check
+    [[ "$output" == *"not found"* ]] || [[ "$output" == *"Cannot resolve"* ]]
 }
 
 # --- T-DISP-003: エラー系 - settings.yaml不在 ---
