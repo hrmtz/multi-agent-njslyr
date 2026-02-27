@@ -1,5 +1,5 @@
 #!/bin/bash
-# multi-agent-shogun ネオサイタマ・デプロイメント・スクリプト（毎日の起動用）
+# multi-agent-njslyr ネオサイタマ・デプロイメント・スクリプト（毎日の起動用）
 # Daily Deployment Script for Multi-Agent Orchestration System
 #
 # 使用方法:
@@ -207,9 +207,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         -h|--help)
             echo ""
-            echo "◆ multi-agent-shogun ネオサイタマ・デプロイメント・スクリプト ◆"
+            echo "◆ multi-agent-njslyr ネオサイタマ・デプロイメント・スクリプト ◆"
             echo ""
-            echo "使用方法: ./shutsujin_departure.sh [オプション]"
+            echo "使用方法: ./yokubari.sh [オプション]"
             echo ""
             echo "オプション:"
             echo "  -c, --clean         キューとダッシュボードをリセットして起動（クリーンスタート）"
@@ -225,16 +225,16 @@ while [[ $# -gt 0 ]]; do
             echo "  -h, --help          このヘルプを表示"
             echo ""
             echo "例:"
-            echo "  ./shutsujin_departure.sh              # 前回の状態を維持してデプロイ"
-            echo "  ./shutsujin_departure.sh -c           # クリーンスタート（キューリセット）"
-            echo "  ./shutsujin_departure.sh -s           # セットアップのみ（手動でClaude起動）"
-            echo "  ./shutsujin_departure.sh -t           # 全エージェント起動 + ターミナルタブ展開"
-            echo "  ./shutsujin_departure.sh -shell bash  # bash用プロンプトで起動"
-            echo "  ./shutsujin_departure.sh -k           # ケッセンの陣（全クローンヤクザOpus）"
-            echo "  ./shutsujin_departure.sh -c -k         # クリーンスタート＋ケッセンの陣"
-            echo "  ./shutsujin_departure.sh -shell zsh   # zsh用プロンプトで起動"
-            echo "  ./shutsujin_departure.sh --darkninja-no-thinking  # ダークニンジャのthinkingを無効化（中継特化）"
-            echo "  ./shutsujin_departure.sh -S           # サイレントモード（echo表示なし）"
+            echo "  ./yokubari.sh              # 前回の状態を維持してデプロイ"
+            echo "  ./yokubari.sh -c           # クリーンスタート（キューリセット）"
+            echo "  ./yokubari.sh -s           # セットアップのみ（手動でClaude起動）"
+            echo "  ./yokubari.sh -t           # 全エージェント起動 + ターミナルタブ展開"
+            echo "  ./yokubari.sh -shell bash  # bash用プロンプトで起動"
+            echo "  ./yokubari.sh -k           # ケッセンの陣（全クローンヤクザOpus）"
+            echo "  ./yokubari.sh -c -k         # クリーンスタート＋ケッセンの陣"
+            echo "  ./yokubari.sh -shell zsh   # zsh用プロンプトで起動"
+            echo "  ./yokubari.sh --darkninja-no-thinking  # ダークニンジャのthinkingを無効化（中継特化）"
+            echo "  ./yokubari.sh -S           # サイレントモード（echo表示なし）"
             echo ""
             echo "モデル構成:"
             echo "  ダークニンジャ:      Opus（デフォルト。--darkninja-no-thinkingで無効化）"
