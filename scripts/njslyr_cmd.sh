@@ -43,69 +43,14 @@ mkdir -p "$STATE_DIR"
 # shellcheck source=scripts/njslyr_lib.sh
 source "$SCRIPT_DIR/njslyr_lib.sh"
 
-# ─── helper: ntfy fallback for suriken (cross-machine) ───
-# ローカルペインが見つからない場合にntfy経由でリモートマシンにスリケンを送る
-# 引数: agent_id (必須)
-_cmd_suriken_ntfy_fallback() {
-    local agent_id="$1"
-
-    # inbox unread count を取得
-    local unread_count
-    unread_count=$(grep -c 'read: false' \
-        "$PROJECT_ROOT/queue/inbox/${agent_id}.yaml" 2>/dev/null || echo "0")
-
-    # settings.yaml から ntfy_topic と machine.role を読む
-    local ntfy_topic machine_role
-    ntfy_topic=$(awk '/^ntfy_topic:/ {gsub(/"/, ""); print $2; exit}' \
-        "$PROJECT_ROOT/config/settings.yaml")
-    machine_role=$(awk '/^  role:/ {print $2; exit}' \
-        "$PROJECT_ROOT/config/settings.yaml")
-
-    # legacy role name normalization (ryzen→kyoto, mbp→neosaitama)
-    case "$machine_role" in
-        mbp)   machine_role="neosaitama" ;;
-        ryzen) machine_role="kyoto" ;;
-    esac
-
-    # machine.role に基づいてpeer topicを決定
-    local peer_topic
-    case "$machine_role" in
-        kyoto|ryzen)     peer_topic="${ntfy_topic}-neosaitama" ;;
-        neosaitama|mbp)  peer_topic="${ntfy_topic}-kyoto" ;;
-        *)
-            echo "[suriken] ntfy fallback: unknown machine role: $machine_role" >&2
-            return 1
-            ;;
-    esac
-
-    # lib/ntfy_auth.sh を source して認証引数取得
-    # shellcheck source=lib/ntfy_auth.sh
-    source "$SCRIPT_DIR/lib/ntfy_auth.sh"
-    local auth_args=()
-    while IFS= read -r line; do
-        [[ -n "$line" ]] && auth_args+=("$line")
-    done < <(ntfy_get_auth_args "$PROJECT_ROOT/config/ntfy_auth.env")
-
-    # curl で POST
-    local response_code
-    response_code=$(curl -s -o /dev/null -w "%{http_code}" \
-        "${auth_args[@]}" \
-        -H 'Title: suriken' \
-        -d "suriken:${agent_id}:${unread_count}" \
-        "https://ntfy.sh/${peer_topic}")
-
-    if [[ "$response_code" =~ ^2 ]]; then
-        echo "[suriken] ntfy fallback → ${peer_topic}: suriken:${agent_id}:${unread_count} (HTTP ${response_code})"
-        return 0
-    else
-        echo "[suriken] ntfy fallback FAILED: HTTP ${response_code}" >&2
-        return 1
-    fi
-}
-
 # ─── A-1: suriken — エージェントにnudgeを送る ───
-# 設計書 Section A-1 準拠
+# 設計書 Section A-1 準拠 / SSH fallback: context/ssh_fallback_design.md Section 2
 # 引数: agent_id (必須), message (任意), type (任意), priority (任意)
+#
+# 3段 fallback:
+#   Stage 1: ローカル tmux send-keys（pane が見つかった場合）
+#   Stage 2: ntfy cross-machine suriken（pane がローカルにない場合）
+#   Stage 3: SSH fallback（ntfy 失敗時）
 cmd_suriken() {
     local agent_id="${1:?ERROR: suriken requires agent_id}"
     local message="${2:-}"
@@ -116,33 +61,128 @@ cmd_suriken() {
     local pane_id
     pane_id=$(resolve_pane_by_agent_id "$agent_id")
 
-    if [[ -z "$pane_id" ]]; then
-        echo "[suriken] pane not found for $agent_id — trying ntfy fallback..." >&2
-        _cmd_suriken_ntfy_fallback "$agent_id"
-        return $?
+    if [[ -n "$pane_id" ]]; then
+        # ─── STAGE 1: ローカル tmux send-keys ───
+        # メッセージがある場合はinbox_write（from="njslyr"固定）
+        # inbox_write失敗でnudge送信を中断しないよう || true（nudgeが主目的）
+        if [[ -n "$message" ]]; then
+            bash "$SCRIPT_DIR/inbox_write.sh" \
+                "$agent_id" "$message" "$type" "njslyr" "" "$priority" || true
+        fi
+
+        # unread数を確認してnudgeテキストを生成
+        local unread_count
+        unread_count=$(grep -c 'read: false' \
+            "$PROJECT_ROOT/queue/inbox/${agent_id}.yaml" 2>/dev/null || echo "0")
+        local nudge_text="スリケン！inbox${unread_count}"
+
+        # オートコンプリート回避: text→Escape→Enter（0.3秒間隔）
+        tmux send-keys -t "$pane_id" "$nudge_text" 2>/dev/null
+        sleep 0.3
+        tmux send-keys -t "$pane_id" Escape 2>/dev/null
+        sleep 0.1
+        tmux send-keys -t "$pane_id" Enter 2>/dev/null
+
+        echo "[suriken] → $agent_id ($pane_id): inbox${unread_count}"
+        return 0
     fi
 
-    # メッセージがある場合はinbox_write（from="njslyr"固定）
-    # inbox_write失敗でnudge送信を中断しないよう || true（nudgeが主目的）
-    if [[ -n "$message" ]]; then
-        bash "$SCRIPT_DIR/inbox_write.sh" \
-            "$agent_id" "$message" "$type" "njslyr" "" "$priority" || true
+    # ─── クロスマシン配信モード ───
+    # ローカルに pane が見つからない → リモートエージェントと判断
+
+    # SSH再帰防止: リモートSSH経由で呼ばれた場合、再度クロスマシン配信しない
+    if [[ "${NJSLYR_SSH_DEPTH:-0}" -ge 1 ]]; then
+        echo "[suriken] $agent_id: pane not found on remote either (SSH depth=${NJSLYR_SSH_DEPTH}). Giving up." >&2
+        return 1
     fi
 
-    # unread数を確認してnudgeテキストを生成
+    # エージェント-マシンマッピング: 固定マシンエージェントがローカルにいない場合の判定
+    local agent_machine my_role
+    agent_machine=$(resolve_agent_machine "$agent_id")
+    my_role=$(get_my_machine_role)
+    if [[ "$agent_machine" != "active" && "$agent_machine" == "$my_role" ]]; then
+        # このマシン固定のエージェントだがpaneが見つからない → 起動していない
+        echo "ERROR: suriken: $agent_id is ${agent_machine}-only but not running locally" >&2
+        return 1
+    fi
+
+    echo "[suriken] $agent_id not found locally (agent_machine=${agent_machine}), attempting cross-machine delivery..." >&2
+
+    # settings.yaml から共通情報を取得
+    local topic peer_host peer_project_root
+    topic=$(awk '/ntfy_topic:/ {gsub(/"/, ""); print $2; exit}' \
+        "$PROJECT_ROOT/config/settings.yaml" 2>/dev/null || echo "")
+    peer_host=$(awk '/^  peer_host:/ {print $2; exit}' \
+        "$PROJECT_ROOT/config/settings.yaml" 2>/dev/null || echo "")
+    peer_project_root=$(awk '/^  peer_project_root:/ {print $2; exit}' \
+        "$PROJECT_ROOT/config/settings.yaml" 2>/dev/null || echo "")
+
+    # unread数はローカルinboxから取得（参考値: リモートのinboxとは異なる可能性あり）
     local unread_count
     unread_count=$(grep -c 'read: false' \
         "$PROJECT_ROOT/queue/inbox/${agent_id}.yaml" 2>/dev/null || echo "0")
-    local nudge_text="スリケン！inbox${unread_count}"
 
-    # オートコンプリート回避: text→Escape→Enter（0.3秒間隔）
-    tmux send-keys -t "$pane_id" "$nudge_text" 2>/dev/null
-    sleep 0.3
-    tmux send-keys -t "$pane_id" Escape 2>/dev/null
-    sleep 0.1
-    tmux send-keys -t "$pane_id" Enter 2>/dev/null
+    # メッセージがある場合は SSH でリモート inbox_write（ローカルには書かない）
+    if [[ -n "$message" && -n "$peer_host" && -n "$peer_project_root" ]]; then
+        if ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no "$peer_host" \
+            "bash '${peer_project_root}/scripts/inbox_write.sh' \
+            '${agent_id}' '${message}' '${type}' 'njslyr' '' '${priority}'" 2>/dev/null; then
+            echo "[suriken] remote inbox_write OK for $agent_id via SSH" >&2
+        else
+            echo "[suriken] WARNING: remote inbox_write failed for $agent_id" >&2
+        fi
+    fi
 
-    echo "[suriken] → $agent_id ($pane_id): inbox${unread_count}"
+    # ─── STAGE 2: ntfy cross-machine suriken ───
+    local peer_topic=""
+    case "$my_role" in
+        neosaitama) peer_topic="${topic}-kyoto" ;;
+        kyoto)      peer_topic="${topic}-neosaitama" ;;
+    esac
+
+    if [[ -n "$topic" && -n "$peer_topic" ]]; then
+        # ntfy 認証引数取得（設定がなければ空）
+        local auth_args=()
+        if [[ -f "$PROJECT_ROOT/lib/ntfy_auth.sh" && -f "$PROJECT_ROOT/config/ntfy_auth.env" ]]; then
+            # shellcheck source=../lib/ntfy_auth.sh
+            source "$PROJECT_ROOT/lib/ntfy_auth.sh" 2>/dev/null || true
+            if declare -f ntfy_get_auth_args >/dev/null 2>&1; then
+                while IFS= read -r _line; do
+                    [[ -n "$_line" ]] && auth_args+=("$_line")
+                done < <(ntfy_get_auth_args "$PROJECT_ROOT/config/ntfy_auth.env" 2>/dev/null)
+            fi
+        fi
+
+        local http_status
+        http_status=$(curl -s -o /dev/null -w '%{http_code}' \
+            ${auth_args[@]:+"${auth_args[@]}"} \
+            -H 'Content-Type: text/plain' \
+            -d "suriken:${agent_id}:${unread_count}" \
+            "https://ntfy.sh/${peer_topic}" 2>/dev/null || echo "000")
+
+        if [[ "$http_status" =~ ^2 ]]; then
+            echo "[suriken] → $agent_id (ntfy/${peer_topic}): inbox${unread_count}"
+            return 0
+        fi
+        echo "[suriken] ntfy failed (HTTP $http_status), trying SSH fallback..." >&2
+    fi
+
+    # ─── STAGE 3: SSH fallback ───
+    if [[ -z "$peer_host" || -z "$peer_project_root" ]]; then
+        echo "ERROR: suriken: all stages failed for $agent_id (no peer_host configured)" >&2
+        return 1
+    fi
+
+    # リモートの njslyr_cmd.sh suriken を実行（tmux PATH・pane 解決はリモートに委任）
+    # NJSLYR_SSH_DEPTH=1 で再帰防止: リモート側では再度SSH fallbackしない
+    if ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no "$peer_host" \
+        "NJSLYR_SSH_DEPTH=1 bash '${peer_project_root}/scripts/njslyr_cmd.sh' suriken '${agent_id}'" 2>/dev/null; then
+        echo "[suriken] → $agent_id (SSH/${peer_host}): inbox${unread_count}"
+        return 0
+    fi
+
+    echo "ERROR: suriken: all stages failed for $agent_id (local + ntfy + SSH)" >&2
+    return 1
 }
 
 # ─── A-2: chop — エージェントに /clear を送り、リカバリー後にnudgeする ───

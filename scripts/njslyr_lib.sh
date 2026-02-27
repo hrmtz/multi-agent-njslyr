@@ -53,3 +53,32 @@ resolve_pane_by_agent_id() {
     tmux list-panes -a -F '#{@agent_id} #{pane_id}' 2>/dev/null \
         | awk -v id="$agent_id" '$1 == id {print $2; exit}'
 }
+
+# ─── resolve_agent_machine ───
+# エージェントが所属するマシンを返す（クロスマシン配信の判断に使用）
+# Returns: "kyoto" | "neosaitama" | "active" (active_machineに依存)
+# - kyoto固定: darkninja, master_tortoise
+# - neosaitama固定: master_crane
+# - active: gryakuza, yakuza1-7, soukaiya（稼働マシン次第）
+resolve_agent_machine() {
+    local agent_id="$1"
+    case "$agent_id" in
+        darkninja)       echo "kyoto" ;;
+        master_tortoise) echo "kyoto" ;;
+        master_crane)    echo "neosaitama" ;;
+        *)               echo "active" ;;  # gryakuza, yakuza1-7, soukaiya, yakuzatengu
+    esac
+}
+
+# ─── get_my_machine_role ───
+# 現在のマシンのロールを返す（settings.yaml から取得、レガシー名を正規化）
+get_my_machine_role() {
+    local role
+    role=$(awk '/^  role:/ {print $2; exit}' \
+        "$PROJECT_ROOT/config/settings.yaml" 2>/dev/null || echo "kyoto")
+    case "$role" in
+        mbp)   echo "neosaitama" ;;
+        ryzen) echo "kyoto" ;;
+        *)     echo "$role" ;;
+    esac
+}

@@ -182,18 +182,35 @@ LOAD=$(awk '{print $1}' /proc/loadavg)
 CTX="ok"  # or "warn" / "critical" based on analysis
 
 # 2. ローカルYAML記録
+ts=$(date -d "@${EPOCH}" "+%Y-%m-%dT%H:%M:%S%z" | sed 's/\(..\)$/:\1/')
 cat > queue/heartbeat/tortoise.yaml << EOF
 machine_id: tortoise
-last_beat: "$(date -d "@${EPOCH}" "+%Y-%m-%dT%H:%M:%S%z" | sed 's/\(..\)$/:\1/')"
+last_beat: "${ts}"
 status: alive
 agents_active: ${AGENT_COUNT}
 load_avg: ${LOAD}
 context_summary: ${CTX}
 EOF
 
-# 3. ntfy送信（settings.yamlのntfy_topicを使用）
+# 3. ntfy送信（settings.yamlのntfy_topicを使用）+ SSH fallback
 TOPIC=$(awk '/ntfy_topic:/ {gsub(/"/, ""); print $2; exit}' config/settings.yaml)
-curl -s -d "hb:tortoise:${EPOCH}:${AGENT_COUNT}:${LOAD}:${CTX}" "https://ntfy.sh/${TOPIC}-heartbeat"
+HB_HTTP=$(curl -s -o /dev/null -w '%{http_code}' \
+    -d "hb:tortoise:${EPOCH}:${AGENT_COUNT}:${LOAD}:${CTX}" \
+    "https://ntfy.sh/${TOPIC}-heartbeat" 2>/dev/null || echo "000")
+
+if [[ ! "$HB_HTTP" =~ ^2 ]]; then
+    # cmd_297 SSH fallback: ntfy失敗時は直接リモートの heartbeat YAML を更新
+    PEER_HOST=$(awk '/^  peer_host:/ {print $2; exit}' config/settings.yaml 2>/dev/null)
+    PEER_PROJECT_ROOT=$(awk '/^  peer_project_root:/ {print $2; exit}' config/settings.yaml 2>/dev/null)
+    if [[ -n "$PEER_HOST" && -n "$PEER_PROJECT_ROOT" ]]; then
+        ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$PEER_HOST" \
+            "mkdir -p '${PEER_PROJECT_ROOT}/queue/heartbeat' && \
+             printf 'machine_id: tortoise\nlast_beat: \"%s\"\nstatus: alive\nagents_active: %s\nload_avg: %s\ncontext_summary: %s\ntransport: ssh_fallback\n' \
+             '${ts}' '${AGENT_COUNT}' '${LOAD}' '${CTX}' \
+             > '${PEER_PROJECT_ROOT}/queue/heartbeat/tortoise.yaml'" 2>/dev/null || \
+            echo "[tortoise] WARNING: SSH heartbeat fallback also failed" >&2
+    fi
+fi
 ```
 
 ### 受信（crane側のハートビート）
@@ -229,13 +246,15 @@ context_summary: ok
 | 宛先 | 手段 | 用途 |
 |------|------|------|
 | gryakuza | inbox_write.sh | 異常報告、予測警告、/clear推奨 |
-| master_crane | ntfy `{base_topic}-heartbeat` トピック | ハートビート交換（直接通信手段はこれのみ） |
+| master_crane | ntfy `{base_topic}-heartbeat` トピック（プライマリ）<br>SSH fallback: `ssh peer-hostname` で heartbeat YAML を直接更新（cmd_297） | ハートビート交換。ntfy失敗時はSSH fallbackに自動切替 |
 | darkninja（緊急時） | ntfy `{base_topic}` メイントピック | マシンCRITICAL通知のみ |
 
 **crane⇔tortoise通信パス**: 両監視エージェントは直接inbox通信不可。
-ntfy heartbeatトピック (`{base_topic}-heartbeat`) 経由でのみ相互の状態を把握する。
-ntfy_listener.shが受信したheartbeatを `queue/heartbeat/{host}.yaml` に書き込むため、
+通常は ntfy heartbeatトピック (`{base_topic}-heartbeat`) 経由でハートビートを交換する。
+ntfy障害時は SSH fallback（cmd_297）に自動切替し、対向マシンの `queue/heartbeat/{host}.yaml` を
+直接SSH書き込みすることで通信を継続する。
 ローカルで対向マシンの状態を読み取る場合は `queue/heartbeat/crane.yaml` を参照。
+SSH fallback で書き込まれたYAMLには `transport: ssh_fallback` フィールドが付与される。
 
 ## Forbidden Actions（再掲・必読）
 
