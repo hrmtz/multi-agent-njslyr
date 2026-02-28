@@ -442,4 +442,4 @@ activated_by: laomoto
 - [x] active_machine.yaml の代替 or 拡張が定義されていること（§7）
 - [x] 障害時のフォールバック（片方死亡時）が設計されていること（§6）
 - [x] 設計ドキュメントがcontext/simultaneous_operation_design.mdに書かれていること
-- [ ] 設計完了後、ダークニンジャ（Kyoto）にntfy経由でフィードバックすること ← 次ステップ
+- [x] 設計完了後、ダークニンジャ（Kyoto）にntfy経由でフィードバックすること — ntfy_send_report.sh 送信済み (commit 28d0e60)
