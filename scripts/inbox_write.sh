@@ -4,6 +4,9 @@
 # Example: bash scripts/inbox_write.sh gryakuza "ヤクザ5号、任務完了" report_received yakuza5 "" P1
 # Example (task_assigned): bash scripts/inbox_write.sh yakuza3 "タスクYAML読んで作業開始" task_assigned gryakuza queue/tasks/yakuza3_subtask_237c.yaml P2
 
+# macOS SSH non-interactive shell PATH fix (Homebrew binaries not loaded by default)
+export PATH=/opt/homebrew/bin:/usr/local/bin:$PATH
+
 set -e
 
 # macOS (Darwin): util-linux (flock) via Homebrew

@@ -81,6 +81,7 @@
 !context/
 !context/README.md
 !context/cross_machine_architecture.md
+!context/simultaneous_operation_design.md
 
 # Scripts
 !scripts/
