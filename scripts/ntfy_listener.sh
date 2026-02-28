@@ -352,6 +352,9 @@ load_avg: $load
 context_summary: $ctx_summary
 EOF
     mv -f "$tmp_file" "$hb_dir/${host}.yaml"
+
+    # NTFY-004: watcher_supervisorのheartbeat watchdog用にtimestampを記録
+    echo "$(date +%s)" > "$SCRIPT_DIR/logs/ntfy_listener_last_heartbeat.txt"
 }
 
 # ping:source:epoch:message → heartbeat YAML update (no ntfy_inbox recording)
@@ -566,28 +569,45 @@ except Exception:
         report_received ntfy_listener "$task_file"
 }
 
-# suriken:{agent_id}:{unread_count} → local agent へのnudge中継（クロスマシン対応）
-# リモートマシンからntfy経由で届いたsurikenをローカルエージェントに転送する
+# suriken:{agent_id}:{count} → クロスマシンsuriken受信・ローカルペインにnudge (cmd_298)
 handle_suriken() {
     local payload="$1"
-    # payload format: agent_id or agent_id:unread_count
-    local agent_id="${payload%%:*}"
-    local unread_count="${payload#*:}"
-    # If no colon in payload, unread_count equals agent_id — normalize to empty
-    [[ "$unread_count" == "$agent_id" ]] && unread_count=""
+    local log_file="$SCRIPT_DIR/logs/ntfy_listener.log"
+    mkdir -p "$(dirname "$log_file")"
 
-    # Validate agent_id (alphanumeric + underscore only)
-    if [[ ! "$agent_id" =~ ^[a-zA-Z0-9_]+$ ]]; then
-        echo "[$(date)] [ntfy_listener] WARNING: suriken: invalid agent_id: '${agent_id:0:50}'" >&2
+    # パース: agent_id:count
+    local agent_id count
+    IFS=':' read -r agent_id count <<< "$payload"
+
+    # agent_id バリデーション（[a-z0-9_]+ のみ許可、インジェクション防止）
+    if [[ ! "$agent_id" =~ ^[a-z0-9_]+$ ]]; then
+        echo "[$(date)] [ntfy_listener] ERROR: suriken: invalid agent_id='$agent_id'" >&2
+        echo "[$(date)] [ntfy_listener] ERROR: suriken: invalid agent_id='$agent_id'" >> "$log_file"
         return 1
     fi
 
-    echo "[$(date)] [ntfy_listener] suriken: relaying to local agent: $agent_id${unread_count:+ (unread: $unread_count)}" >&2
+    # count デフォルト（未指定時は1）+ 整数強制（プロンプトインジェクション防止）
+    count="${count:-1}"
+    [[ ! "$count" =~ ^[0-9]+$ ]] && count=1
 
-    # FIX: correct path — scripts/ prefix was missing (monju-A review)
-    # NJSLYR_VIA_NTFY=1: ntfy経由で届いたsurikenは再度ntfy送信しない（無限ループ防止）
-    if ! NJSLYR_VIA_NTFY=1 bash "$SCRIPT_DIR/scripts/njslyr_cmd.sh" suriken "$agent_id"; then
-        echo "[$(date)] [ntfy_listener] WARNING: suriken: local relay failed for $agent_id" >&2
+    # ローカルペイン探索
+    local pane_id
+    pane_id=$(tmux list-panes -a -F '#{pane_id} #{@agent_id}' 2>/dev/null \
+              | awk -v id="$agent_id" '$2==id {print $1; exit}')
+
+    if [[ -n "$pane_id" ]]; then
+        # オートコンプリート安全nudge送信（text → Escape → Enter）
+        local nudge_text="スリケン！inbox${count}"
+        tmux send-keys -t "$pane_id" "$nudge_text" 2>/dev/null
+        sleep 0.3
+        tmux send-keys -t "$pane_id" Escape 2>/dev/null
+        sleep 0.1
+        tmux send-keys -t "$pane_id" Enter 2>/dev/null
+        echo "[$(date)] [ntfy_listener] suriken: nudge sent to $agent_id ($pane_id) count=$count" >&2
+        echo "[$(date)] [ntfy_listener] suriken: nudge sent to $agent_id ($pane_id) count=$count" >> "$log_file"
+    else
+        echo "[$(date)] [ntfy_listener] ERROR: suriken: pane not found for agent_id='$agent_id'" >&2
+        echo "[$(date)] [ntfy_listener] ERROR: suriken: pane not found for agent_id='$agent_id'" >> "$log_file"
         return 1
     fi
 }
@@ -637,11 +657,6 @@ route_message() {
             handle_ping "$payload"
             return 2
             ;;
-        suriken)
-            # suriken: クロスマシンnudge中継 — skip ntfy_inbox recording (return 2)
-            handle_suriken "$payload"
-            return 2
-            ;;
         dispatch)
             handle_task_dispatch "$payload"
             return 0
@@ -650,9 +665,13 @@ route_message() {
             handle_report "$payload"
             return 0
             ;;
+        suriken)
+            handle_suriken "$payload"
+            return 2
+            ;;
         *)
-            # Unknown prefix or no prefix → fallback to original behavior
-            echo "[$(date)] [ntfy_listener] unrecognized prefix, fallback to darkninja: ${msg:0:80}" >&2
+            # Unknown prefix or no prefix → log as unrecognized, do not route
+            echo "[$(date)] [ntfy_listener] [UNRECOGNIZED PREFIX]: ${msg:0:80}" >&2
             return 1
             ;;
     esac
@@ -689,7 +708,7 @@ while true; do
 
     # Stream new messages from multiple topics (long-lived connection)
     # FIX-022: Use -sS (show errors on stderr) instead of suppressing all stderr with 2>/dev/null
-    curl -sS --no-buffer "${AUTH_ARGS[@]}" "https://ntfy.sh/$SUBSCRIBE_TOPICS/json${_since_param}" 2>> "$SCRIPT_DIR/logs/ntfy_listener_curl.log" | while IFS= read -r line; do
+    curl -sS --no-buffer --max-time 300 "${AUTH_ARGS[@]}" "https://ntfy.sh/$SUBSCRIBE_TOPICS/json${_since_param}" 2>> "$SCRIPT_DIR/logs/ntfy_listener_curl.log" | while IFS= read -r line; do
         # Parse all needed fields in a single python3 call (including topic)
         IFS=$'\x1f' read -r EVENT _ MSG MSG_ID MSG_TOPIC < <(parse_message_fields <<< "$line")
 
@@ -725,14 +744,12 @@ while true; do
                 # ping: handled — skip ntfy_inbox recording entirely
                 ;;
             *)
-                # Unknown prefix — original behavior: ntfy_inbox (pending) + darkninja
-                if ! append_ntfy_inbox "$MSG_ID" "$TIMESTAMP" "$MSG"; then
+                # Unknown prefix — log to ntfy_unrecognized.log, record in ntfy_inbox as pending
+                # Do NOT forward to darkninja inbox (prevents inbox pollution)
+                mkdir -p "$SCRIPT_DIR/logs"
+                echo "[$(date)] [UNRECOGNIZED PREFIX] topic=$MSG_TOPIC msg=${MSG:0:200}" >> "$SCRIPT_DIR/logs/ntfy_unrecognized.log"
+                append_ntfy_inbox "$MSG_ID" "$TIMESTAMP" "$MSG" || \
                     echo "[$(date)] [ntfy_listener] WARNING: failed to append ntfy_inbox entry" >&2
-                    continue
-                fi
-                bash "$SCRIPT_DIR/scripts/inbox_write.sh" darkninja \
-                    "ntfyから新しいメッセージ受信。queue/ntfy_inbox.yaml を確認し処理せよ。" \
-                    ntfy_received ntfy_listener
                 ;;
         esac
     done

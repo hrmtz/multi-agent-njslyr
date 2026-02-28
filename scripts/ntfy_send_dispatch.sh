@@ -67,31 +67,52 @@ case "$MY_ROLE" in
   neosaitama|mbp) DISPATCH_TOPIC="${TOPIC}-kyoto" ;;
   *)              DISPATCH_TOPIC="${TOPIC}-neosaitama" ;;  # fallback
 esac
-# ─── ntfy POST（リトライ付き: 3回・5秒間隔）───
+
+# NTFY-002: payload size check
+# NOTE: gzip圧縮(dispatch_gz)は受信側(ntfy_listener.sh route_message)にハンドラが
+# 未実装のため一時無効化。dispatch_gzで送信するとサイレント消失する (LBUG-003)。
+# 受信側ハンドラ実装後に有効化すること。
+PREFIX="dispatch"
+if [[ ${#PAYLOAD} -gt 4096 ]]; then
+    echo "[ntfy_send_dispatch] WARNING: payload ${#PAYLOAD}B > 4096B (large, but sending uncompressed — dispatch_gz receiver not yet implemented)" >&2
+    # 旧コード（受信側実装後に有効化）:
+    # PAYLOAD=$(gzip -c "$TASK_REALPATH" | base64 | tr -d '\n')
+    # PREFIX="dispatch_gz"
+fi
+
+# NTFY-003: send_with_retry — 3回リトライ（指数バックオフ: 1s / 3s / 9s）
+send_with_retry() {
+    local url="$1" data="$2"
+    local max_attempts=3
+    local wait_times=(1 3 9)
+    local log_file="${SCRIPT_DIR}/logs/ntfy_send_dispatch.log"
+    mkdir -p "$(dirname "$log_file")"
+    for i in "${!wait_times[@]}"; do
+        local attempt=$((i + 1))
+        local resp
+        resp=$(curl -s -w "\n%{http_code}" -X POST "$url" \
+            "${AUTH_ARGS[@]}" \
+            -H 'Content-Type: text/plain' \
+            -H 'Title: task_dispatch' \
+            -d "$data")
+        local code="${resp##*$'\n'}"
+        local body="${resp%$'\n'*}"
+        echo "[$(date '+%Y-%m-%dT%H:%M:%S')] attempt $attempt: HTTP $code | body: ${body:0:200}" >> "$log_file"
+        if [[ "$code" =~ ^2 ]]; then
+            echo "[ntfy_send_dispatch] POST success (attempt $attempt): HTTP $code" >&2
+            return 0
+        fi
+        echo "[ntfy_send_dispatch] POST failed (attempt $attempt/$max_attempts): HTTP $code" >&2
+        [[ $attempt -lt $max_attempts ]] && sleep "${wait_times[$i]}"
+    done
+    echo "[ntfy_send_dispatch] All $max_attempts attempts failed" >&2
+    return 1
+}
+
+# ─── ntfy POST（send_with_retryで3回・指数バックオフ 1s/3s/9s）───
 # cmd_297 SSH fallback: context/ssh_fallback_design.md Section 3
-MAX_NTFY_RETRIES=3
-NTFY_RETRY_INTERVAL=5
-ntfy_ok=false
-
-for attempt in $(seq 1 $MAX_NTFY_RETRIES); do
-    HTTP_STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "https://ntfy.sh/${DISPATCH_TOPIC}" \
-        "${AUTH_ARGS[@]}" \
-        -H 'Content-Type: text/plain' \
-        -H 'Title: task_dispatch' \
-        -d "dispatch:${PAYLOAD}")
-
-    if [[ "$HTTP_STATUS" =~ ^2 ]]; then
-        echo "[ntfy_send_dispatch] SUCCESS (attempt ${attempt}): $TASK_PATH → ntfy/...-${DISPATCH_TOPIC##*-} (HTTP $HTTP_STATUS)" >&2
-        ntfy_ok=true
-        break
-    fi
-    echo "[ntfy_send_dispatch] ntfy POST failed (HTTP $HTTP_STATUS, attempt ${attempt}/${MAX_NTFY_RETRIES})" >&2
-    if [[ $attempt -lt $MAX_NTFY_RETRIES ]]; then
-        sleep $NTFY_RETRY_INTERVAL
-    fi
-done
-
-if [[ "$ntfy_ok" == "true" ]]; then
+if send_with_retry "https://ntfy.sh/${DISPATCH_TOPIC}" "${PREFIX}:${PAYLOAD}"; then
+    echo "[ntfy_send_dispatch] SUCCESS: $TASK_PATH → ntfy/...-${DISPATCH_TOPIC##*-}" >&2
     exit 0
 fi
 

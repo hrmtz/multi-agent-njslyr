@@ -241,6 +241,105 @@ context_summary: ok
 
 `agents_active` は整数値（稼働エージェント数）。ntfy_listener.shのheartbeat handler出力と同一形式。
 
+## オートコンプリートスタック監視 (autocomplete-stuck detection)
+
+Claude CLIのオートコンプリートがEnterキーを横取りし、スリケン等の文字列が入力欄に残ったまま送信されない問題を検知・解消する。
+
+### 監視対象
+
+全ヤクザエージェントのペイン（yakuza1〜yakuza7）
+
+### 検知方法
+
+60秒サイクルの監視ループで各エージェントペインをキャプチャし、以下の条件を確認:
+
+```bash
+# @agent_id ベースで動的ペイン探索
+for AGENT_ID in yakuza1 yakuza2 yakuza3 yakuza4 yakuza5 yakuza6 yakuza7; do
+  PANE_ID=$(tmux list-panes -a -F '#{@agent_id} #{pane_id}' | awk -v a="$AGENT_ID" '$1==a{print $2}')
+  [ -z "$PANE_ID" ] && continue
+  CONTENT=$(tmux capture-pane -t "$PANE_ID" -p -S -5)
+  # スタック判定: 入力欄にテキストが残っているが最終行がプロンプトでない
+  if echo "$CONTENT" | grep -qE "スリケン！inbox|inbox[0-9]" && ! echo "$CONTENT" | tail -1 | grep -qE "^>|^\s*$"; then
+    # スタック検知 → Escape + Enter で解消
+    tmux send-keys -t "$PANE_ID" Escape
+    sleep 0.1
+    tmux send-keys -t "$PANE_ID" Enter
+    # ログ記録
+    echo "$(date -Iseconds) STUCK_DETECTED agent=$AGENT_ID pane=$PANE_ID" >> logs/autocomplete_stuck.log
+  fi
+done
+```
+
+### 検知条件
+
+- 入力欄に「スリケン！inbox」や「inbox{N}」等の文字列が見える
+- かつ最終行が入力プロンプト（`>`等）で終わっていない（まだ確定されていない）
+
+### 解消方法
+
+検知時に Escape → Enter を送信（0.1秒間隔）:
+
+```bash
+tmux send-keys -t {pane} Escape && sleep 0.1 && tmux send-keys -t {pane} Enter
+```
+
+### 実施タイミング
+
+60秒サイクルの監視ループ内で実施（F004例外の監視サイクルに含める）
+
+### 記録
+
+```
+logs/autocomplete_stuck.log
+形式: {ISO8601タイムスタンプ} STUCK_DETECTED agent={agent_id} pane={pane_id}
+```
+
+---
+
+## SSHハートビートハイブリッド (ntfy + SSH二重確認)
+
+soukaiyaの推奨設計（soukaiya_report_ntfy_diagnosis.yaml SECTION 4）に準拠。ntfy単独の欠損だけでは判断できないケースをSSHで補完する。
+
+### 設計
+
+- **Primary**: ntfy heartbeat（現行通り60秒サイクル）
+- **Secondary**: SSH heartbeat check（ntfy heartbeat 3分未受信で起動）
+
+### SSH確認コマンド
+
+```bash
+SSH_OPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
+PEER_HOST="peer-hostname"  # MBP/crane の Tailscale ホスト名
+PEER_PROJECT="/Users/hrmtz/project/personal/multi-agent-njslyr"
+
+ssh $SSH_OPTS $PEER_HOST "cat ${PEER_PROJECT}/queue/heartbeat/tortoise.yaml"
+```
+
+### 判定ロジック
+
+| SSH結果 | last_beat | 判定 | アクション |
+|---------|-----------|------|----------|
+| 成功 | 更新済み（直近120秒以内） | ntfy遅延（問題なし） | 経過観察 |
+| 成功 | 古い（120秒超） | peer側listener障害疑い | gryakuza inboxへ通知（P1） |
+| 失敗 | - | ネットワーク障害 | darkninja inbox + ntfy `{base_topic}` に通知 |
+
+### self heartbeat記録 (queue/heartbeat/tortoise.yaml)
+
+各サイクルで以下を書き込む（SSH確認の参照元となる）:
+
+```yaml
+machine: tortoise
+last_beat: 1709123456        # epoch秒
+last_beat_iso: "2026-02-28T10:00:00+09:00"
+agents_active: 9
+context_summary: ok
+```
+
+ディレクトリ `queue/heartbeat/` が存在しない場合は `mkdir -p queue/heartbeat` を実行してから書き込む。
+
+---
+
 ## 通信プロトコル
 
 | 宛先 | 手段 | 用途 |

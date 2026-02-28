@@ -1,15 +1,14 @@
 #!/usr/bin/env bats
-# test_njslyr_cmd.bats — njslyr_cmd.sh suriken/inject コマンドのユニットテスト
+# test_njslyr_cmd.bats — njslyr_cmd.sh suriken コマンドのユニットテスト (cmd_297)
 #
 # テスト構成:
-#   T-CMD-SRK-001: ローカルペインあり → tmux send-keys 3回（リグレッション確認）
-#   T-CMD-SRK-002: ローカルペインなし → ntfy fallback呼び出し確認
-#   T-CMD-SRK-003: cmd_suriken ntfy Stage 2: HTTP 200 → 成功
-#   T-CMD-SRK-004: cmd_suriken ntfy Stage 2: HTTP 500 + SSH設定なし → return 1
-#   T-CMD-SRK-005: cmd_suriken (kyoto role) → neosaitama topicに送信
-#   T-CMD-INJ-001: cmd_inject: pane見つからず → return 1 (FIX-008)
-#   T-CMD-INJ-002: cmd_inject: 既にOpus → スキップ (FIX-008)
-#   T-CMD-INJ-003: cmd_inject: Sonnet → /model opus + @model_name更新 (FIX-008)
+#   T-CMD-SRK-001: ローカルペインあり → tmux send-keys 3回呼ばれる（リグレッション確認）
+#   T-CMD-SRK-002: ローカルペインなし → _cmd_suriken_ntfy_fallback 呼び出し確認
+#   T-CMD-SRK-003: _cmd_suriken_ntfy_fallback: HTTP 200 → 成功
+#   T-CMD-SRK-004: _cmd_suriken_ntfy_fallback: HTTP 500 → return 1
+#   T-CMD-INJ-001: cmd_inject: pane見つからず → return 1
+#   T-CMD-INJ-002: cmd_inject: 既にOpus + bg=#1a002e → スキップ
+#   T-CMD-INJ-003: cmd_inject: Sonnet → /model opus + @model_name更新
 
 # --- セットアップ ---
 
@@ -29,11 +28,13 @@ setup() {
     MOCK_PROJECT="$TEST_TMP/project"
     mkdir -p "$MOCK_PROJECT"/{config,lib,scripts,queue/inbox,.state}
 
-    # Mock settings.yaml (kyoto role, ntfy_topic, no peer_host → SSH stage fails gracefully)
+    # Mock settings.yaml
     cat > "$MOCK_PROJECT/config/settings.yaml" << 'YAML'
 language: ja
 machine:
   role: kyoto
+  peer_host: mock-peer
+  peer_project_root: /mock/peer/project
 ntfy_topic: test-topic-abc123xyz
 YAML
 
@@ -46,6 +47,9 @@ YAML
 ntfy_get_auth_args() { return 0; }
 ntfy_validate_topic() { return 0; }
 MOCK
+
+    # Mock ssh_fallback.sh (real lib — uses mock ssh binary via PATH)
+    cp "$PROJECT_ROOT/lib/ssh_fallback.sh" "$MOCK_PROJECT/lib/ssh_fallback.sh"
 
     # Mock inbox_write.sh
     INBOX_WRITE_LOG="$TEST_TMP/inbox_write_calls.log"
@@ -63,22 +67,13 @@ messages:
   read: true
 YAML
 
-    # Mock njslyr_lib.sh (provides resolve_pane_by_agent_id, resolve_agent_machine,
-    # get_my_machine_role, stage3_slay, sedi, agent_is_busy)
+    # Mock njslyr_lib.sh (provides resolve_pane_by_agent_id, stage3_slay, sedi, agent_is_busy)
     RESOLVE_PANE_RESULT=""
-    RESOLVE_AGENT_MACHINE="active"
-    MY_MACHINE_ROLE="kyoto"
-    export RESOLVE_PANE_RESULT RESOLVE_AGENT_MACHINE MY_MACHINE_ROLE
+    export RESOLVE_PANE_RESULT
     cat > "$TEST_TMP/mock_njslyr_lib.sh" << 'MOCK'
 #!/bin/bash
 resolve_pane_by_agent_id() {
     echo "${RESOLVE_PANE_RESULT}"
-}
-resolve_agent_machine() {
-    echo "${RESOLVE_AGENT_MACHINE:-active}"
-}
-get_my_machine_role() {
-    echo "${MY_MACHINE_ROLE:-kyoto}"
 }
 stage3_slay() { echo "mock stage3_slay: $*"; }
 sedi() { sed -i "$@"; }
@@ -89,21 +84,25 @@ MOCK
     mkdir -p "$TEST_TMP/mock_bin"
     export PATH="$TEST_TMP/mock_bin:$PATH"
 
-    # Mock sleep (no-op for test speed)
-    cat > "$TEST_TMP/mock_bin/sleep" << 'MOCK'
-#!/bin/bash
-exit 0
-MOCK
-    chmod +x "$TEST_TMP/mock_bin/sleep"
-
-    # Extract cmd_suriken and cmd_inject functions from njslyr_cmd.sh
-    # Uses awk with ASCII-only function name boundaries (macOS sed multibyte workaround)
-    awk '/^cmd_suriken\(\)/{found=1} /^cmd_chop\(\)/{found=0} found' \
+    # Extract cmd_suriken, _cmd_suriken_ntfy_fallback, _cmd_suriken_ssh_fallback from njslyr_cmd.sh
+    # Range: from _cmd_suriken_ntfy_fallback() to just before cmd_chop()
+    sed -n '/^_cmd_suriken_ntfy_fallback()/,/^# ─── A-2: chop/{/^# ─── A-2: chop/d;p}' \
         "$NJSLYR_CMD" > "$TEST_TMP/functions.sh"
 
-    # Append cmd_inject function (FIX-008)
-    awk '/^cmd_inject\(\)/{found=1} /^cmd_detox\(\)/{found=0} found' \
+    # Extract cmd_inject from njslyr_cmd.sh (A-7: inject → A-6: detox boundary)
+    sed -n '/^cmd_inject()/,/^# ─── A-6: detox/{/^# ─── A-6: detox/d;p}' \
         "$NJSLYR_CMD" >> "$TEST_TMP/functions.sh"
+
+    # Set SCRIPT_DIR and PROJECT_ROOT for sourced functions
+    # shellcheck source=/dev/null
+    (
+        SCRIPT_DIR="$MOCK_PROJECT/scripts"
+        PROJECT_ROOT="$MOCK_PROJECT"
+        # shellcheck source=/dev/null
+        source "$TEST_TMP/mock_njslyr_lib.sh"
+        # shellcheck source=/dev/null
+        source "$TEST_TMP/functions.sh"
+    ) 2>/dev/null || true
 }
 
 teardown() {
@@ -118,6 +117,11 @@ source_functions() {
     source "$TEST_TMP/mock_njslyr_lib.sh"
     # shellcheck source=/dev/null
     source "$TEST_TMP/functions.sh"
+}
+
+# Helper: run function capturing stdout+stderr
+call_with_stderr() {
+    "$@" 2>&1
 }
 
 # =============================================================================
@@ -155,7 +159,7 @@ MOCK
 }
 
 # =============================================================================
-# T-CMD-SRK-002: ローカルペインなし → ntfy fallback呼び出し確認
+# T-CMD-SRK-002: ローカルペインなし → _cmd_suriken_ntfy_fallback 呼び出し
 # =============================================================================
 
 @test "T-CMD-SRK-002: cmd_suriken calls ntfy fallback when pane not found" {
@@ -189,10 +193,10 @@ MOCK
 }
 
 # =============================================================================
-# T-CMD-SRK-003: cmd_suriken ntfy Stage 2 HTTP 200 → 成功
+# T-CMD-SRK-003: _cmd_suriken_ntfy_fallback HTTP 200 → 成功
 # =============================================================================
 
-@test "T-CMD-SRK-003: cmd_suriken ntfy stage succeeds on HTTP 200" {
+@test "T-CMD-SRK-003: _cmd_suriken_ntfy_fallback succeeds on HTTP 200" {
     # Mock curl: returns 200
     CURL_CALL_LOG="$TEST_TMP/curl_calls.log"
     export CURL_CALL_LOG
@@ -203,63 +207,50 @@ echo "200"
 MOCK
     chmod +x "$TEST_TMP/mock_bin/curl"
 
-    RESOLVE_PANE_RESULT=""
-    RESOLVE_AGENT_MACHINE="active"
-    MY_MACHINE_ROLE="kyoto"
-    export RESOLVE_PANE_RESULT RESOLVE_AGENT_MACHINE MY_MACHINE_ROLE
-
     run bash -c "
         SCRIPT_DIR='$MOCK_PROJECT/scripts'
         PROJECT_ROOT='$MOCK_PROJECT'
         source '$TEST_TMP/mock_njslyr_lib.sh'
         source '$TEST_TMP/functions.sh'
-        cmd_suriken yakuza3
+        _cmd_suriken_ntfy_fallback yakuza3
     " 2>&1
     [ "$status" -eq 0 ]
-    [[ "$output" == *"ntfy/"* ]]
+    [[ "$output" == *"ntfy fallback →"* ]]
+    [[ "$output" == *"HTTP 200"* ]]
 }
 
 # =============================================================================
-# T-CMD-SRK-004: cmd_suriken ntfy Stage 2 HTTP 500 + SSH設定なし → return 1
+# T-CMD-SRK-004: _cmd_suriken_ntfy_fallback HTTP 500 → return 1
 # =============================================================================
 
-@test "T-CMD-SRK-004: cmd_suriken returns 1 when ntfy fails and no peer_host" {
+@test "T-CMD-SRK-004: _cmd_suriken_ntfy_fallback returns 1 on HTTP 500" {
     # Mock curl: returns 500
+    CURL_CALL_LOG="$TEST_TMP/curl_calls.log"
+    export CURL_CALL_LOG
     cat > "$TEST_TMP/mock_bin/curl" << 'MOCK'
 #!/bin/bash
+echo "$@" >> "${CURL_CALL_LOG}"
 echo "500"
 MOCK
     chmod +x "$TEST_TMP/mock_bin/curl"
 
-    RESOLVE_PANE_RESULT=""
-    RESOLVE_AGENT_MACHINE="active"
-    MY_MACHINE_ROLE="kyoto"
-    export RESOLVE_PANE_RESULT RESOLVE_AGENT_MACHINE MY_MACHINE_ROLE
-
-    # settings.yaml with ntfy_topic but NO peer_host (SSH stage cannot proceed)
-    cat > "$MOCK_PROJECT/config/settings.yaml" << 'YAML'
-language: ja
-machine:
-  role: kyoto
-ntfy_topic: test-topic-abc123xyz
-YAML
-
     run bash -c "
         SCRIPT_DIR='$MOCK_PROJECT/scripts'
         PROJECT_ROOT='$MOCK_PROJECT'
         source '$TEST_TMP/mock_njslyr_lib.sh'
         source '$TEST_TMP/functions.sh'
-        cmd_suriken yakuza3
+        _cmd_suriken_ntfy_fallback yakuza3
     " 2>&1
     [ "$status" -eq 1 ]
-    [[ "$output" == *"all stages failed"* ]]
+    [[ "$output" == *"ntfy fallback FAILED"* ]]
+    [[ "$output" == *"HTTP 500"* ]]
 }
 
 # =============================================================================
-# T-CMD-SRK-005: cmd_suriken (kyoto role) → neosaitama topicに送信
+# T-CMD-SRK-005: _cmd_suriken_ntfy_fallback peer_topic decision (kyoto → neosaitama)
 # =============================================================================
 
-@test "T-CMD-SRK-005: cmd_suriken (kyoto role) sends to neosaitama ntfy topic" {
+@test "T-CMD-SRK-005: _cmd_suriken_ntfy_fallback sends to neosaitama topic when role is kyoto" {
     # Mock curl: capture full args
     CURL_CALL_LOG="$TEST_TMP/curl_calls.log"
     export CURL_CALL_LOG
@@ -270,10 +261,46 @@ echo "200"
 MOCK
     chmod +x "$TEST_TMP/mock_bin/curl"
 
+    run bash -c "
+        SCRIPT_DIR='$MOCK_PROJECT/scripts'
+        PROJECT_ROOT='$MOCK_PROJECT'
+        source '$TEST_TMP/mock_njslyr_lib.sh'
+        source '$TEST_TMP/functions.sh'
+        _cmd_suriken_ntfy_fallback yakuza3
+    " 2>&1
+    [ "$status" -eq 0 ]
+
+    # ntfy.sh/{topic}-neosaitama に送信されているか確認
+    [ -f "$CURL_CALL_LOG" ]
+    grep -q "neosaitama" "$CURL_CALL_LOG"
+}
+
+# =============================================================================
+# T-CMD-SRK-006: ntfy失敗 → SSH tier2が呼ばれる
+# =============================================================================
+
+@test "T-CMD-SRK-006: cmd_suriken falls back to SSH tier2 when ntfy fails" {
+    # Mock curl: HTTP 500 (ntfy fails)
+    cat > "$TEST_TMP/mock_bin/curl" << 'MOCK'
+#!/bin/bash
+echo "500"
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/curl"
+
+    # Mock ssh: success (logs call)
+    SSH_CALL_LOG="$TEST_TMP/ssh_calls.log"
+    export SSH_CALL_LOG
+    cat > "$TEST_TMP/mock_bin/ssh" << 'MOCK'
+#!/bin/bash
+echo "$@" >> "${SSH_CALL_LOG}"
+echo "[mock ssh] suriken sent"
+exit 0
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/ssh"
+
+    # resolve_pane_by_agent_id returns empty (pane not found → triggers fallback chain)
     RESOLVE_PANE_RESULT=""
-    RESOLVE_AGENT_MACHINE="active"
-    MY_MACHINE_ROLE="kyoto"
-    export RESOLVE_PANE_RESULT RESOLVE_AGENT_MACHINE MY_MACHINE_ROLE
+    export RESOLVE_PANE_RESULT
 
     run bash -c "
         SCRIPT_DIR='$MOCK_PROJECT/scripts'
@@ -284,13 +311,72 @@ MOCK
     " 2>&1
     [ "$status" -eq 0 ]
 
-    # ntfy.sh/{topic}-neosaitama に送信されているか確認
-    [ -f "$CURL_CALL_LOG" ]
-    grep -q "neosaitama" "$CURL_CALL_LOG"
+    # SSH was called
+    [ -f "$SSH_CALL_LOG" ]
+    grep -q "mock-peer" "$SSH_CALL_LOG"
+    grep -q "suriken" "$SSH_CALL_LOG"
+
+    # Output indicates tier2 was used
+    [[ "$output" == *"SSH tier2"* ]]
 }
 
 # =============================================================================
-# T-CMD-INJ-001: cmd_inject: pane見つからず → return 1 (FIX-008)
+# T-CMD-SRK-007: _cmd_suriken_ssh_fallback SSH成功 → return 0
+# =============================================================================
+
+@test "T-CMD-SRK-007: _cmd_suriken_ssh_fallback returns 0 on SSH success" {
+    # Mock ssh: success
+    SSH_CALL_LOG="$TEST_TMP/ssh_calls.log"
+    export SSH_CALL_LOG
+    cat > "$TEST_TMP/mock_bin/ssh" << 'MOCK'
+#!/bin/bash
+echo "$@" >> "${SSH_CALL_LOG}"
+echo "[mock ssh] suriken delivered"
+exit 0
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/ssh"
+
+    run bash -c "
+        SCRIPT_DIR='$MOCK_PROJECT/scripts'
+        PROJECT_ROOT='$MOCK_PROJECT'
+        source '$TEST_TMP/mock_njslyr_lib.sh'
+        source '$TEST_TMP/functions.sh'
+        _cmd_suriken_ssh_fallback yakuza3
+    " 2>&1
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"SSH tier2 success"* ]]
+
+    # SSH called with correct peer host
+    [ -f "$SSH_CALL_LOG" ]
+    grep -q "mock-peer" "$SSH_CALL_LOG"
+}
+
+# =============================================================================
+# T-CMD-SRK-008: _cmd_suriken_ssh_fallback SSH失敗 → return 1
+# =============================================================================
+
+@test "T-CMD-SRK-008: _cmd_suriken_ssh_fallback returns 1 on SSH failure" {
+    # Mock ssh: failure
+    cat > "$TEST_TMP/mock_bin/ssh" << 'MOCK'
+#!/bin/bash
+echo "ssh: connect to host mock-peer: Connection refused" >&2
+exit 255
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/ssh"
+
+    run bash -c "
+        SCRIPT_DIR='$MOCK_PROJECT/scripts'
+        PROJECT_ROOT='$MOCK_PROJECT'
+        source '$TEST_TMP/mock_njslyr_lib.sh'
+        source '$TEST_TMP/functions.sh'
+        _cmd_suriken_ssh_fallback yakuza3
+    " 2>&1
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"SSH tier2 FAILED"* ]]
+}
+
+# =============================================================================
+# T-CMD-INJ-001: cmd_inject: pane見つからず → return 1
 # =============================================================================
 
 @test "T-CMD-INJ-001: cmd_inject returns 1 when pane not found" {
@@ -315,10 +401,10 @@ MOCK
 }
 
 # =============================================================================
-# T-CMD-INJ-002: cmd_inject: 既にOpus + bg=#1a002e → スキップ (FIX-008)
+# T-CMD-INJ-002: cmd_inject: 既にOpus + bg=#1a002e → スキップ
 # =============================================================================
 
-@test "T-CMD-INJ-002: cmd_inject skips when already Opus" {
+@test "T-CMD-INJ-002: cmd_inject skips when already Opus with correct bg" {
     RESOLVE_PANE_RESULT="%2"
     export RESOLVE_PANE_RESULT
 
@@ -354,7 +440,7 @@ MOCK
 }
 
 # =============================================================================
-# T-CMD-INJ-003: cmd_inject: Sonnet → /model opus + @model_name更新 (FIX-008)
+# T-CMD-INJ-003: cmd_inject: Sonnet → /model opus + @model_name更新
 # =============================================================================
 
 @test "T-CMD-INJ-003: cmd_inject switches Sonnet to Opus and updates model_name" {
@@ -363,6 +449,13 @@ MOCK
 
     TMUX_CALL_LOG="$TEST_TMP/tmux_calls.log"
     export TMUX_CALL_LOG
+    # Mock sleep (no-op for test speed)
+    cat > "$TEST_TMP/mock_bin/sleep" << 'MOCK'
+#!/bin/bash
+exit 0
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/sleep"
+
     cat > "$TEST_TMP/mock_bin/tmux" << 'MOCK'
 #!/bin/bash
 echo "$@" >> "${TMUX_CALL_LOG}"

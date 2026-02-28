@@ -18,6 +18,11 @@ STATE_DIR="$PROJECT_ROOT/.state"
 RESCAN_FILE="$STATE_DIR/rescan_watchers"
 RESTART_LOG="${RESTART_LOG:-$STATE_DIR/watcher_restart.log}"
 
+# NTFY-004: heartbeat watchdog設定
+HEARTBEAT_TIMEOUT=180  # 3分間heartbeat受信なしでntfy_listener再起動
+NTFY_LISTENER_HEARTBEAT="$PROJECT_ROOT/logs/ntfy_listener_last_heartbeat.txt"
+NTFY_LISTENER_LOG="$PROJECT_ROOT/logs/ntfy_listener.log"
+
 mkdir -p logs queue/inbox "$STATE_DIR"
 
 # Per-agent backoff state: consecutive restart count and next-allowed-restart timestamp
@@ -71,7 +76,7 @@ start_watcher_if_missing() {
     fi
 
     # FIX-024: Use [%] anchor to avoid partial match (yakuza1 matching yakuza10 etc.)
-    if pgrep -f "scripts/inbox_watcher.sh ${agent} [%]" >/dev/null 2>&1; then
+    if pgrep -f "scripts/inbox_watcher.sh ${agent} " >/dev/null 2>&1; then
         # Running: reset consecutive restart count on stable recovery
         RESTART_COUNT[$agent]=0
         return 0
@@ -119,7 +124,7 @@ start_watcher_for_agent() {
     fi
 
     # UNIFIED-MED-005: [%] matches the literal % prefix of pane_id (e.g. %42)
-    if pgrep -f "scripts/inbox_watcher.sh ${agent} [%]" >/dev/null 2>&1; then
+    if pgrep -f "scripts/inbox_watcher.sh ${agent} " >/dev/null 2>&1; then
         # Running: reset consecutive restart count on stable recovery
         RESTART_COUNT[$agent]=0
         return 0
@@ -180,6 +185,52 @@ scan_all_agents() {
         | awk 'NF && !seen[$0]++')
 }
 
+# NTFY-004: heartbeat watchdog — ntfy_listenerのサイレントドロップを検出して再起動
+# logs/ntfy_listener_last_heartbeat.txt に記録された最終受信epochと現在時刻を比較する。
+# HEARTBEAT_TIMEOUT秒以上経過していた場合、ntfy_listenerをkillして再起動する。
+check_heartbeat_watchdog() {
+    # heartbeat timestampファイルが存在しない場合はスキップ（ntfy_listener未起動）
+    [[ ! -f "$NTFY_LISTENER_HEARTBEAT" ]] && return 0
+
+    local last_hb now elapsed
+    last_hb=$(cat "$NTFY_LISTENER_HEARTBEAT" 2>/dev/null)
+    # 不正な値の場合はスキップ
+    [[ ! "$last_hb" =~ ^[0-9]+$ ]] && return 0
+
+    now=${EPOCHSECONDS:-$(date +%s)}
+    elapsed=$(( now - last_hb ))
+
+    if (( elapsed >= HEARTBEAT_TIMEOUT )); then
+        echo "[watcher_supervisor] NTFY-004 watchdog: heartbeat stale (${elapsed}s >= ${HEARTBEAT_TIMEOUT}s). Restarting ntfy_listener..." >&2
+
+        # Step 1: graceful stop signal (.state/ntfy_listener_stop ファイルベース)
+        touch "$STATE_DIR/ntfy_listener_stop"
+        sleep 5
+
+        # Step 2: graceful stopで終了しなかった場合のみ force kill
+        # D006 exception: watcher_supervisor is infrastructure layer,
+        # kill target is monitored process (ntfy_listener), not an agent.
+        # This is a supervisor→monitored-process restart, not agent termination.
+        local ntfy_pid
+        ntfy_pid=$(pgrep -f "scripts/ntfy_listener.sh" 2>/dev/null | head -1)
+        if [[ -n "$ntfy_pid" ]]; then
+            kill "$ntfy_pid" 2>/dev/null || true
+            sleep 1
+        fi
+
+        # stop signal cleanup
+        rm -f "$STATE_DIR/ntfy_listener_stop"
+
+        # ntfy_listener 再起動
+        mkdir -p "$(dirname "$NTFY_LISTENER_LOG")"
+        nohup bash "$PROJECT_ROOT/scripts/ntfy_listener.sh" >> "$NTFY_LISTENER_LOG" 2>&1 &
+        echo "[watcher_supervisor] ntfy_listener restarted (PID: $!)"
+
+        # 再起動直後はtimestampを更新して即時再検出を防止
+        date +%s > "$NTFY_LISTENER_HEARTBEAT"
+    fi
+}
+
 # Graceful shutdown: log and exit cleanly on SIGTERM/SIGINT
 cleanup() {
     echo "[watcher_supervisor] shutting down (signal received)" >&2
@@ -201,6 +252,7 @@ while true; do
         continue  # LOW-001: rescan後は通常スキャンをスキップ（2重スキャン防止）
     fi
 
+    check_heartbeat_watchdog
     scan_all_agents
     sleep 5
 done

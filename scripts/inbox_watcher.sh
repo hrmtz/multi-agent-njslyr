@@ -67,6 +67,7 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
     # Daemon process must log exit and clean up cache files.
     _inbox_watcher_cleanup() {
         local exit_code=$?
+        trap - EXIT INT TERM   # 二重発火防止
         echo "[$(date)] inbox_watcher stopping — agent: $AGENT_ID (exit_code=$exit_code)" >&2
         # Clean up busy-detection cache (stale cache causes false-busy on restart)
         rm -f "${CACHE_DIR}/inbox_watcher_busy_cache_${AGENT_ID}" 2>/dev/null
@@ -502,7 +503,7 @@ resolve_pane_target() {
     # Dynamic lookup: find pane by @agent_id
     local resolved
     resolved=$(tmux list-panes -a -F '#{@agent_id} #{pane_id}' 2>/dev/null \
-        | awk -v id="$AGENT_ID" '$1 == id {print $2; exit}')
+        | awk -v id="$AGENT_ID" '$1 == id {print $2; exit}') || true
 
     if [ -n "$resolved" ]; then
         PANE_TARGET="$resolved"
@@ -1080,7 +1081,7 @@ process_unread() {
             if disable_normal_nudge; then
                 echo "[$(date)] [SKIP] disable_normal_nudge=1, no normal スリケン for $AGENT_ID" >&2
             else
-                send_wakeup "$normal_count"
+                send_wakeup "$normal_count" || true
             fi
             return 0
         fi
@@ -1093,12 +1094,12 @@ process_unread() {
             if disable_normal_nudge; then
                 echo "[$(date)] [SKIP] disable_normal_nudge=1, deferring to escalation-only path" >&2
             else
-                send_wakeup "$normal_count"
+                send_wakeup "$normal_count" || true
             fi
         elif [ "$age" -lt "$ESCALATE_PHASE2" ]; then
             # Phase 2 (2-4 min): Escape + スリケン
             echo "[$(date)] $normal_count unread for $AGENT_ID (${age}s — escalating: Escape+スリケン)" >&2
-            send_wakeup_with_escape "$normal_count"
+            send_wakeup_with_escape "$normal_count" || true
         else
             # Phase 3 (4+ min): /clear (throttled to once per 5 min)
             # FIX-004: darkninja向けは/clear送信不可(send_cli_commandがSKIP)のため
@@ -1112,7 +1113,7 @@ process_unread() {
                 # tmux通知（5秒表示）
                 timeout 2 tmux display-message -d 5000 "ALERT: inbox ${normal_count} unread for darkninja (${age}s)" 2>/dev/null || true
                 # Phase2スリケンを継続（ループに入らない）
-                send_wakeup_with_escape "$normal_count"
+                send_wakeup_with_escape "$normal_count" || true
             elif [ "$LAST_CLEAR_TS" -lt "$((now - ESCALATE_COOLDOWN))" ]; then
                 local effective_cli
                 effective_cli=$(get_effective_cli_type)
@@ -1120,7 +1121,7 @@ process_unread() {
                     # Codex /clear -> /new は会話を切ってしまうため、安全側に倒す。
                     echo "[$(date)] ESCALATION Phase 3: $AGENT_ID unresponsive for ${age}s, but cli=codex — skipping /clear." >&2
                     FIRST_UNREAD_SEEN=$now  # Reset timer (no destructive action)
-                    send_wakeup "$normal_count"
+                    send_wakeup "$normal_count" || true
                 else
                     echo "[$(date)] ESCALATION Phase 3: Agent $AGENT_ID unresponsive for ${age}s. Sending /clear." >&2
                     send_cli_command "/clear"
@@ -1133,7 +1134,7 @@ process_unread() {
             else
                 # Cooldown active — fall back to Escape+スリケン
                 echo "[$(date)] $normal_count unread for $AGENT_ID (${age}s — /clear cooldown, using Escape+スリケン)" >&2
-                send_wakeup_with_escape "$normal_count"
+                send_wakeup_with_escape "$normal_count" || true
             fi
         fi
     else

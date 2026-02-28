@@ -188,6 +188,17 @@ rsync_with_retry() {
     done
 
     log_error "rsync failed after $MAX_RETRIES attempts: $src → $dest"
+
+    # SCP tier2 fallback: rsync全滅時にscp -rで転送 (cmd_298)
+    log_warn "rsync failed → SCP tier2 fallback: $src → $dest"
+    local SSH_OPTS="-o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
+    # shellcheck disable=SC2086
+    if scp -r $SSH_OPTS "$src" "$dest" 2>>"$LOG_FILE"; then
+        log_info "SCP tier2 fallback succeeded: $src → $dest"
+        return 0
+    fi
+
+    log_error "SCP tier2 fallback also failed: $src → $dest"
     return 1
 }
 

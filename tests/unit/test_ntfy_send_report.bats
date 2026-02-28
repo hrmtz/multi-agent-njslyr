@@ -63,6 +63,27 @@ echo "test-topic-12345"
 MOCK
     chmod +x "$TEST_TMP/mock_bin/awk"
 
+    # Mock sleep (no-op for fast test execution — retry backoff uses sleep)
+    cat > "$TEST_TMP/mock_bin/sleep" << 'MOCK'
+#!/bin/bash
+exit 0
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/sleep"
+
+    # Mock date (for retry log timestamp)
+    cat > "$TEST_TMP/mock_bin/date" << 'MOCK'
+#!/bin/bash
+echo "2026-02-28T01:00:00"
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/date"
+
+    # Mock mkdir (for log dir creation)
+    cat > "$TEST_TMP/mock_bin/mkdir" << 'MOCK'
+#!/bin/bash
+command mkdir "$@"
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/mkdir"
+
     # curl args log
     CURL_ARGS_LOG="$TEST_TMP/curl_args.log"
     export CURL_ARGS_LOG
@@ -122,7 +143,8 @@ MOCK
 
     run env PATH="$TEST_TMP/mock_bin:$PATH" bash "$TEST_TMP/send_report.sh" "$MOCK_REPORT"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"ntfy POST failed: HTTP 403"* ]]
+    [[ "$output" == *"POST failed"* ]]
+    [[ "$output" == *"HTTP 403"* ]]
 }
 
 @test "T-NSR-003: ntfy_send_report.sh succeeds on HTTP 200 with status display" {
@@ -139,5 +161,5 @@ MOCK
 
     run env PATH="$TEST_TMP/mock_bin:$PATH" bash "$TEST_TMP/send_report.sh" "$MOCK_REPORT"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"curl failed"* ]]
+    [[ "$output" == *"failed after retries"* ]]
 }

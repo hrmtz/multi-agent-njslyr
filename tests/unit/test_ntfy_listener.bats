@@ -56,8 +56,24 @@ echo "$@" >> "${INBOX_WRITE_LOG}"
 MOCK
     chmod +x "$MOCK_PROJECT/scripts/inbox_write.sh"
 
-    # Mock git (records calls, succeeds by default)
+    # Mock tmux (records calls, returns mock pane data)
     mkdir -p "$TEST_TMP/mock_bin"
+    TMUX_CALL_LOG="$TEST_TMP/tmux_calls.log"
+    export TMUX_CALL_LOG
+    cat > "$TEST_TMP/mock_bin/tmux" << 'MOCK'
+#!/bin/bash
+echo "$@" >> "${TMUX_CALL_LOG}"
+case "$1" in
+    list-panes)
+        if [ -f "${MOCK_PANES_FILE:-/dev/null}" ]; then
+            cat "$MOCK_PANES_FILE"
+        fi
+        ;;
+esac
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/tmux"
+
+    # Mock git (records calls, succeeds by default)
     GIT_CALL_LOG="$TEST_TMP/git_calls.log"
     export GIT_CALL_LOG
     cat > "$TEST_TMP/mock_bin/git" << 'MOCK'
@@ -79,8 +95,7 @@ MOCK
 
     # Extract function definitions from ntfy_listener.sh
     # Range: from parse_message_fields() to just before 'trap cleanup' line
-    # Use awk for macOS/BSD sed compatibility (BSD sed rejects {cmd;cmd} syntax)
-    awk '/^parse_message_fields\(\)/{started=1} started && /^trap cleanup/{exit} started{print}' \
+    sed -n '/^parse_message_fields()/,/^trap cleanup/{/^trap cleanup/d;p}' \
         "$NTFY_LISTENER" > "$TEST_TMP/functions.sh"
     # shellcheck source=/dev/null
     source "$TEST_TMP/functions.sh"
@@ -205,7 +220,7 @@ call_with_stderr() {
 @test "T-NL-PFX-003: route_message returns 1 for unknown prefix (fallback)" {
     run call_with_stderr route_message "unknown_thing:data_here" ""
     [ "$status" -eq 1 ]
-    [[ "$output" == *"unrecognized prefix"* ]]
+    [[ "$output" == *"UNRECOGNIZED PREFIX"* ]]
 }
 
 # --- T-NL-PFX-004: prefix偽装安全処理 ---
@@ -715,105 +730,91 @@ YAML
     grep -q "active_machine: neosaitama" "$MOCK_PROJECT/queue/active_machine.yaml"
 }
 
-# =============================================================================
-# handle_suriken: クロスマシンnudge中継テスト (cmd_297)
-# =============================================================================
+# ═══════════════════════════════════════════════════════════════
+# suriken: handler tests (cmd_298 NTFY-001)
+# ═══════════════════════════════════════════════════════════════
 
-# --- T-NL-SRK-001: handle_suriken 正常処理 → njslyr_cmd.sh suriken が呼ばれる ---
+# --- T-NL-SRK-001: suriken: 正常処理（ペイン発見→nudge送信） ---
 
-@test "T-NL-SRK-001: handle_suriken relays valid agent_id to njslyr_cmd.sh" {
-    NJSLYR_CMD_LOG="$TEST_TMP/njslyr_cmd_calls.log"
-    export NJSLYR_CMD_LOG
-    # FIX: correct path is scripts/njslyr_cmd.sh (monju-A review)
-    cat > "$MOCK_PROJECT/scripts/njslyr_cmd.sh" << 'MOCK'
-#!/bin/bash
-echo "$@" >> "${NJSLYR_CMD_LOG}"
-MOCK
-    chmod +x "$MOCK_PROJECT/scripts/njslyr_cmd.sh"
+@test "T-NL-SRK-001: handle_suriken sends nudge to found pane" {
+    # Mock pane data: yakuza3 is at %5
+    MOCK_PANES_FILE="$TEST_TMP/mock_panes.txt"
+    export MOCK_PANES_FILE
+    cat > "$MOCK_PANES_FILE" << 'EOF'
+%0 gryakuza
+%1 yakuza1
+%5 yakuza3
+%8 soukaiya
+EOF
 
     run call_with_stderr handle_suriken "yakuza3:2"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"suriken: relaying to local agent: yakuza3"* ]]
-    # unread_count が出力に含まれること
-    [[ "$output" == *"(unread: 2)"* ]]
+    [[ "$output" == *"nudge sent to yakuza3"* ]]
+    [[ "$output" == *"count=2"* ]]
 
-    # njslyr_cmd.sh suriken yakuza3 が呼ばれたこと
-    [ -f "$NJSLYR_CMD_LOG" ]
-    grep -q "suriken yakuza3" "$NJSLYR_CMD_LOG"
+    # tmux send-keys が呼ばれたことを確認
+    [ -f "$TMUX_CALL_LOG" ]
+    grep -q "send-keys" "$TMUX_CALL_LOG"
+    grep -q "%5" "$TMUX_CALL_LOG"
 }
 
-# --- T-NL-SRK-002: handle_suriken 不正agent_id → return 1, WARNING, njslyr_cmd.sh未呼び出し ---
+# --- T-NL-SRK-002: suriken: 不正agent_id → エラー ---
 
-@test "T-NL-SRK-002: handle_suriken rejects invalid agent_id with semicolon" {
-    NJSLYR_CMD_LOG="$TEST_TMP/njslyr_cmd_calls.log"
-    export NJSLYR_CMD_LOG
-    cat > "$MOCK_PROJECT/scripts/njslyr_cmd.sh" << 'MOCK'
-#!/bin/bash
-echo "$@" >> "${NJSLYR_CMD_LOG}"
-MOCK
-    chmod +x "$MOCK_PROJECT/scripts/njslyr_cmd.sh"
-
-    run call_with_stderr handle_suriken "evil;agent:1"
+@test "T-NL-SRK-002: handle_suriken rejects invalid agent_id (injection attempt)" {
+    run call_with_stderr handle_suriken "invalid!agent:1"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"WARNING: suriken: invalid agent_id"* ]]
+    [[ "$output" == *"invalid agent_id"* ]]
 
-    # njslyr_cmd.sh が呼ばれていないこと
-    [ ! -f "$NJSLYR_CMD_LOG" ]
+    # tmux send-keys が呼ばれていないこと
+    [ ! -f "$TMUX_CALL_LOG" ] || ! grep -q "send-keys" "$TMUX_CALL_LOG"
 }
 
-# --- T-NL-SRK-003: handle_suriken njslyr_cmd.sh 失敗 → return 1 + WARNING ---
+# --- T-NL-SRK-003: suriken: ペイン未発見 → エラー ---
 
-@test "T-NL-SRK-003: handle_suriken returns 1 and logs WARNING when njslyr_cmd.sh fails" {
-    cat > "$MOCK_PROJECT/scripts/njslyr_cmd.sh" << 'MOCK'
-#!/bin/bash
-exit 1
-MOCK
-    chmod +x "$MOCK_PROJECT/scripts/njslyr_cmd.sh"
+@test "T-NL-SRK-003: handle_suriken returns error when pane not found" {
+    # Mock pane data: noexist は存在しない
+    MOCK_PANES_FILE="$TEST_TMP/mock_panes.txt"
+    export MOCK_PANES_FILE
+    cat > "$MOCK_PANES_FILE" << 'EOF'
+%0 gryakuza
+%1 yakuza1
+EOF
 
-    run call_with_stderr handle_suriken "yakuza1:1"
-    # njslyr_cmd.sh 失敗 → return 1 (relay failure propagated)
+    run call_with_stderr handle_suriken "noexist:0"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"WARNING: suriken: local relay failed for yakuza1"* ]]
+    [[ "$output" == *"pane not found"* ]]
+
+    # tmux send-keys が呼ばれていないこと
+    ! grep -q "send-keys" "$TMUX_CALL_LOG" 2>/dev/null
 }
 
-# --- T-NL-SRK-004: route_message suriken: → return 2 (ntfy_inbox記録スキップ) ---
+# --- T-NL-SRK-004: route_message suriken: → return 0 ---
 
-@test "T-NL-SRK-004: route_message dispatches suriken: and returns 2 (skip ntfy_inbox)" {
-    NJSLYR_CMD_LOG="$TEST_TMP/njslyr_cmd_calls.log"
-    export NJSLYR_CMD_LOG
-    cat > "$MOCK_PROJECT/scripts/njslyr_cmd.sh" << 'MOCK'
-#!/bin/bash
-echo "$@" >> "${NJSLYR_CMD_LOG}"
-MOCK
-    chmod +x "$MOCK_PROJECT/scripts/njslyr_cmd.sh"
+@test "T-NL-SRK-004: route_message dispatches suriken: prefix and returns 2 (skip ntfy_inbox)" {
+    MOCK_PANES_FILE="$TEST_TMP/mock_panes.txt"
+    export MOCK_PANES_FILE
+    cat > "$MOCK_PANES_FILE" << 'EOF'
+%3 yakuza5
+EOF
 
     run call_with_stderr route_message "suriken:yakuza5:3" ""
-    # return 2 = handled, ntfy_inbox記録スキップ (regardless of handle_suriken result)
     [ "$status" -eq 2 ]
-
-    # njslyr_cmd.sh suriken yakuza5 が呼ばれたこと
-    [ -f "$NJSLYR_CMD_LOG" ]
-    grep -q "suriken yakuza5" "$NJSLYR_CMD_LOG"
+    [[ "$output" == *"nudge sent to yakuza5"* ]]
 }
 
-# --- T-NL-SRK-005: handle_suriken agent_idのみ（unread_countなし）でも正常動作 ---
+# --- T-NL-SRK-005: suriken: count未指定 → デフォルト1 ---
 
-@test "T-NL-SRK-005: handle_suriken works with agent_id only (no unread_count)" {
-    NJSLYR_CMD_LOG="$TEST_TMP/njslyr_cmd_calls.log"
-    export NJSLYR_CMD_LOG
-    cat > "$MOCK_PROJECT/scripts/njslyr_cmd.sh" << 'MOCK'
-#!/bin/bash
-echo "$@" >> "${NJSLYR_CMD_LOG}"
-MOCK
-    chmod +x "$MOCK_PROJECT/scripts/njslyr_cmd.sh"
+@test "T-NL-SRK-005: handle_suriken defaults count to 1 when not specified" {
+    MOCK_PANES_FILE="$TEST_TMP/mock_panes.txt"
+    export MOCK_PANES_FILE
+    cat > "$MOCK_PANES_FILE" << 'EOF'
+%2 yakuza2
+EOF
 
-    # コロンなし — agent_idのみ
-    run call_with_stderr handle_suriken "gryakuza"
+    run call_with_stderr handle_suriken "yakuza2"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"suriken: relaying to local agent: gryakuza"* ]]
-    # unread_countがないので "(unread: ...)" は出力されない
-    [[ "$output" != *"(unread:"* ]]
+    [[ "$output" == *"count=1"* ]]
 
-    [ -f "$NJSLYR_CMD_LOG" ]
-    grep -q "suriken gryakuza" "$NJSLYR_CMD_LOG"
+    # nudge text にinbox1が含まれるか確認
+    grep -q "inbox1" "$TMUX_CALL_LOG"
 }
