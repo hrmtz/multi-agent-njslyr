@@ -2,6 +2,7 @@
 
 > cmd_303 | 設計: gryakuza@neosaitama | 日付: 2026-02-28
 > 前提文書: `context/cross_machine_architecture.md` §2.2 Simultaneous Mode
+> **Rev.2 (2026-02-28 ダークニンジャP0指示)**: §5 通信設計をSSHファースト・ntfyフォールバックに改訂
 
 ---
 
@@ -16,7 +17,7 @@
 | 2 | 指揮系統 | ダークニンジャ → Kyoto gryakuza → Neo gryakuza | §2 |
 | 3 | タスク分配 | machine affinity + 所有権タグ | §3 |
 | 4 | queue/inbox同期 | inbox=ローカル専用。STATE_PATHSから除外維持 | §4 |
-| 5 | 通信 | ntfy dispatch/report + SSH fallback（既存活用） | §5 |
+| 5 | 通信 | **SSHファースト + ntfyフォールバック**（スリープ/スマホ/HB限定） | §5 |
 | 6 | 障害時フォールバック | heartbeat監視 + 縮退運転プロトコル | §6 |
 | 7 | cmd_301整合性 | active_machine.yaml modeで自動切り替え | §7 |
 
@@ -199,17 +200,21 @@ queue/inbox/gryakuza.yaml @ NeoSaitama ← Neo gryakuza専用
 
 両者は独立したファイル。rsync STATE_PATHSから**除外維持**（現行設計どおり）。
 
-### §4.2 クロスマシンメッセージング
+### §4.2 クロスマシンメッセージング（SSHファースト）
 
-マシン間のメッセージは**ntfy経由でローカルinboxに書き込む**:
+マシン間のメッセージは**SSH経由で相手マシンのinbox_write.shを直接実行**する:
 
+```bash
+# Neo gryakuza → Kyoto gryakuza (SSH direct)
+ssh peer-hostname "cd ~/project/multi-agent-njslyr && \
+  bash scripts/inbox_write.sh gryakuza '完了報告' report_received gryakuza@neo"
+
+# Kyoto gryakuza → Neo gryakuza (SSH direct)
+ssh {neo_host} "cd ~/project/personal/multi-agent-njslyr && \
+  bash scripts/inbox_write.sh gryakuza 'タスク割り当て' task_assigned gryakuza@kyoto"
 ```
-Neo gryakuza → Kyoto gryakuza:
-  ntfy_send_report.sh → ntfy_listener@Kyoto → inbox_write gryakuza@kyoto
 
-Kyoto gryakuza → Neo gryakuza:
-  ntfy_send_dispatch.sh → ntfy_listener@NeoSaitama → inbox_write gryakuza@neosaitama
-```
+SSH失敗時（NeoSaitamaスリープ等）のフォールバック → ntfy dispatch/report経由（§5参照）
 
 ### §4.3 inboxの整合性保証
 
@@ -219,51 +224,91 @@ Kyoto gryakuza → Neo gryakuza:
 
 ---
 
-## §5 通信設計（既存基盤の活用）
+## §5 通信設計（SSHファースト・ntfyフォールバック）
 
-### §5.1 既存インフラ（cmd_274/277/278/298で構築済み）
+> **方針変更 (2026-02-28 ダークニンジャP0指示)**: Tailscale SSH常時接続を前提に、
+> マシン間通信の主経路をSSHに切り替え。ntfyはスマホ連携・スリープ時バックアップ・ハートビートに限定。
 
-| スクリプト | 方向 | 用途 |
-|-----------|------|------|
-| `ntfy_send_dispatch.sh` | Kyoto → NeoSaitama | タスクYAML転送 |
-| `ntfy_send_report.sh` | NeoSaitama → Kyoto | 完了報告・レポート転送 |
-| `ntfy_listener.sh` | 受信側 | プレフィックスルーティング |
-| `ntfy_listener_supervisor.sh` | 各マシン | listener死活監視・自動再起動 |
-| `cross_sync.sh` | 双方向rsync | STATE_PATHS同期（定期/手動） |
+### §5.1 通信階層
 
-### §5.2 同時稼働追加通信パターン
-
-```yaml
-# 既存プレフィックス体系に追加なし。既存で十分。
-# ただし利用パターンを明確化:
-
-Kyoto→Neo dispatch:
-  プレフィックス: dispatch:{base64_yaml}
-  トピック: {TOPIC}-neosaitama
-  受信: ntfy_listener@Neo → queue/tasks/ 保存 → inbox通知
-
-Neo→Kyoto report:
-  プレフィックス: report:{base64_yaml}
-  トピック: {TOPIC} (main, outboundタグ付き)
-  受信: ntfy_listener@Kyoto → queue/reports/ 保存 → gryakuza inbox通知
-
-ハートビート:
-  トピック: {TOPIC}-heartbeat
-  master_tortoise(Kyoto) + master_crane(Neo) が60秒周期送受信
-  障害検知のトリガー（§6参照）
+```
+[優先度1] SSH via Tailscale   — エージェント間通信のメイン経路
+[優先度2] ntfy               — スマホ通知・MBPスリープ時フォールバック・ハートビート
 ```
 
-### §5.3 SSH Fallback
+### §5.2 SSHファースト実装
 
-ntfy障害時のフォールバック:
+**エージェント間メッセージ（inbox_write）**:
 
 ```bash
-# NeoSaitama → Kyoto 直接SSH inbox_write
-ssh peer-hostname "cd ~/project/personal/multi-agent-njslyr && \
-  bash scripts/inbox_write.sh gryakuza '緊急報告:ntfy不通' system_notice gryakuza@neosaitama"
+# NeoSaitama → Kyoto (Neo gryakuza → Kyoto gryakuza)
+ssh peer-hostname "cd ~/project/multi-agent-njslyr && \
+  bash scripts/inbox_write.sh gryakuza '完了報告内容' report_received gryakuza@neo \
+  queue/reports/neo_report_xxx.yaml P1"
+
+# Kyoto → NeoSaitama (Kyoto gryakuza → Neo gryakuza)
+ssh {neo_tailscale_host} "cd ~/project/personal/multi-agent-njslyr && \
+  bash scripts/inbox_write.sh gryakuza 'タスク割り当て' task_assigned gryakuza@kyoto \
+  queue/tasks/neo_task_xxx.yaml P2"
 ```
 
-条件: Tailscaleが生存していること（`tailscale ping --timeout=5s peer-hostname`）
+**ファイル転送（report YAML・task YAML）**:
+
+```bash
+# Neo → Kyoto (rsync via SSH) — cross_sync.sh を利用
+rsync -avz --rsh=ssh queue/reports/neo_report_xxx.yaml \
+  peer-hostname:~/project/multi-agent-njslyr/queue/reports/
+
+# Kyoto → Neo (rsync via SSH)
+rsync -avz --rsh=ssh queue/tasks/neo_task_xxx.yaml \
+  {neo_host}:~/project/personal/multi-agent-njslyr/queue/tasks/
+```
+
+**gitプッシュ（SSHダイレクト）**:
+
+```bash
+# NeoSaitama → GitHub（現行維持） → Kyoto pullのサイクル
+# SSH加速オプション: Kyotoをgitリモートとして追加（今後検討）
+# git remote add kyoto-direct peer-hostname:~/project/multi-agent-njslyr
+# git push kyoto-direct feat/cmd_XXX-neo
+```
+
+**新スクリプト: `scripts/ssh_inbox_write.sh`（実装フェーズで作成）**:
+
+```bash
+# SSH接続確認 → SSH実行 → 失敗時ntfyフォールバック
+ssh_inbox_write.sh <peer_host> <target_agent> <message> <type> <from> [yaml_path] [priority]
+```
+
+### §5.3 ntfy役割（限定）
+
+| 用途 | ntfyトピック | 理由 |
+|------|-------------|------|
+| ラオモト/スマホへの重要通知 | `{TOPIC}` | SSH到達不能（スマホはSSH受信不可） |
+| MBPスリープ時バックアップ | `{TOPIC}-neosaitama` | SSHがスリープMacに届かない場合の起床通知 |
+| ハートビート | `{TOPIC}-heartbeat` | 非同期監視（60秒サイクル継続） |
+| ntfy.sh障害時のSSHへの切り替え | — | SSH優先のため障害影響が最小化 |
+
+**ntfyへのフォールバック条件**:
+
+```bash
+# SSH疎通確認
+if ! ssh -o ConnectTimeout=5 peer-hostname true 2>/dev/null; then
+    # SSH失敗 → ntfy_send_report.sh / ntfy_send_dispatch.sh にフォールバック
+    bash scripts/ntfy_send_report.sh "$REPORT_PATH"
+fi
+```
+
+### §5.4 既存スクリプトの役割再定義
+
+| スクリプト | 新役割 | 変更要否 |
+|-----------|--------|---------|
+| `cross_sync.sh` | STATE_PATHS rsync（SSH経由で変わらず） | なし |
+| `ntfy_send_dispatch.sh` | NeoSaitamaスリープ時フォールバック専用 | 用途変更 |
+| `ntfy_send_report.sh` | ntfy障害時フォールバック専用 | 用途変更 |
+| `ntfy_listener.sh` | ラオモト→エージェントの下降方向のみ維持 | 大幅縮小 |
+| `ntfy_listener_supervisor.sh` | 継続（ntfyが生きている間の監視） | なし |
+| `ssh_inbox_write.sh` | **新規作成**: SSH-first cross-machine inbox write | 新規 |
 
 ---
 
@@ -416,18 +461,19 @@ activated_by: laomoto
 | フェーズ | 内容 | 担当 | 優先度 |
 |---------|------|------|--------|
 | P1 | active_machine.yaml フィールド名修正（ryzen→kyoto, mbp→neosaitama） | Kyoto gryakuza | P1 |
-| P2 | タスクYAMLのassigned_to `@machine` タグ対応（ルーティングロジック） | Kyoto gryakuza | P1 |
-| P3 | ntfy_send_cmd.sh 作成（darkninja→Neo直接パス） | yakuza | P2 |
-| P4 | ハートビート閾値・障害アクション実装（master_crane/tortoise連携） | yakuza | P2 |
-| P5 | recovery_needed ステータス処理（Kyoto gryakuzaの救済フロー） | yakuza | P2 |
-| P6 | gryakuza起動時モード判定ロジック（CLAUDE.md Session Start更新） | gryakuza(全体) | P2 |
+| P2 | `ssh_inbox_write.sh` 新規作成（SSH接続確認→inbox_write実行→ntfyフォールバック） | yakuza | P1 |
+| P3 | タスクYAMLのassigned_to `@machine` タグ対応（ルーティングロジック） | Kyoto gryakuza | P1 |
+| P4 | ntfy_send_dispatch.sh / ntfy_send_report.sh をフォールバック専用に更新 | yakuza | P2 |
+| P5 | ハートビート閾値・障害アクション実装（master_crane/tortoise連携） | yakuza | P2 |
+| P6 | recovery_needed ステータス処理（Kyoto gryakuzaの救済フロー） | yakuza | P2 |
+| P7 | gryakuza起動時モード判定ロジック（CLAUDE.md Session Start更新） | gryakuza(全体) | P2 |
 
 ---
 
 ## §9 設計の前提・制約
 
-1. **ntfy基盤が前提**: ntfy_listener.sh + supervisor が両マシンで稼働していること
-2. **Tailscale接続が前提**: クロスマシン通信の土台。切断時は§6.4フォールバック
+1. **Tailscale SSH常時接続が前提**: クロスマシン通信のメイン経路。切断時は§6.4フォールバック
+2. **ntfyはセカンダリ**: スマホ通知・MBPスリープ時バックアップ・ハートビートに限定。ntfy停止はSSHがあれば許容
 3. **ラオモト最終権限**: handover、mode切り替えはラオモトの明示的指示のみ
 4. **inbox_write.sh PATH修正済み**: macOS SSH非インタラクティブシェルでflock動作確認
 5. **Memory MCP**: Kyoto writable、NeoSaitamaはread-only（rsync pull）
