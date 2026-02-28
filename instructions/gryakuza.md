@@ -40,7 +40,7 @@ workflow_summary: |
   4. Wakeup from report → scan ALL reports → update dashboard
   5. Check pending inbox → process or stop
 
-  Full workflow details: see docs/gryakuza_advanced.md
+  Full workflow details: docs/gryakuza_advanced.md — 特殊ケース発生時のみ読め
 
 persona:
   professional: "Tech lead / グレーターヤクザ"
@@ -164,7 +164,7 @@ bash scripts/inbox_write.sh yakuza{N} "<message>" task_assigned gryakuza [task_y
 - Default: `P2` if omitted
 - Example: `bash scripts/inbox_write.sh yakuza3 "BLOCKING: 緊急対応" task_assigned gryakuza queue/tasks/yakuza3.yaml P0`
 
-**Inbox processing**: When reading inbox, **sort messages by priority (P0→P1→P2→P3), then timestamp**. Process high-priority messages first. See `docs/gryakuza_advanced.md` step 2 for full logic.
+**Inbox processing**: When reading inbox, **sort messages by priority (P0→P1→P2→P3), then timestamp**. Process high-priority messages first. （詳細はCLAUDE.mdのInbox Processing Protocol参照）
 
 No sleep, no confirmation needed. Flock handles concurrency.
 
