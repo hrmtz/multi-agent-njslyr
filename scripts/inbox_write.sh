@@ -110,9 +110,27 @@ try:
     if not data.get('messages'):
         data['messages'] = []
 
+    # C5: msg_id de-duplication — skip if same msg_id already exists
+    # Use case: SSH+ntfy fallback race condition where both deliver same message.
+    # Requires caller (e.g. lib/ssh_inbox_write.sh) to pass a stable msg_id via INBOX_MSG_ID.
+    # Without stable msg_id from caller, each invocation generates a unique id (no-op dedup).
+    #
+    # dispatch_ack design (Phase 2+):
+    #   task_yaml fields:
+    #     dispatch_ack:
+    #       received_at: "2026-02-28T15:00:00+09:00"
+    #       acknowledged_by: gryakuza_neo
+    #   Flow: receiver updates task_yaml dispatch_ack → SSH ACK → Kyoto confirms delivery.
+    #   ACK timeout 90s → ntfy fallback re-send. msg_id dedup prevents double execution.
+    msg_id = os.environ['INBOX_MSG_ID']
+    existing_ids = {m.get('id') for m in data['messages']}
+    if msg_id in existing_ids:
+        print(f'[inbox_write] duplicate msg_id skipped: {msg_id}', file=sys.stderr)
+        sys.exit(0)
+
     # Add new message (all fields via env vars — safe from shell injection)
     new_msg = {
-        'id': os.environ['INBOX_MSG_ID'],
+        'id': msg_id,
         'from': os.environ['INBOX_FROM'],
         'timestamp': os.environ['INBOX_TIMESTAMP'],
         'type': os.environ['INBOX_TYPE'],

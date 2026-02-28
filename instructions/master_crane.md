@@ -365,6 +365,58 @@ context_summary: ok
 
 ---
 
+## Kyoto障害時ラオモト直接通知（C2）
+
+> 仕様根拠: context/ssh_ntfy_architecture.md §6.3
+
+Kyotoハートビートが3サイクル（3分）欠落し、SSHでも疎通できない場合、master_craneはntfyで**ラオモトのスマホに直接通知**する。
+
+**ntfyはKyoto非依存のクラウドサービスなので、Kyoto障害時も送信可能。**
+
+### 通知トリガー
+
+SSHハートビートハイブリッドの判定ロジックで「SSH失敗」が確定した場合（上記判定ロジック表参照）。
+
+### 通知手順
+
+```bash
+# Kyoto障害確定時のラオモト直接ntfy通知（C2）
+# 1. ntfy_topicを取得（config/settings.yamlから）
+TOPIC=$(awk '/ntfy_topic:/ {gsub(/"/, ""); print $2; exit}' config/settings.yaml)
+
+# 2. ラオモトのスマホにntfy通知（Kyoto非依存のクラウド経由）
+curl -s \
+    -H "Title: CRITICAL: Kyotoハートビート喪失" \
+    -H "Priority: urgent" \
+    -H "Tags: warning,rotating_light" \
+    -d "CRITICAL: Kyotoハートビート喪失。3サイクル(3分)欠落+SSH疎通失敗。handover:neosaitama を送信してください" \
+    "https://ntfy.sh/${TOPIC}" >/dev/null
+
+# 3. Neo gryakuza inboxにも通知（ローカル通信はKyoto障害非依存）
+bash scripts/inbox_write.sh gryakuza \
+    "CRITICAL: Kyotoハートビート3サイクル欠落+SSH疎通失敗を確認。ラオモトにntfy通知済み。handoverを待機中。" \
+    system_notice master_crane "" P0
+```
+
+### 重要制約
+
+- **自律的なstandalone移行は絶対禁止**: ラオモトの明示的ntfy `handover:neosaitama` コマンドを待つこと
+- **通知は1回のみ**: 同一障害インシデントで複数回ntfy通知しない（5分インターバルを設ける）
+- **gryakuza指示に従う**: handover受領後はgryakuzaの指示に従って行動する
+
+### 通知後の待機動作
+
+```
+1. 通知直後: ローカルstate/.kyoto_failure_notified_{epoch}.flag を作成（重複通知防止）
+2. gryakuza inbox: "Kyoto障害。handover待機中" を送信（P0）
+3. 以後60秒サイクルで:
+   - gryakuza inboxを確認（handover指示が届いていないか）
+   - SSH疎通を再試行（Kyoto復旧確認）
+   - Kyoto復旧確認 → gryakuza + ラオモトに復旧通知 → flag削除
+```
+
+---
+
 ## 通信プロトコル
 
 | 宛先 | 手段 | 用途 |

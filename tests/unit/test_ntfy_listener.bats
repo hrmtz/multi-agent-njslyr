@@ -708,8 +708,8 @@ YAML
     run call_with_stderr handle_handover "neosaitama"
     [ "$status" -eq 0 ]
 
-    # active_machine.yaml が更新されているか確認
-    grep -q "active_machine: neosaitama" "$MOCK_PROJECT/queue/active_machine.yaml"
+    # active_machine.yaml が更新されているか確認（C4-B修正後: primary: フォーマット）
+    grep -q "primary: neosaitama" "$MOCK_PROJECT/queue/active_machine.yaml"
 
     # gryakuza inbox通知が送られているか確認
     [ -f "$INBOX_WRITE_LOG" ]
@@ -726,8 +726,8 @@ YAML
     run call_with_stderr handle_handover "neosaitama"
     [ "$status" -eq 0 ]
 
-    # active_machine.yaml が更新されているか確認
-    grep -q "active_machine: neosaitama" "$MOCK_PROJECT/queue/active_machine.yaml"
+    # active_machine.yaml が更新されているか確認（C4-B修正後: primary: フォーマット）
+    grep -q "primary: neosaitama" "$MOCK_PROJECT/queue/active_machine.yaml"
 }
 
 # ═══════════════════════════════════════════════════════════════
@@ -817,4 +817,79 @@ EOF
 
     # nudge text にinbox1が含まれるか確認
     grep -q "inbox1" "$TMUX_CALL_LOG"
+}
+
+# ═══════════════════════════════════════════════════════════════
+# activate:simultaneous handler tests (cmd_306 C6)
+# ═══════════════════════════════════════════════════════════════
+
+# --- T-NL-ACT-001: handle_activate_simultaneous 正常ケース ---
+
+@test "T-NL-ACT-001: handle_activate_simultaneous writes mode:simultaneous to active_machine.yaml" {
+    run call_with_stderr handle_activate_simultaneous
+    [ "$status" -eq 0 ]
+
+    local am_file="$MOCK_PROJECT/queue/active_machine.yaml"
+    [ -f "$am_file" ]
+    grep -q "mode: simultaneous" "$am_file"
+    grep -q "primary: kyoto" "$am_file"
+    grep -q "secondary: neosaitama" "$am_file"
+    grep -q "activated_by: laomoto_ntfy" "$am_file"
+}
+
+# --- T-NL-ACT-002: handle_activate_simultaneous gryakuza P0通知確認 ---
+
+@test "T-NL-ACT-002: handle_activate_simultaneous notifies gryakuza with P0 priority" {
+    run call_with_stderr handle_activate_simultaneous
+    [ "$status" -eq 0 ]
+
+    [ -f "$INBOX_WRITE_LOG" ]
+    grep -q "gryakuza" "$INBOX_WRITE_LOG"
+    grep -q "P0" "$INBOX_WRITE_LOG"
+}
+
+# --- T-NL-ACT-003: route_message activate:simultaneous ルーティング確認 ---
+
+@test "T-NL-ACT-003: route_message dispatches activate:simultaneous to handle_activate_simultaneous" {
+    run call_with_stderr route_message "activate:simultaneous" "test-topic"
+    [ "$status" -eq 0 ]
+
+    local am_file="$MOCK_PROJECT/queue/active_machine.yaml"
+    [ -f "$am_file" ]
+    grep -q "mode: simultaneous" "$am_file"
+    grep -q "gryakuza" "$INBOX_WRITE_LOG"
+}
+
+# --- T-NL-ACT-004: 未知payload → WARNING + return 0 ---
+
+@test "T-NL-ACT-004: route_message activate:unknown logs WARNING and returns 0" {
+    run call_with_stderr route_message "activate:unknown_payload" "test-topic"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"WARNING"* ]]
+    [[ "$output" == *"unknown activate subcommand"* ]]
+
+    # active_machine.yaml は書き込まれないこと
+    [ ! -f "$MOCK_PROJECT/queue/active_machine.yaml" ]
+}
+
+# ═══════════════════════════════════════════════════════════════
+# free text forwarding tests (cmd_306 C4-A)
+# ═══════════════════════════════════════════════════════════════
+
+# --- T-NL-FT-001: free text → darkninja inbox_write 呼び出し確認 ---
+
+@test "T-NL-FT-001: route_message free text forwards to darkninja via inbox_write" {
+    run call_with_stderr route_message "hello from laomoto" "test-topic"
+    [ "$status" -eq 0 ]
+
+    [ -f "$INBOX_WRITE_LOG" ]
+    grep -q "darkninja" "$INBOX_WRITE_LOG"
+    grep -q "ntfy free text" "$INBOX_WRITE_LOG"
+}
+
+# --- T-NL-FT-002: free text → return 0 確認 ---
+
+@test "T-NL-FT-002: route_message free text returns 0" {
+    run call_with_stderr route_message "another free text message" "test-topic"
+    [ "$status" -eq 0 ]
 }
