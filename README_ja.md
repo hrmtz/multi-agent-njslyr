@@ -163,6 +163,17 @@ cd ~/multi-agent-njslyr && chmod +x *.sh
 
 メッセージ内容はtmuxを経由しない — 短い起床シグナルのみ。待機中CPU使用率ゼロ。
 
+### モニタリングエージェント（master_tortoise / master_crane）
+
+各マシンに常駐するSonnetエージェントが、システムの健全性を異なる視点で監視:
+
+| エージェント | 常駐マシン | 視点 | 主な役割 |
+|-------------|-----------|------|---------|
+| **master_tortoise** | Kyoto | 予防監視（未来視） | コンテキスト溢れ予測、応答パターン分析 |
+| **master_crane** | NeoSaitama | 事後分析（過去視） | 障害原因特定、再発防止策、パターンDB蓄積 |
+
+60秒サイクルでハートビート交換（ntfy `{base_topic}-heartbeat` トピック）。コード編集・タスク分配・エージェント停止は禁止。
+
 ### njslyr — 監視デーモン
 
 3段階エスカレーションによるエージェント自動回復:
@@ -203,7 +214,10 @@ Kyoto (Ryzen WSL)  ←---ntfy---→  NeoSaitama (MBP)
 
 - **Tailscale** でSSH認証済み（kyoto ↔ peer-hostname）
 - **rsync** でリポジトリ同期
-- **ntfy** でクロスマシン通知・コマンド送信
+- **通信2層構造**:
+  - Tier1: **ntfy** (プッシュ通知) — 通常のクロスマシン通知・コマンド送信
+  - Tier2: **SSH** (Tailscale経由) — ntfy障害時のフォールバック・手動同期
+- **suriken双方向対応**: `njslyr_cmd.sh suriken` はKyoto/NeoSaitama間でも機能。エージェント起床信号をクロスマシン配信
 - `queue/active_machine.yaml` で現在の稼働マシンを管理
 
 ### バリキドリンク（Opus投与）
@@ -299,7 +313,7 @@ multi-agent-njslyr/
 │   ├── ntfy.sh                # プッシュ通知送信
 │   ├── ntfy_listener.sh       # スマホメッセージ受信
 │   ├── ntfy_send_dispatch.sh  # ntfy送信ディスパッチャー
-│   └── ntfy_send_report.sh   # MBP→Ryzenレポート送信
+│   └── ntfy_send_report.sh   # NeoSaitama→Kyotoレポート送信
 │
 ├── queue/                     # 通信ファイル（真実のソース）
 │   ├── inbox/                 # エージェント別inbox

@@ -167,7 +167,7 @@ scan_all_agents() {
 
     # Cache full pane map once to avoid N tmux calls per agent (N+1 → 1).
     local pane_map
-    pane_map=$(tmux list-panes -a -F '#{@agent_id} #{pane_id}' 2>/dev/null)
+    pane_map=$(tmux list-panes -a -F '#{@agent_id} #{pane_id}' 2>/dev/null) || true
 
     # FIX-004: Dynamic agents window name (agents on kyoto, neosaitama on neosaitama)
     local _agents_window
@@ -182,7 +182,7 @@ scan_all_agents() {
         [[ -z "$agent" || "$agent" == "darkninja" ]] && continue
         start_watcher_for_agent "$agent" "logs/inbox_watcher_${agent}.log" "$pane_map"
     done < <(tmux list-panes -t "multiagent:${_agents_window}" -F '#{@agent_id}' 2>/dev/null \
-        | awk 'NF && !seen[$0]++')
+        | awk 'NF && !seen[$0]++' || true)
 }
 
 # NTFY-004: heartbeat watchdog — ntfy_listenerのサイレントドロップを検出して再起動
