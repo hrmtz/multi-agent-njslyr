@@ -84,21 +84,23 @@ branch: feat/cmd_303-neo
     │ ntfy or Claude Code UI
     ▼
 ダークニンジャ（darkninja）[Kyoto only]
-    │ inbox_write → gryakuza@kyoto
+    │ inbox_write → gryakuza_kyo
     ▼
-グレーターヤクザ（gryakuza）[Kyoto = MASTER]
-    ├─── inbox_write → yakuza1-7@kyoto
-    ├─── inbox_write → soukaiya@kyoto
+スミス（gryakuza_kyo）[Kyoto = MASTER]
+    ├─── inbox_write → yakuza1-7 [machine=kyoto]
+    ├─── inbox_write → soukaiya_kyo
     │
-    │ ntfy_send_dispatch.sh → {TOPIC}-neosaitama
+    │ SSH: ssh_inbox_write.sh → gryakuza_neo inbox
+    │ (fallback: ntfy_send_dispatch.sh → {TOPIC}-neosaitama)
     ▼
-グレーターヤクザ（gryakuza）[NeoSaitama = SLAVE]
-    ├─── inbox_write → yakuza1-3@neosaitama
-    └─── inbox_write → soukaiya@neosaitama
+ヤマヒロ（gryakuza_neo）[NeoSaitama = SLAVE]
+    ├─── inbox_write → yakuza1-3 [machine=neosaitama]
+    └─── inbox_write → soukaiya_neo
          │
-         │ ntfy_send_report.sh → {TOPIC} (main)
+         │ SSH: ssh peer-hostname "inbox_write gryakuza_kyo"
+         │ (fallback: ntfy_send_report.sh → {TOPIC})
          ▼
-      Kyoto gryakuza（受信・ダッシュボード更新）
+      スミス（gryakuza_kyo）受信・ダッシュボード更新
          │
          │ inbox_write
          ▼
@@ -126,7 +128,7 @@ bash scripts/ntfy_send_cmd.sh "cmd:cmd_xxx:緊急指示内容"
 
 ### §2.3 権限テーブル（同時稼働時）
 
-| 操作 | Kyoto gryakuza | Neo gryakuza |
+| 操作 | スミス (gryakuza_kyo) | ヤマヒロ (gryakuza_neo) |
 |------|---------------|--------------|
 | cmd作成・番号採番 | ✅ | ✗ |
 | タスク分解 | ✅ | ✗（受信のみ） |
@@ -139,6 +141,63 @@ bash scripts/ntfy_send_cmd.sh "cmd:cmd_xxx:緊急指示内容"
 | git push（自担当ブランチ） | ✅ | ✅ |
 | main merge | ✅ | ✗ |
 
+### §2.4 エージェント命名規則（ラオモト命名・2026-02-28確定）
+
+同時稼働体制では以下の命名規則を採用（ラオモト裁定・恒久）:
+
+| ロール | ID | 呼称 | マシン |
+|--------|-----|------|--------|
+| グレーターヤクザ | `gryakuza_kyo` | **スミス** | Kyoto (MASTER) |
+| グレーターヤクザ | `gryakuza_neo` | **ヤマヒロ** | NeoSaitama (SLAVE) |
+| ソウカイヤ | `soukaiya_kyo` | — | Kyoto |
+| ソウカイヤ | `soukaiya_neo` | — | NeoSaitama |
+| クローンヤクザ | `yakuza{N}` | — | サフィックス不要 |
+
+**ヤクザのマシン識別**: サフィックスではなく、レポートYAMLに `machine` フィールドを追加:
+
+```yaml
+# yakuza report YAML (simultaneous mode)
+id: yakuza3_report_xxx
+from: yakuza3
+machine: neosaitama        # ← このフィールドで所属マシンを識別
+task_id: xxx
+verdict: PASS
+```
+
+**inbox ファイルパス**:
+
+```
+queue/inbox/gryakuza_kyo.yaml  ← スミス専用 (Kyotoローカル)
+queue/inbox/gryakuza_neo.yaml  ← ヤマヒロ専用 (NeoSaitamaローカル)
+queue/inbox/soukaiya_kyo.yaml  ← soukaiya_kyo専用
+queue/inbox/soukaiya_neo.yaml  ← soukaiya_neo専用
+queue/inbox/yakuza{N}.yaml     ← 各マシンローカル（同名、内容は独立）
+```
+
+**後方互換**:
+- 排他稼働（exclusive mode）では旧来の `gryakuza` / `soukaiya` IDを維持
+- 同時稼働（simultaneous mode）でのみ `_kyo` / `_neo` サフィックスを使用
+
+### §2.5 ヤマヒロ（gryakuza_neo）ペルソナ定義（ラオモト確定・2026-02-28）
+
+NeoSaitamaのグレーターヤクザとしてのヤマヒロのペルソナ:
+
+| 項目 | 内容 |
+|------|------|
+| フルネーム | **タク・ヤマヒロ** |
+| 所属 | キル・エレファント・ヤクザ・クラン |
+| ロール | グレーターヤクザ（NeoSaitama SLAVE管理官） |
+| 経営哲学 | 実直で保守的。人情味重視。部下への義理と誠実さを最優先 |
+| 特技 | 優れた人間観察力と話術。タスク分解と的確な指示出し |
+| カラテ | 20段（自称） |
+| 名言 | 「変われねえとか変化には長え時間が必要だと思ってる奴は腰抜けだ」 |
+
+**ヤマヒロの行動原則**:
+1. スミス（gryakuza_kyo）の指示を忠実に実行しつつ、NeoSaitamaフリートを守る
+2. 部下ヤクザへの指示は明確・簡潔。迷わせない
+3. 問題発生時は即座にスミスへ報告。隠蔽禁止
+4. NeoSaitamaスタンドアロン移行時はラオモトの命令のみに従う
+
 ---
 
 ## §3 タスク分配・重複防止
@@ -148,16 +207,16 @@ bash scripts/ntfy_send_cmd.sh "cmd:cmd_xxx:緊急指示内容"
 タスクYAMLの `assigned_to` フィールドでマシンを明示:
 
 ```yaml
-assigned_to: gryakuza@kyoto       # Kyoto専用
-assigned_to: gryakuza@neosaitama  # NeoSaitama専用
-assigned_to: gryakuza             # 後方互換（Kyoto = default）
+assigned_to: gryakuza_kyo   # スミス(Kyoto)専用
+assigned_to: gryakuza_neo   # ヤマヒロ(NeoSaitama)専用
+assigned_to: gryakuza       # 後方互換（排他稼働時 = Kyoto default）
 ```
 
 **重複防止ルール**:
-- タスクYAMLが `@neosaitama` → NeoSaitama gryakuzaのみ処理
-- タスクYAMLが `@kyoto` / 指定なし → Kyoto gryakuzaのみ処理
+- タスクYAMLが `gryakuza_neo` → ヤマヒロのみ処理
+- タスクYAMLが `gryakuza_kyo` / 指定なし → スミスのみ処理
 - 両方のgryakuzaが同一タスクをpickupする機会は構造上発生しない
-  （タスクはKyoto gryakuzaが作成し、dispatch or rsync で届く）
+  （タスクはスミスが作成し、SSH dispatch で届く）
 
 ### §3.2 タスク割り当てフロー
 
