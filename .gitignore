@@ -55,6 +55,8 @@
 !lib/
 !lib/cli_adapter.sh
 !lib/ntfy_auth.sh
+!lib/ssh_fallback.sh
+!lib/ssh_inbox_write.sh
 
 # Multi-CLI: Codex auto-load file
 !AGENTS.md
