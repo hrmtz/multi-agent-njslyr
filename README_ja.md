@@ -453,11 +453,15 @@ multi-agent-njslyr/
 │   ├── inbox_watcher.sh       # inbox変更検知（inotifywait）
 │   ├── watcher_supervisor.sh  # watcherライフサイクル管理
 │   ├── cross_sync.sh          # Tailscale SSH経由rsync
-│   ├── ssh_fallback.sh        # ntfy障害時のSSHフォールバック
 │   ├── ntfy.sh                # プッシュ通知送信
 │   ├── ntfy_listener.sh       # スマホ＋クロスマシンメッセージ受信
 │   ├── ntfy_send_dispatch.sh  # タスク送信（キョート→ネオサイタマ）
 │   └── ntfy_send_report.sh    # レポート送信（ネオサイタマ→キョート）
+│
+├── lib/                       # 共有ライブラリ
+│   ├── cli_adapter.sh         # 動的CLI選択
+│   ├── ntfy_auth.sh           # ntfy認証
+│   └── ssh_fallback.sh        # SSH共通ライブラリ（フォールバック通信）
 │
 ├── queue/                     # 通信ファイル（真実のソース）
 │   ├── inbox/                 # エージェント別inbox
@@ -465,9 +469,6 @@ multi-agent-njslyr/
 │   └── reports/               # 完了レポート
 │
 ├── skills/                    # 再利用可能なオペレーションパターン
-│   ├── opus-3body-review/     # モンジュ: Opus3体相互批判
-│   ├── pipeline-runner/       # 多段パイプライン実行
-│   ├── tengu-spawn/           # ヤクザ天狗ライフサイクル
 │   └── skill-creator/         # メタ: 新スキル作成
 │
 ├── tests/                     # BATSテストスイート（ユニット＋インテグレーション）

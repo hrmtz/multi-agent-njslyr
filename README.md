@@ -454,11 +454,15 @@ multi-agent-njslyr/
 │   ├── inbox_watcher.sh       # Inbox change detection (inotifywait)
 │   ├── watcher_supervisor.sh  # Watcher lifecycle management
 │   ├── cross_sync.sh          # rsync over Tailscale SSH
-│   ├── ssh_fallback.sh        # SSH fallback when ntfy unavailable
 │   ├── ntfy.sh                # Push notifications
 │   ├── ntfy_listener.sh       # Phone + cross-machine message receiver
 │   ├── ntfy_send_dispatch.sh  # Task dispatch (Kyoto → NeoSaitama)
 │   └── ntfy_send_report.sh    # Report sender (NeoSaitama → Kyoto)
+│
+├── lib/                       # Shared libraries
+│   ├── cli_adapter.sh         # Dynamic CLI selection
+│   ├── ntfy_auth.sh           # ntfy authentication
+│   └── ssh_fallback.sh        # SSH common library (fallback transport)
 │
 ├── queue/                     # Communication (source of truth)
 │   ├── inbox/                 # Per-agent inbox files
@@ -466,9 +470,6 @@ multi-agent-njslyr/
 │   └── reports/               # Completion reports
 │
 ├── skills/                    # Reusable operation patterns
-│   ├── opus-3body-review/     # Monju: 3 Opus cross-critique
-│   ├── pipeline-runner/       # Multi-step pipeline execution
-│   ├── tengu-spawn/           # Yakuza Tengu lifecycle
 │   └── skill-creator/         # Meta: create new skills
 │
 ├── tests/                     # BATS test suite (unit + integration)
