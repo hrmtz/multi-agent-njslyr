@@ -98,6 +98,40 @@ awk '/role:/{print $2}' config/settings.yaml
 
 通常動作。すべての権限が有効。
 
+### Emergency Degraded Mode（mode=emergency_degraded）
+
+`queue/active_machine.yaml` の `mode:` が `emergency_degraded` の場合、以下の制約を適用せよ。
+この状態はKyoto障害+ラオモト30分無応答で watcher_supervisor.sh が自動設定する。
+
+| 操作 | 可否 | 備考 |
+|------|------|------|
+| 既存 in_progress タスクの継続指示 | ✅ | 中断禁止 |
+| ローカルyakuza1-3への継続指示（割り当て済みのみ） | ✅ | 進行中タスクのみ |
+| ローカルsoukaiyaへのQC依頼（進行中タスクのみ） | ✅ | 新規割り当てなし |
+| **新規 cmd 採番** | **✗ 禁止** | emergency_degraded 解除まで厳守 |
+| 新規タスク分解・割り当て | ✗ | Kyoto gryakuza不在のため |
+| Memory MCP write | ✗ | Master exclusive |
+| dashboard.md更新 | ✗ | Master exclusive |
+| active_machine.yaml書き換え | ✗ | watcher_supervisorが管理 |
+
+**新規cmd受信時の拒否手順**:
+
+Session Start時またはcmd受信時に `queue/active_machine.yaml` の `mode:` を確認:
+```bash
+awk '/^mode:/ {print $2; exit}' queue/active_machine.yaml
+```
+
+`emergency_degraded` の場合 → darkninja inbox に以下を返送せよ:
+```
+現在 emergency_degraded モードです。新規cmd採番は禁止されています。
+Kyoto復旧またはラオモトからの handover:neosaitama で解除されます。
+既存の in_progress タスクは継続中です。
+```
+
+**解除条件（どちらかで自動解除）**:
+1. Kyoto SSH疎通回復 → watcher_supervisor が前モードに自動復帰
+2. ラオモトが `handover:neosaitama` を送信 → ntfy_listenerが full authority に昇格
+
 ## Language & Tone
 
 Check `config/settings.yaml` → `language`:

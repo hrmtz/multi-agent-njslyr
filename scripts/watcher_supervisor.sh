@@ -23,6 +23,15 @@ HEARTBEAT_TIMEOUT=180  # 3分間heartbeat受信なしでntfy_listener再起動
 NTFY_LISTENER_HEARTBEAT="$PROJECT_ROOT/logs/ntfy_listener_last_heartbeat.txt"
 NTFY_LISTENER_LOG="$PROJECT_ROOT/logs/ntfy_listener.log"
 
+# KYOTO-MONITOR: Kyoto SSH heartbeat監視 + 緊急縮退モード（NeoSaitamaのみ）
+KYOTO_HEARTBEAT_TIMEOUT=180   # 3分間SSH応答なし→障害確定（3サイクル×60s）
+KYOTO_ALERT_TIMEOUT=1800      # 30分間ラオモト応答なし→emergency_degraded移行
+KYOTO_CHECK_INTERVAL=60       # SSH疎通確認間隔（秒）
+KYOTO_LAST_SEEN="$STATE_DIR/kyoto_last_seen"
+KYOTO_NEXT_CHECK="$STATE_DIR/kyoto_next_check"
+KYOTO_ALERT_SENT="$STATE_DIR/kyoto_alert_sent_at"
+KYOTO_PRE_EMERGENCY="$STATE_DIR/kyoto_pre_emergency_mode"
+
 mkdir -p logs queue/inbox "$STATE_DIR"
 
 # Per-agent backoff state: consecutive restart count and next-allowed-restart timestamp
@@ -235,6 +244,153 @@ check_heartbeat_watchdog() {
     fi
 }
 
+# KYOTO-MONITOR: Kyoto SSH heartbeat監視 + 緊急縮退モード自動移行（NeoSaitamaのみ動作）
+# ラオモト裁定 Option A: 30分タイムアウト → emergency_degraded モード
+check_kyoto_heartbeat_and_emergency() {
+    # NeoSaitama (role=neosaitama) のみ実行。Kyoto側ではスキップ。
+    local _role
+    _role=$(awk '/^  role:/ {print $2; exit}' "$SCRIPT_DIR/config/settings.yaml" 2>/dev/null)
+    _role="${_role:-kyoto}"
+    case "$_role" in mbp) _role="neosaitama" ;; ryzen) _role="kyoto" ;; esac
+    [[ "$_role" != "neosaitama" ]] && return 0
+
+    local peer_host
+    peer_host=$(awk '/peer_host:/ {print $2; exit}' "$SCRIPT_DIR/config/settings.yaml" 2>/dev/null)
+    [[ -z "$peer_host" ]] && return 0
+
+    local now
+    now=${EPOCHSECONDS:-$(date +%s)}
+
+    # Rate-limit: KYOTO_CHECK_INTERVAL秒に1回のみSSH確認実行
+    local next_check
+    next_check=$(cat "$KYOTO_NEXT_CHECK" 2>/dev/null)
+    [[ ! "$next_check" =~ ^[0-9]+$ ]] && next_check=0
+    if (( now < next_check )); then
+        return 0
+    fi
+    printf '%s\n' "$(( now + KYOTO_CHECK_INTERVAL ))" > "$KYOTO_NEXT_CHECK"
+
+    local am_file="$PROJECT_ROOT/queue/active_machine.yaml"
+
+    # SSH ping Kyoto（BatchMode=yes: パスワード入力待ちを防止）
+    if ssh -o ConnectTimeout=5 -o BatchMode=yes "$peer_host" "exit 0" >/dev/null 2>&1; then
+        # Kyoto生存: last_seen更新
+        printf '%s\n' "$now" > "$KYOTO_LAST_SEEN"
+
+        # emergency_degradedからの復旧処理
+        local current_mode
+        current_mode=$(awk '/^mode:/ {print $2; exit}' "$am_file" 2>/dev/null)
+        if [[ "$current_mode" == "emergency_degraded" ]]; then
+            local pre_mode
+            pre_mode=$(cat "$KYOTO_PRE_EMERGENCY" 2>/dev/null)
+            pre_mode="${pre_mode:-simultaneous}"
+            echo "[watcher_supervisor] KYOTO-MONITOR: Kyoto SSH restored. Reverting emergency_degraded → ${pre_mode}." >&2
+            local ts
+            ts=$(date "+%Y-%m-%dT%H:%M:%S+09:00")
+            local tmp_file="${STATE_DIR}/am_recovery_$$"
+            cat > "$tmp_file" << EOF
+mode: ${pre_mode}
+primary: kyoto
+secondary: neosaitama
+since: "${ts}"
+activated_by: watcher_supervisor
+recovered_from: emergency_degraded
+EOF
+            mv "$tmp_file" "$am_file"
+            bash "$PROJECT_ROOT/scripts/inbox_write.sh" gryakuza \
+                "緊急縮退モード解除: Kyoto SSH疎通回復。${pre_mode}モードに復帰。新規cmd採番制限を解除。" \
+                "system_notice" "watcher_supervisor" "" P0 2>/dev/null || true
+            rm -f "$KYOTO_ALERT_SENT" "$KYOTO_PRE_EMERGENCY"
+        fi
+        return 0
+    fi
+
+    # SSH失敗: elapsed計算
+    local last_seen
+    last_seen=$(cat "$KYOTO_LAST_SEEN" 2>/dev/null)
+    if [[ ! "$last_seen" =~ ^[0-9]+$ ]]; then
+        # 初回失敗: ベースライン記録してまだ障害扱いしない
+        printf '%s\n' "$now" > "$KYOTO_LAST_SEEN"
+        return 0
+    fi
+
+    local elapsed=$(( now - last_seen ))
+
+    # 3分未満: まだ警戒中（障害未確定）
+    if (( elapsed < KYOTO_HEARTBEAT_TIMEOUT )); then
+        return 0
+    fi
+
+    # 障害確定（3分以上SSH応答なし）: ラオモトへntfy通知（初回のみ）
+    if [[ ! -f "$KYOTO_ALERT_SENT" ]]; then
+        echo "[watcher_supervisor] KYOTO-MONITOR: Kyoto heartbeat lost (${elapsed}s). Alerting Laomoto via ntfy." >&2
+        local ntfy_topic
+        ntfy_topic=$(awk '/ntfy_topic:/ {print $2; exit}' "$SCRIPT_DIR/config/settings.yaml" 2>/dev/null)
+        if [[ -n "$ntfy_topic" ]]; then
+            curl -s --max-time 10 -X POST "https://ntfy.sh/${ntfy_topic}" \
+                -H "Title: CRITICAL: Kyoto障害検知" \
+                -H "Priority: urgent" \
+                -d "NeoSaitamaがKyotoのSSH heartbeatを${elapsed}秒間検知できません。handover:neosaitama を送信してください。30分以内に応答がない場合、緊急縮退モード(emergency_degraded)に自動移行します。" \
+                >/dev/null 2>&1 || true
+        fi
+        bash "$PROJECT_ROOT/scripts/inbox_write.sh" gryakuza \
+            "CRITICAL: Kyoto SSH heartbeat喪失 (${elapsed}秒経過)。ラオモトへntfy通知送信済み。30分応答なし→emergency_degradedに自動移行予定。" \
+            "system_notice" "watcher_supervisor" "" P0 2>/dev/null || true
+        printf '%s\n' "$now" > "$KYOTO_ALERT_SENT"
+        return 0
+    fi
+
+    # アラート送信済み: 30分タイムアウト確認
+    local alert_sent
+    alert_sent=$(cat "$KYOTO_ALERT_SENT" 2>/dev/null)
+    [[ ! "$alert_sent" =~ ^[0-9]+$ ]] && return 0
+
+    local alert_elapsed=$(( now - alert_sent ))
+    if (( alert_elapsed < KYOTO_ALERT_TIMEOUT )); then
+        return 0  # まだ30分経過していない（ラオモト応答待ち）
+    fi
+
+    # 30分タイムアウト: 既にemergency_degradedまたはexclusiveなら重複移行しない
+    local current_mode
+    current_mode=$(awk '/^mode:/ {print $2; exit}' "$am_file" 2>/dev/null)
+    if [[ "$current_mode" == "emergency_degraded" || "$current_mode" == "exclusive" ]]; then
+        return 0
+    fi
+
+    # 緊急縮退モード（emergency_degraded）移行（ラオモト裁定 Option A）
+    echo "[watcher_supervisor] KYOTO-MONITOR: 30min timeout. No Laomoto response. Activating emergency_degraded." >&2
+    printf '%s\n' "${current_mode:-simultaneous}" > "$KYOTO_PRE_EMERGENCY"
+
+    local ts
+    ts=$(date "+%Y-%m-%dT%H:%M:%S+09:00")
+    local tmp_file="${STATE_DIR}/am_emergency_$$"
+    cat > "$tmp_file" << EOF
+mode: emergency_degraded
+primary: neosaitama
+since: "${ts}"
+triggered_by: kyoto_heartbeat_timeout_30min
+kyoto_last_seen: "${ts}"
+restrictions:
+  new_cmd_assignment: forbidden
+  in_progress_tasks: continue
+EOF
+    mv "$tmp_file" "$am_file"
+
+    bash "$PROJECT_ROOT/scripts/inbox_write.sh" gryakuza \
+        "緊急縮退モード（emergency_degraded）移行完了。Kyoto SSH heartbeat喪失から30分経過、ラオモト応答なし。既存in_progressタスクのみ継続可。新規cmd採番禁止。active_machine.yaml更新済み。解除: Kyoto復旧またはhandover:neosaitama。" \
+        "system_notice" "watcher_supervisor" "" P0 2>/dev/null || true
+
+    local ntfy_topic
+    ntfy_topic=$(awk '/ntfy_topic:/ {print $2; exit}' "$SCRIPT_DIR/config/settings.yaml" 2>/dev/null)
+    if [[ -n "$ntfy_topic" ]]; then
+        curl -s --max-time 10 -X POST "https://ntfy.sh/${ntfy_topic}" \
+            -H "Title: 緊急縮退モード移行完了" \
+            -H "Priority: urgent" \
+            -d "NeoSaitamaが緊急縮退モード(emergency_degraded)に移行しました。既存タスクのみ継続。解除: handover:neosaitama または Kyoto復旧。" \
+            >/dev/null 2>&1 || true
+    fi
+}
+
 # Graceful shutdown: log and exit cleanly on SIGTERM/SIGINT
 cleanup() {
     echo "[watcher_supervisor] shutting down (signal received)" >&2
@@ -257,6 +413,7 @@ while true; do
     fi
 
     check_heartbeat_watchdog
+    check_kyoto_heartbeat_and_emergency
     scan_all_agents
     sleep 5
 done
