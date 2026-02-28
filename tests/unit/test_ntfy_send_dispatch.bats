@@ -36,8 +36,9 @@ machine:
   peer_host: peer-hostname
 EOF
 
-    # lib/ntfy_auth.sh（本物をコピー）
+    # lib/ntfy_auth.sh + lib/ssh_fallback.sh（本物をコピー）
     cp "$PROJECT_ROOT/lib/ntfy_auth.sh" "$MOCK_DIR/lib/"
+    cp "$PROJECT_ROOT/lib/ssh_fallback.sh" "$MOCK_DIR/lib/"
 
     # テスト用タスクYAML
     cat > "$MOCK_DIR/queue/tasks/yakuza3_subtask_test.yaml" << 'EOF'

@@ -31,6 +31,13 @@ YAML
 ntfy_get_auth_args() { echo ""; }
 MOCK
 
+    # Stub ssh_fallback.sh: peer未設定を返す（SSH fallbackをスキップさせる）
+    cat > "$MOCK_PROJECT/lib/ssh_fallback.sh" << 'STUB'
+SSH_OPTS=""
+_ssh_get_peer_host() { echo ""; }
+_ssh_get_peer_project() { echo ""; }
+STUB
+
     # Mock report YAML
     MOCK_REPORT="$TEST_TMP/test_report.yaml"
     cat > "$MOCK_REPORT" << 'YAML'
