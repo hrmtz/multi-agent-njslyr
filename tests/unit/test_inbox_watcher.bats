@@ -181,9 +181,10 @@ teardown() {
 # Section 1: Timeout & Main Loop Code Structure (FIX-001)
 # ═══════════════════════════════════════════════════════════════
 
-@test "T-TIMEOUT-001: INOTIFY_TIMEOUT defaults to 5 (not 30)" {
-    grep -q 'INOTIFY_TIMEOUT=.*5' "$WATCHER_SCRIPT"
-    ! grep -q 'INOTIFY_TIMEOUT=.*30' "$WATCHER_SCRIPT"
+@test "T-TIMEOUT-001: INOTIFY_TIMEOUT base defaults to 5 (not 30)" {
+    # FIX-021: INOTIFY_TIMEOUT renamed to INOTIFY_TIMEOUT_BASE (thundering herd jitter)
+    grep -q 'INOTIFY_TIMEOUT_BASE=.*5' "$WATCHER_SCRIPT" || grep -q 'INOTIFY_TIMEOUT=.*5' "$WATCHER_SCRIPT"
+    ! grep -q 'INOTIFY_TIMEOUT_BASE=.*30' "$WATCHER_SCRIPT"
 }
 
 @test "T-TIMEOUT-002: Main loop contains mtime before/after recheck (FIX-001)" {

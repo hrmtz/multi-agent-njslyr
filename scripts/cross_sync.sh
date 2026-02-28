@@ -22,7 +22,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SETTINGS="$SCRIPT_DIR/config/settings.yaml"
+SETTINGS="${SETTINGS_FILE:-$SCRIPT_DIR/config/settings.yaml}"
 LOCKFILE="$SCRIPT_DIR/.state/njslyr_sync.lock"
 LOG_DIR="$SCRIPT_DIR/logs"
 LOG_FILE="$LOG_DIR/cross_sync.log"
@@ -117,6 +117,12 @@ _mcp_project_slug=$(echo "$SCRIPT_DIR" | sed 's|^/||; s|/|-|g')
 MCP_MEMORY_DIR="$HOME/.claude/projects/-${_mcp_project_slug}/memory/"
 
 # ─── Helper functions ──────────────────────────────────────────
+
+_get_operation_mode() {
+    local mode
+    mode=$(awk '/operation_mode:/ {print $2; exit}' "$SETTINGS" 2>/dev/null)
+    echo "${mode:-kyoto_master}"
+}
 
 log_info() {
     echo "[$(date)] $LOG_TAG $*" >&2
@@ -261,6 +267,11 @@ sync_mcp_memory() {
 # ─── Main execution ───────────────────────────────────────────
 
 main() {
+    if [[ "$(_get_operation_mode)" == "standalone" ]]; then
+        echo "[cross_sync] standalone mode: skipping cross-machine sync" >&2
+        return 0
+    fi
+
     log_info "Starting cross_sync: $SUBCMD (role=$MACHINE_ROLE peer=$PEER_HOST)"
 
     # Ensure directories exist for lock file and log file

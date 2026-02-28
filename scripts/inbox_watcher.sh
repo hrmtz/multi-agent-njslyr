@@ -1160,13 +1160,25 @@ process_unread_once() {
 # ─── Startup & Main loop (skipped in testing mode) ───
 if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
 
+# ─── Startup jitter: stagger watcher start times to prevent thundering herd ───
+# FIX-021: 11 watchers starting simultaneously cause fork burst → Resource temporarily unavailable
+_startup_jitter=$(( RANDOM % 3 ))
+echo "[$(date)] inbox_watcher startup jitter: ${_startup_jitter}s for $AGENT_ID" >&2
+sleep "$_startup_jitter"
+
 # ─── Startup: process any existing unread messages ───
 process_unread_once
 
 # ─── Main loop: event-driven via inotifywait ───
-# Timeout 5s: WSL2 /mnt/c/ can miss inotify events. Shorter timeout = faster escalation retry.
+# Timeout 5-10s: WSL2 /mnt/c/ can miss inotify events. Shorter timeout = faster escalation retry.
+# FIX-021: Randomized timeout (base + jitter) prevents thundering herd.
 # Linux: dir監視 + moved_to イベントで atomic write (tmp→rename) に対応。
-INOTIFY_TIMEOUT="${INOTIFY_TIMEOUT:-5}"
+INOTIFY_TIMEOUT_BASE="${INOTIFY_TIMEOUT:-5}"
+INOTIFY_TIMEOUT_JITTER="${INOTIFY_TIMEOUT_JITTER:-5}"
+# FIX-021: Consecutive fork failure counter — backoff on repeated failures
+_FORK_FAIL_COUNT=0
+_FORK_FAIL_MAX=5
+_FORK_FAIL_BACKOFF_BASE=2
 
 while true; do
     # FIX-010: Orphan check integrated with resolve_pane_target (avoids duplicate tmux list-panes)
@@ -1178,18 +1190,20 @@ while true; do
         exit 0
     fi
 
+    # FIX-021: Randomized inotify timeout to prevent thundering herd
+    _jittered_timeout=$(( INOTIFY_TIMEOUT_BASE + RANDOM % (INOTIFY_TIMEOUT_JITTER + 1) ))
+
     # Block until file is modified OR timeout (safety net for WSL2 / fswatch)
     # set +e: file-watch returns 2 on timeout, which would kill script under set -e
     set +e
-    _wait_for_file_change "$INBOX" "$INOTIFY_TIMEOUT"
+    _wait_for_file_change "$INBOX" "$_jittered_timeout"
     rc=$?
-    set -e
 
     # rc=0: event fired (instant delivery — moved_to/close_write/modify)
     # rc=1: watch invalidated — Claude Code uses atomic write (tmp+rename),
     #        which replaces the inode. inotifywait sees DELETE_SELF → rc=1.
     #        File still exists with new inode. Treat as event, re-watch next loop.
-    # rc=2: timeout (5s safety net for WSL2 inotify gaps)
+    # rc=2: timeout (safety net for WSL2 inotify gaps)
     # All cases: check for unread, then loop back to inotifywait (re-watches new inode)
 
     # FIX-001: Capture mtime before processing to detect gap-window writes
@@ -1199,13 +1213,41 @@ while true; do
         _mtime_before=$(stat -c %Y "$INBOX" 2>/dev/null || echo 0)
     fi
 
+    # FIX-021: Wrap process_unread in error handler to survive transient fork failures.
+    # Without this, set -e kills the watcher on any fork exhaustion during processing,
+    # which triggers supervisor restart of all watchers simultaneously → cascade failure.
     if [ "$rc" -eq 2 ]; then
         if [ "${ASW_PROCESS_TIMEOUT:-1}" = "1" ]; then
-            process_unread "timeout"
+            process_unread "timeout" || {
+                _FORK_FAIL_COUNT=$((_FORK_FAIL_COUNT + 1))
+                _backoff=$(( _FORK_FAIL_BACKOFF_BASE * _FORK_FAIL_COUNT ))
+                (( _backoff > 30 )) && _backoff=30
+                echo "[$(date)] [WARN] process_unread failed for $AGENT_ID (attempt ${_FORK_FAIL_COUNT}) — backoff ${_backoff}s" >&2
+                sleep "$_backoff"
+                if (( _FORK_FAIL_COUNT >= _FORK_FAIL_MAX )); then
+                    echo "[$(date)] [ERROR] $AGENT_ID: ${_FORK_FAIL_MAX} consecutive failures — exiting for supervisor restart" >&2
+                    exit 1
+                fi
+                continue
+            }
         fi
     else
-        process_unread "event"
+        process_unread "event" || {
+            _FORK_FAIL_COUNT=$((_FORK_FAIL_COUNT + 1))
+            _backoff=$(( _FORK_FAIL_BACKOFF_BASE * _FORK_FAIL_COUNT ))
+            (( _backoff > 30 )) && _backoff=30
+            echo "[$(date)] [WARN] process_unread failed for $AGENT_ID (attempt ${_FORK_FAIL_COUNT}) — backoff ${_backoff}s" >&2
+            sleep "$_backoff"
+            if (( _FORK_FAIL_COUNT >= _FORK_FAIL_MAX )); then
+                echo "[$(date)] [ERROR] $AGENT_ID: ${_FORK_FAIL_MAX} consecutive failures — exiting for supervisor restart" >&2
+                exit 1
+            fi
+            continue
+        }
     fi
+    # Reset fork failure counter on success
+    _FORK_FAIL_COUNT=0
+    set -e
 
     # FIX-001: Recheck mtime — if inbox was modified during processing, skip wait and re-loop
     if [[ "$_UNAME_S" == "Darwin" ]]; then

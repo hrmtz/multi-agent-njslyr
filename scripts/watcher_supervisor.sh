@@ -99,6 +99,8 @@ start_watcher_if_missing() {
     BACKOFF_UNTIL[$agent]=$(( now + delay ))
 
     cli=$(tmux show-options -p -t "$pane" -v @agent_cli 2>/dev/null); cli=${cli:-claude}
+    # FIX-021: Stagger restarts to prevent thundering herd fork exhaustion
+    sleep $(( RANDOM % 2 ))
     nohup bash scripts/inbox_watcher.sh "$agent" "$pane" "$cli" >> "$log_file" 2>&1 &
     echo "[watcher_supervisor] started inbox_watcher for $agent (attempt=${count}, next_backoff=${delay}s)"
 }
@@ -148,6 +150,8 @@ start_watcher_for_agent() {
 
     local cli
     cli=$(tmux show-options -p -t "$pane_id" -v @agent_cli 2>/dev/null); cli=${cli:-claude}
+    # FIX-021: Stagger restarts to prevent thundering herd fork exhaustion
+    sleep $(( RANDOM % 2 ))
     nohup bash scripts/inbox_watcher.sh "$agent" "$pane_id" "$cli" >> "$log_file" 2>&1 &
     echo "[watcher_supervisor] started inbox_watcher for $agent → $pane_id (attempt=${count}, next_backoff=${delay}s)"
 }

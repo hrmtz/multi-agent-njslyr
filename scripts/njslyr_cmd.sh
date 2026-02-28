@@ -43,11 +43,21 @@ mkdir -p "$STATE_DIR"
 # shellcheck source=scripts/njslyr_lib.sh
 source "$SCRIPT_DIR/njslyr_lib.sh"
 
+# ─── helper: operation mode check (standalone guard) ───
+_get_operation_mode() {
+    local mode
+    mode=$(awk '/operation_mode:/ {print $2; exit}' "$PROJECT_ROOT/config/settings.yaml" 2>/dev/null)
+    echo "${mode:-kyoto_master}"
+}
+
 # ─── helper: ntfy fallback for suriken (cross-machine) ───
 # ローカルペインが見つからない場合にntfy経由でリモートマシンにスリケンを送る
 # 引数: agent_id (必須)
 _cmd_suriken_ntfy_fallback() {
     local agent_id="$1"
+    if [[ "$(_get_operation_mode)" == "standalone" ]]; then
+        return 1  # fallback skip → local-only
+    fi
 
     # inbox unread count を取得
     local unread_count
@@ -108,6 +118,9 @@ _cmd_suriken_ntfy_fallback() {
 # 引数: agent_id (必須)
 _cmd_suriken_ssh_fallback() {
     local agent_id="$1"
+    if [[ "$(_get_operation_mode)" == "standalone" ]]; then
+        return 1  # fallback skip → local-only
+    fi
     # shellcheck source=lib/ssh_fallback.sh
     source "$PROJECT_ROOT/lib/ssh_fallback.sh"
     echo "[suriken] SSH tier2 → $agent_id" >&2

@@ -17,6 +17,17 @@ if [[ ! -f "$SETTINGS" ]]; then
     exit 1
 fi
 
+_get_operation_mode() {
+    local mode
+    mode=$(awk '/operation_mode:/ {print $2; exit}' "$SETTINGS" 2>/dev/null)
+    echo "${mode:-kyoto_master}"
+}
+
+if [[ "$(_get_operation_mode)" == "standalone" ]]; then
+    echo "[ntfy_send_report] standalone mode: skipping" >&2
+    exit 0
+fi
+
 TOPIC=$(awk '/ntfy_topic:/ {gsub(/"/, ""); print $2; exit}' "$SETTINGS")
 
 # shellcheck source=../lib/ntfy_auth.sh

@@ -9,12 +9,23 @@
 # ═══════════════════════════════════════════════════════════════
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SETTINGS="$SCRIPT_DIR/config/settings.yaml"
+SETTINGS="${SETTINGS_FILE:-$SCRIPT_DIR/config/settings.yaml}"
 
 # settings.yaml 存在確認（スタンドアロン動作防止）
 if [[ ! -f "$SETTINGS" ]]; then
     echo "[ntfy_send_dispatch] ERROR: settings.yaml not found (role=kyoto). dispatch unavailable." >&2
     exit 1
+fi
+
+_get_operation_mode() {
+    local mode
+    mode=$(awk '/operation_mode:/ {print $2; exit}' "$SETTINGS" 2>/dev/null)
+    echo "${mode:-kyoto_master}"
+}
+
+if [[ "$(_get_operation_mode)" == "standalone" ]]; then
+    echo "[dispatch] standalone mode: skipping" >&2
+    exit 0
 fi
 
 TOPIC=$(awk '/ntfy_topic:/ {gsub(/"/, ""); print $2; exit}' "$SETTINGS")
