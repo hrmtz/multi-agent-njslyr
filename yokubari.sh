@@ -792,6 +792,8 @@ else
     tmux set-option -p -t main:tortoise @model_name "Sonnet"
     tmux set-option -p -t main:tortoise @current_task ""
     MONITOR_PANE="main:tortoise"
+    # attach時にダークニンジャが前面に来るようにする（tortoise new-windowでアクティブが移るため）
+    tmux select-window -t main:darkninja
     log_success "  └─ ラオモトのホンジン（darkninja + tortoise）、コンストラクト完了！ワザマエ！"
 fi
 

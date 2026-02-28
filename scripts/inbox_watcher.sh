@@ -1180,14 +1180,25 @@ _FORK_FAIL_COUNT=0
 _FORK_FAIL_MAX=5
 _FORK_FAIL_BACKOFF_BASE=2
 
+# FIX-022: Orphan detection grace — require 3 consecutive misses before exit.
+# Single-miss exit caused false orphan kills during yokubari restart / window rename.
+_ORPHAN_MISS_COUNT=0
+_ORPHAN_MISS_MAX=3
+
 while true; do
     # FIX-010: Orphan check integrated with resolve_pane_target (avoids duplicate tmux list-panes)
     # Force cache refresh for orphan detection
     _RESOLVE_CACHE_TARGET=""
     resolve_pane_target
     if [ "${_RESOLVE_PANE_FOUND:-1}" -eq 0 ]; then
-        echo "[inbox_watcher] pane for $AGENT_ID not found. Exiting orphan watcher." >&2
-        exit 0
+        _ORPHAN_MISS_COUNT=$(( _ORPHAN_MISS_COUNT + 1 ))
+        if [ "$_ORPHAN_MISS_COUNT" -ge "$_ORPHAN_MISS_MAX" ]; then
+            echo "[inbox_watcher] pane for $AGENT_ID not found (${_ORPHAN_MISS_COUNT}/${_ORPHAN_MISS_MAX} consecutive misses). Exiting orphan watcher." >&2
+            exit 0
+        fi
+        echo "[$(date)] [WARN] pane for $AGENT_ID not found (${_ORPHAN_MISS_COUNT}/${_ORPHAN_MISS_MAX}). Will retry." >&2
+    else
+        _ORPHAN_MISS_COUNT=0
     fi
 
     # FIX-021: Randomized inotify timeout to prevent thundering herd
