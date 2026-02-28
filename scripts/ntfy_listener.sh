@@ -283,8 +283,10 @@ handle_handover() {
     local tmp_file
     tmp_file=$(mktemp "${am_file}.XXXXXX")
     cat > "$tmp_file" << EOF
-active_machine: $target
+mode: exclusive
+primary: $target
 since: "$ts"
+activated_by: laomoto
 handover_by: laomoto
 standby_mode: minimal        # minimal | full_stop
 EOF
@@ -612,6 +614,30 @@ handle_suriken() {
     fi
 }
 
+# activate:simultaneous → active_machine.yaml をsimultaneousモードに更新
+handle_activate_simultaneous() {
+    echo "[$(date)] [ntfy_listener] activate:simultaneous received" >&2
+    local am_file="$SCRIPT_DIR/queue/active_machine.yaml"
+    local ts tz_len
+    ts=$(date "+%Y-%m-%dT%H:%M:%S%z")
+    tz_len=${#ts}
+    ts="${ts:0:$((tz_len-2))}:${ts:$((tz_len-2))}"
+    local tmp_file
+    tmp_file=$(mktemp "${am_file}.XXXXXX")
+    cat > "$tmp_file" << EOF
+mode: simultaneous
+primary: kyoto
+secondary: neosaitama
+since: "$ts"
+activated_by: laomoto_ntfy
+EOF
+    mv -f "$tmp_file" "$am_file"
+    echo "[$(date)] [ntfy_listener] active_machine.yaml updated → simultaneous" >&2
+    bash "$SCRIPT_DIR/scripts/inbox_write.sh" gryakuza \
+        "activate:simultaneous 受信。active_machine.yaml をsimultaneousモードに更新した。同時稼働準備を開始せよ。" \
+        ntfy_received ntfy_listener "" P0
+}
+
 # Route message by prefix. Returns 0 if handled, 1 if fallback needed.
 # Return code 2 means: handled but skip ntfy_inbox recording (e.g. ping:).
 route_message() {
@@ -669,10 +695,20 @@ route_message() {
             handle_suriken "$payload"
             return 2
             ;;
+        activate)
+            if [[ "$payload" == "simultaneous" ]]; then
+                handle_activate_simultaneous
+            else
+                echo "[$(date)] [ntfy_listener] WARNING: unknown activate subcommand: ${payload:0:50}" >&2
+            fi
+            return 0
+            ;;
         *)
-            # Unknown prefix or no prefix → log as unrecognized, do not route
-            echo "[$(date)] [ntfy_listener] [UNRECOGNIZED PREFIX]: ${msg:0:80}" >&2
-            return 1
+            # Free text from Raomoto's phone → forward to darkninja inbox
+            bash "$SCRIPT_DIR/scripts/inbox_write.sh" darkninja \
+                "ntfy free text: $msg" "ntfy_message" "ntfy_listener" "" P1
+            echo "[$(date)] [ntfy_listener] free text forwarded to darkninja: ${msg:0:80}" >&2
+            return 0
             ;;
     esac
 }
