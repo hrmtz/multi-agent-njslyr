@@ -50,8 +50,8 @@ _get_operation_mode() {
     echo "${mode:-kyoto_master}"
 }
 
-# ─── helper: ntfy fallback for suriken (cross-machine) ───
-# ローカルペインが見つからない場合にntfy経由でリモートマシンにスリケンを送る
+# ─── helper: ntfy tier2 fallback for suriken (cross-machine) ───
+# SSH tier1失敗時にntfy経由でリモートマシンにスリケンを送る（tier2フォールバック）
 # 引数: agent_id (必須)
 _cmd_suriken_ntfy_fallback() {
     local agent_id="$1"
@@ -105,16 +105,16 @@ _cmd_suriken_ntfy_fallback() {
         "https://ntfy.sh/${peer_topic}")
 
     if [[ "$response_code" =~ ^2 ]]; then
-        echo "[suriken] ntfy fallback → ${peer_topic}: suriken:${agent_id}:${unread_count} (HTTP ${response_code})"
+        echo "[suriken] ntfy tier2 → ${peer_topic}: suriken:${agent_id}:${unread_count} (HTTP ${response_code})"
         return 0
     else
-        echo "[suriken] ntfy fallback FAILED: HTTP ${response_code}" >&2
+        echo "[suriken] ntfy tier2 FAILED: HTTP ${response_code}" >&2
         return 1
     fi
 }
 
-# ─── helper: SSH tier2 fallback for suriken (cross-machine) ───
-# ntfy tier1失敗時にSSH経由でリモートマシンにスリケンを送る
+# ─── helper: SSH tier1 primary for suriken (cross-machine) ───
+# ローカルペインが見つからない場合にSSH経由でリモートマシンにスリケンを送る（tier1優先）
 # 引数: agent_id (必須)
 _cmd_suriken_ssh_fallback() {
     local agent_id="$1"
@@ -123,12 +123,12 @@ _cmd_suriken_ssh_fallback() {
     fi
     # shellcheck source=lib/ssh_fallback.sh
     source "$PROJECT_ROOT/lib/ssh_fallback.sh"
-    echo "[suriken] SSH tier2 → $agent_id" >&2
+    echo "[suriken] SSH tier1 → $agent_id" >&2
     if ssh_send_suriken "$agent_id"; then
-        echo "[suriken] SSH tier2 success → $agent_id"
+        echo "[suriken] SSH tier1 success → $agent_id"
         return 0
     else
-        echo "[suriken] SSH tier2 FAILED → $agent_id" >&2
+        echo "[suriken] SSH tier1 FAILED → $agent_id" >&2
         return 1
     fi
 }
@@ -180,13 +180,13 @@ cmd_suriken() {
             fi
         fi
 
-        echo "[suriken] pane not found for $agent_id — trying ntfy tier1 fallback..." >&2
-        if ! _cmd_suriken_ntfy_fallback "$agent_id"; then
-            echo "[suriken] ntfy tier1 failed → SSH tier2..." >&2
-            _cmd_suriken_ssh_fallback "$agent_id"
-            return $?
+        echo "[suriken] pane not found for $agent_id — trying SSH tier1..." >&2
+        if _cmd_suriken_ssh_fallback "$agent_id"; then
+            return 0
         fi
-        return 0
+        echo "[suriken] SSH tier1 failed → ntfy tier2..." >&2
+        _cmd_suriken_ntfy_fallback "$agent_id"
+        return $?
     fi
 
     # メッセージがある場合はinbox_write（from="njslyr"固定）

@@ -90,6 +90,16 @@ echo "mock cross_sync: $*"
 MOCK
     chmod +x "$MOCK_PROJECT/scripts/cross_sync.sh"
 
+    # Mock lib/ssh_inbox_write.sh (records calls, succeeds by default)
+    SSH_INBOX_WRITE_LOG="$TEST_TMP/ssh_inbox_write_calls.log"
+    export SSH_INBOX_WRITE_LOG
+    cat > "$MOCK_PROJECT/lib/ssh_inbox_write.sh" << 'MOCK'
+#!/bin/bash
+echo "$@" >> "${SSH_INBOX_WRITE_LOG}"
+exit 0
+MOCK
+    chmod +x "$MOCK_PROJECT/lib/ssh_inbox_write.sh"
+
     # Add mock bin to PATH (before real commands)
     export PATH="$TEST_TMP/mock_bin:$PATH"
 
@@ -215,12 +225,19 @@ call_with_stderr() {
     grep -q "darkninja" "$INBOX_WRITE_LOG"
 }
 
-# --- T-NL-PFX-003: 未知prefixのデフォルト処理 ---
+# --- T-NL-PFX-003: 未知prefixのデフォルト処理（free textとしてdarkninja転送）---
+# free textハンドラー追加(cmd_306 C4-A)により、未知prefixはdarkninja inboxに転送。
+# 旧動作: return 1 + "UNRECOGNIZED PREFIX" → 新動作: return 0 + inbox_write(darkninja)
 
-@test "T-NL-PFX-003: route_message returns 1 for unknown prefix (fallback)" {
+@test "T-NL-PFX-003: route_message forwards unknown prefix as free text to darkninja" {
     run call_with_stderr route_message "unknown_thing:data_here" ""
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"UNRECOGNIZED PREFIX"* ]]
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"free text forwarded to darkninja"* ]]
+
+    # darkninja へ inbox_write が呼ばれたことを確認
+    [ -f "$INBOX_WRITE_LOG" ]
+    grep -q "darkninja" "$INBOX_WRITE_LOG"
+    grep -q "ntfy free text" "$INBOX_WRITE_LOG"
 }
 
 # --- T-NL-PFX-004: prefix偽装安全処理 ---
@@ -892,4 +909,120 @@ EOF
 @test "T-NL-FT-002: route_message free text returns 0" {
     run call_with_stderr route_message "another free text message" "test-topic"
     [ "$status" -eq 0 ]
+}
+
+# ═══════════════════════════════════════════════════════════════
+# laomoto topic forwarding tests (cmd_315 subtask_315b)
+# ═══════════════════════════════════════════════════════════════
+
+# --- T-NL-LAOMOTO-001: laomotoトピックメッセージ → darkninja inbox転送 ---
+
+@test "T-NL-LAOMOTO-001: route_message laomoto topic forwards to darkninja with LINE: prefix" {
+    TOPIC_LAOMOTO="test-laomoto-topic"
+    run call_with_stderr route_message "こんにちは from スマホ" "test-laomoto-topic"
+    [ "$status" -eq 0 ]
+
+    [ -f "$INBOX_WRITE_LOG" ]
+    grep -q "darkninja" "$INBOX_WRITE_LOG"
+    grep -q "master_tortoise" "$INBOX_WRITE_LOG"
+    grep -q "LINE:" "$INBOX_WRITE_LOG"
+    grep -q "laomoto_message" "$INBOX_WRITE_LOG"
+}
+
+# --- T-NL-LAOMOTO-002: laomotoトピック内のcmd:プレフィックスも darkninja に転送（prefix routingバイパス） ---
+
+@test "T-NL-LAOMOTO-002: route_message laomoto topic bypasses prefix routing (cmd: still forwarded to darkninja)" {
+    TOPIC_LAOMOTO="test-laomoto-topic"
+    run call_with_stderr route_message "cmd:something" "test-laomoto-topic"
+    [ "$status" -eq 0 ]
+
+    [ -f "$INBOX_WRITE_LOG" ]
+    grep -q "darkninja" "$INBOX_WRITE_LOG"
+    grep -q "master_tortoise" "$INBOX_WRITE_LOG"
+    grep -q "LINE:" "$INBOX_WRITE_LOG"
+}
+
+# --- T-NL-LAOMOTO-003: TOPIC_LAOMOTO未設定時はlaomoto分岐をスキップ ---
+
+@test "T-NL-LAOMOTO-003: route_message skips laomoto branch when TOPIC_LAOMOTO is empty" {
+    TOPIC_LAOMOTO=""
+    run call_with_stderr route_message "free text no laomoto" "some-topic"
+    [ "$status" -eq 0 ]
+
+    # handle_laomoto未実行 → "LINE:"は現れない、free textハンドラが処理
+    [ -f "$INBOX_WRITE_LOG" ]
+    grep -q "ntfy free text" "$INBOX_WRITE_LOG"
+    ! grep -q "LINE:" "$INBOX_WRITE_LOG"
+}
+
+# ═══════════════════════════════════════════════════════════════
+# cmd_330: handle_task_dispatch aisatsu SSH化テスト
+# ═══════════════════════════════════════════════════════════════
+
+# --- T-NL-DSP-330a: MACHINE_ROLE=neosaitama → ssh_inbox_write.sh呼び出し確認 ---
+
+@test "T-NL-DSP-330a: handle_task_dispatch sends aisatsu via ssh_inbox_write on neosaitama" {
+    MACHINE_ROLE="neosaitama"
+    TOPIC="test-topic"
+    AUTH_ARGS=()
+
+    local valid_yaml
+    valid_yaml="task:
+  task_id: subtask_aisatsu_ssh_test
+  parent_cmd: cmd_330
+  assigned_to: yakuza5
+  status: assigned
+"
+    local payload
+    payload=$(printf '%s' "$valid_yaml" | base64 | tr -d '\n')
+
+    run call_with_stderr handle_task_dispatch "$payload"
+    [ "$status" -eq 0 ]
+
+    # ssh_inbox_write.sh が gryakuza 宛てに呼ばれたか確認
+    [ -f "$SSH_INBOX_WRITE_LOG" ]
+    grep -q "gryakuza" "$SSH_INBOX_WRITE_LOG"
+    grep -q "system_notice" "$SSH_INBOX_WRITE_LOG"
+    grep -q "aisatsu受領" "$SSH_INBOX_WRITE_LOG"
+
+    # SSH成功のログメッセージ確認
+    [[ "$output" == *"アイサツ(SSH)"* ]]
+}
+
+# --- T-NL-DSP-330b: ssh_inbox_write失敗時にntfy aisatsuへfallback ---
+
+@test "T-NL-DSP-330b: handle_task_dispatch falls back to ntfy aisatsu when ssh_inbox_write fails" {
+    # ssh_inbox_write.sh を失敗させるよう上書き
+    cat > "$MOCK_PROJECT/lib/ssh_inbox_write.sh" << 'MOCK'
+#!/bin/bash
+exit 1
+MOCK
+    chmod +x "$MOCK_PROJECT/lib/ssh_inbox_write.sh"
+
+    # curl mock: ntfyフォールバック成功
+    cat > "$TEST_TMP/mock_bin/curl" << 'MOCK'
+#!/bin/bash
+exit 0
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/curl"
+
+    MACHINE_ROLE="neosaitama"
+    TOPIC="test-topic"
+    AUTH_ARGS=()
+
+    local valid_yaml
+    valid_yaml="task:
+  task_id: subtask_aisatsu_fallback_test
+  parent_cmd: cmd_330
+  assigned_to: yakuza6
+  status: assigned
+"
+    local payload
+    payload=$(printf '%s' "$valid_yaml" | base64 | tr -d '\n')
+
+    run call_with_stderr handle_task_dispatch "$payload"
+    [ "$status" -eq 0 ]
+
+    # ntfyフォールバック経路が使われたことを確認
+    [[ "$output" == *"ntfyフォールバック"* ]]
 }

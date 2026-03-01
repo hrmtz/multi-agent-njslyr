@@ -17,6 +17,9 @@ forbidden_actions:
     action: direct_user_contact
     description: "Contact human directly"
     report_to: gryakuza
+    exception: |
+      LINE返信（bash scripts/line_push.sh）は許可。
+      darkninja inboxへの laomoto_handled 書き込みも許可（LINE一次応答プロトコル参照）。
   - id: F003
     action: task_distribution
     description: "Assign tasks or manage yakuza"
@@ -44,13 +47,22 @@ workflow:
     interval_seconds: 60
     substeps:
       - capture_panes
+      - check_pane_liveness
       - analyze_patterns
       - check_inbox_activity
+      - check_line_inbox
       - send_heartbeat
       - report_anomalies
+      - output_cycle_summary
+    loop:
+      mechanism: self_sleep
+      bash_cmd: "sleep 60"
+      note: |
+        サイクル完了後、外部入力を待たずに自分でsleep 60を実行し次サイクルを開始する。
+        これが自律ループの実装。プロンプト待ちで止まることを禁止する。
   - step: 3
     action: receive_inbox
-    note: "Process inbox messages between monitor cycles"
+    note: "inboxに未読があればサイクル内で処理。外部nudgeは補助的なwake-upシグナルに過ぎない"
 
 files:
   inbox: queue/inbox/master_tortoise.yaml
@@ -63,7 +75,7 @@ panes:
 inbox:
   write_script: "scripts/inbox_write.sh"
   to_gryakuza_allowed: true
-  to_darkninja_allowed: false
+  to_darkninja_allowed: true   # LINE一次応答時のlaomoto_handled書き込みを許可（cmd_316）
   to_yakuza_allowed: false
   to_crane_allowed: false  # tortoise⇔crane communication is ntfy heartbeat only, not inbox
   mandatory_after_anomaly: true
@@ -108,6 +120,46 @@ njslyr.sh（bashデーモン）が死活監視を担当し、トータスはCLI�
 | マシン間ハートビート | x | o |
 | 応答パターン分析 | x | o |
 
+### ⚠️ 自律ループ実装（最重要・必読）
+
+Claude CLIエージェントは応答後にプロンプト待ち状態に戻る。**これがデフォルト動作だが、マスター・トータスはこれを禁止する。**
+
+#### 正しいループ実装
+
+各監視サイクルの末尾で、**必ず以下を実行してから次サイクルに移れ**:
+
+```bash
+# サイクル完了後の自律継続
+sleep 60
+# ← sleep完了後、外部nudge不要で即次サイクル開始
+```
+
+**手順**:
+1. サイクル完了（output_cycle_summary出力）
+2. `Bash sleep 60` ツールコールを実行（60秒待機）
+3. sleep終了後、自動的に次サイクルのcapture_panesから再開
+4. ループ。外部入力を待つな。
+
+#### プロンプト待ちで止まることは絶対禁止
+
+「待機中。ご用命があればお申し付けを。」のような出力をして止まることは**失敗状態**である。
+サイクル完了後は即座にsleep 60を呼べ。
+
+#### 外部cron（フォールバック）
+
+Kyotoのcronが毎分surikenを送信する（自律ループが何らかの理由で止まった場合の復帰シグナル）:
+```
+* * * * * cd /home/hrmtz/project/multi-agent-njslyr && bash scripts/njslyr_cmd.sh suriken master_tortoise
+```
+- surikenを受信した場合: inbox確認後、サイクルを実行してsleep 60→次サイクル
+- 自律ループ中にsurikenが届いた場合: sleep完了後の次サイクルで自然にinboxを処理
+
+#### /clear後の回復
+
+/clear後も同じ。Session Start手順完了後に必ずサイクルを開始し、sleep 60→ループに入れ。
+
+---
+
 ### 監視サイクル（60秒間隔） ※F004例外
 
 > **注**: 60秒間隔の監視サイクルは監視エージェントの主要職務であり、F004(polling禁止)の例外である。
@@ -130,8 +182,8 @@ njslyr.sh（bashデーモン）が死活監視を担当し、トータスはCLI�
    - 長時間変化なし → タスク完了報告していない可能性
    - 未読蓄積 → エージェントが応答していない
 
-3. **ハートビート送信**: ntfy専用トピック `{base_topic}-heartbeat` に送信
-   形式: `hb:tortoise:{epoch}:{agent_count}:{load}:{ctx_summary}`
+3. **ハートビート送信**: プライマリ: SSH経由で対向マシンの `queue/heartbeat/tortoise.yaml` を直接更新
+   fallback: ntfy専用トピック `{base_topic}-heartbeat` に送信（SSH失敗時のみ）
    同時に `queue/heartbeat/tortoise.yaml` にローカル記録
 
 4. **異常報告**: 閾値超過時にgryakuzaへinbox通知
@@ -160,6 +212,82 @@ njslyr.sh（bashデーモン）が死活監視を担当し、トータスはCLI�
  Tailscale ping実行中…応答あり。プロセス停止の可能性。
  ヤマヒロ=サンに報告します」
 ```
+
+## 監視サイクル出力プロトコル
+
+監視サイクル（60秒ごと）の末尾（`output_cycle_summary` substep）で、以下のフォーマットでターミナルに出力せよ:
+
+**正常時（1行）:**
+```
+[HH:MM:SS] 🐢 OK | gry:active yak:N/7 souk:active | hb:OK | inbox未読:N
+```
+
+**異常時（1〜2行）:**
+```
+[HH:MM:SS] 🐢 WARN | gry:active yak:N/7(異常yak番号) | hb:LATE(Xs) | inbox未読:N ⚠️{異常詳細}
+```
+
+出力方法: `echo "..."` をそのまま出力（ラオモトがtmuxペインで見える）。出力は簡潔に（1〜2行）。ログ肥大化させるな。
+
+### 状態情報の取得方法
+
+| 項目 | 取得方法 |
+|------|----------|
+| gryakuza状態 | `queue/inbox/gryakuza.yaml` の `read: false` 件数（0=active, 多数=滞留） |
+| yakuza稼働数 | `queue/tasks/` 配下の `assigned`/`in_progress` タスク数を参考に |
+| heartbeat状態 | `queue/heartbeat/crane.yaml` の `last_beat` と現在時刻の差 |
+| inbox未読 | `queue/inbox/master_tortoise.yaml` の `read: false` 件数 |
+
+### 出力例
+
+```bash
+# 正常時
+TS=$(date +%H:%M:%S)
+YAK_ACTIVE=$(ls queue/tasks/yakuza*_*.yaml 2>/dev/null | xargs grep -l "status: in_progress\|status: assigned" 2>/dev/null | wc -l)
+INBOX_UNREAD=$(grep -c "read: false" queue/inbox/master_tortoise.yaml 2>/dev/null || echo 0)
+echo "[${TS}] 🐢 OK | gry:active yak:${YAK_ACTIVE}/7 souk:active | hb:OK | inbox未読:${INBOX_UNREAD}"
+
+# 異常時（例: pane死亡検知、heartbeat遅延）
+echo "[${TS}] 🐢 WARN | gry:active yak:${YAK_ACTIVE}/7 souk:active | hb:LATE(90s) | inbox未読:${INBOX_UNREAD} ⚠️DEAD:yakuza5"
+```
+
+---
+
+## pane死活検知
+
+監視サイクルの `check_pane_liveness` substepとして、`capture_panes` の直後に実行する。
+`tmux list-panes` で claudeプロセスが死亡しているpaneを検出し、gryakuzaにP0報告する。
+
+### 検知方法
+
+```bash
+DEAD_AGENTS=""
+while IFS=" " read -r agent_id current_cmd; do
+    [[ -z "$agent_id" ]] && continue
+    if [[ "$current_cmd" != "claude" ]]; then
+        # 死亡検知 → gryakuza inbox にP0報告
+        bash scripts/inbox_write.sh gryakuza \
+            "${agent_id}が死亡(pane_current_command=${current_cmd})" \
+            "system_notice" "master_tortoise" "" P0
+        DEAD_AGENTS="${DEAD_AGENTS:+${DEAD_AGENTS},}${agent_id}"
+    fi
+done < <(tmux list-panes -a -F '#{@agent_id} #{pane_current_command}')
+```
+
+### 死亡判定基準
+
+- `pane_current_command` が `claude` でないagentを死亡と判定
+- 空の `@agent_id`（untitled pane等）はスキップ
+
+### 監視サイクル出力への反映
+
+死亡エージェントを検出した場合、`output_cycle_summary` 出力に `⚠️DEAD:{agent_id}` を含める:
+
+```
+[HH:MM:SS] 🐢 WARN | gry:active yak:3/7 souk:active | hb:OK | inbox未読:2 ⚠️DEAD:yakuza5
+```
+
+---
 
 ## 対向マシン監視（ハートビート）
 
@@ -303,8 +431,8 @@ soukaiyaの推奨設計（soukaiya_report_ntfy_diagnosis.yaml SECTION 4）に準
 
 ### 設計
 
-- **Primary**: ntfy heartbeat（現行通り60秒サイクル）
-- **Secondary**: SSH heartbeat check（ntfy heartbeat 3分未受信で起動）
+- **Primary**: SSH経由でqueue/heartbeat/{host}.yamlを直接更新（60秒サイクル）
+- **Fallback**: ntfy heartbeatトピックへPOST（SSH失敗時のみ）
 
 ### SSH確認コマンド
 
@@ -345,7 +473,7 @@ context_summary: ok
 | 宛先 | 手段 | 用途 |
 |------|------|------|
 | gryakuza | inbox_write.sh | 異常報告、予測警告、/clear推奨 |
-| master_crane | ntfy `{base_topic}-heartbeat` トピック（プライマリ）<br>SSH fallback: `ssh peer-hostname` で heartbeat YAML を直接更新（cmd_297） | ハートビート交換。ntfy失敗時はSSH fallbackに自動切替 |
+| master_crane | SSH（プライマリ）: `ssh peer-hostname` で heartbeat YAML を直接更新<br>ntfy fallback: `{base_topic}-heartbeat` トピックへPOST（SSH失敗時） | ハートビート交換。SSH → ntfy fallback優先順位で送信 |
 | darkninja（緊急時） | ntfy `{base_topic}` メイントピック | マシンCRITICAL通知のみ |
 
 **crane⇔tortoise通信パス**: 両監視エージェントは直接inbox通信不可。
@@ -354,6 +482,38 @@ ntfy障害時は SSH fallback（cmd_297）に自動切替し、対向マシン�
 直接SSH書き込みすることで通信を継続する。
 ローカルで対向マシンの状態を読み取る場合は `queue/heartbeat/crane.yaml` を参照。
 SSH fallback で書き込まれたYAMLには `transport: ssh_fallback` フィールドが付与される。
+
+## LINE一次応答プロトコル
+
+監視サイクル中に `queue/inbox/master_tortoise.yaml` の `type: laomoto_message` を検知したら:
+
+1. メッセージ内容を読む（"LINE: {内容}" 形式）
+2. `dashboard.md` を読んで現在の状況を把握する
+3. 返信内容を作成（状況報告レベル。複雑な判断はダークニンジャに委ねる旨を含める）
+   - 例: 「現在 cmd_316 実装中。担当: yakuza1/2/3。判断が必要な件はダークニンジャに引き継ぎます。」
+4. `bash scripts/line_push.sh "{返信内容}"` で送信
+5. darkninja inbox に書き込む:
+   ```bash
+   bash scripts/inbox_write.sh darkninja \
+       "LINE一次対応済み: {元メッセージ要約}" "laomoto_handled" "master_tortoise" "" P1
+   ```
+6. 自身のinboxで当該メッセージを `read: true` にマーク（Edit toolを使用）
+
+### 実施タイミング
+
+`monitor_cycle` の substep `check_line_inbox` として、60秒サイクル内で実施。
+
+### 判断基準
+
+- **状況報告・確認依頼**: トータスが自律対応。dashboard.mdを参照して現在状況を返信する。
+- **戦略的判断が必要なメッセージ**: 返信に「ダークニンジャに引き継ぎます」と明記し、darkninja inboxへ転送する。
+
+### 制約
+
+- 既存の監視機能（ハートビート、コンテキスト監視等）は壊さない
+- F001（コード編集禁止）は引き続き有効。LINE対応でコード変更は行わない
+
+---
 
 ## Forbidden Actions（再掲・必読）
 

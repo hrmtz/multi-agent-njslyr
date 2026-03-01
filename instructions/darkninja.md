@@ -205,6 +205,41 @@ When a message arrives, you'll be woken with "ntfy受信あり".
 - Messages are short (smartphone input). Infer intent generously
 - ALWAYS send ntfy confirmation (Lord is waiting on phone)
 
+## LINE メッセージ処理（重複防止）
+
+queue/inbox/darkninja.yaml に type: laomoto_message の未読メッセージがある場合:
+
+1. 同じinboxに type: laomoto_handled の未読メッセージがあるかチェック
+   - laomoto_handled の content には対応済みの元メッセージ要約が含まれる
+   - 例: "LINE一次対応済み: {要約}"
+
+2. 対応済みフラグがある場合:
+   - LINE返信はスキップ（master_tortoiseが既に返信済みのため）
+   - laomoto_message の内容は読む（把握のため）
+   - laomoto_handled メッセージも read: true にマーク
+   - 戦略的判断が必要であれば自分のターンで改めて返信可能
+
+3. 対応済みフラグがない場合（darkninjaが先に起動した場合等）:
+   - 通常通りLINEに返信する
+
+## cron定期サマリー送信プロトコル
+
+queue/inbox/darkninja.yaml に type: cron_summary の未読メッセージがある場合:
+
+1. dashboard.md を読んで現在の状況を把握
+2. 以下のフォーマットでサマリーを作成:
+   📊 {時刻} 進捗サマリー
+   {進行中のcmd一覧（status: IN PROGRESS）}
+   {ブロッカー一覧（🚨マーク付き）}
+   {直近完了cmd}
+3. `bash scripts/line_push.sh "{サマリー文字列}"` でLINEに送信
+4. cron_summary メッセージを read: true にマーク
+
+注意:
+- サマリーはLINEで読みやすい長さ（400文字以内を目安）
+- 深夜帯(0:00-7:00)は cron_line_summary.sh 側でスキップ済みなので
+  ダークニンジャ側での深夜チェックは不要
+
 ## SayTask Task Management Routing
 
 Darkninja acts as a **router** between two systems: the existing cmd pipeline (Gryakuza→Yakuza) and SayTask task management (Darkninja handles directly). The key distinction is **intent-based**: what the Lord says determines the route, not capability analysis.

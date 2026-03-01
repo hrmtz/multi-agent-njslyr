@@ -52,8 +52,10 @@ if ! ntfy_validate_topic "$TOPIC"; then
     # TODO: strictモードが追加された場合はここでexit 1に変更
 fi
 
-# Multi-topic subscription: {base},{base}-heartbeat,{base}-{role}
+# Multi-topic subscription: {base},{base}-heartbeat,{base}-{role},{laomoto}
+TOPIC_LAOMOTO=$(awk '/ntfy_topic_laomoto:/ {gsub(/"/, ""); print $2; exit}' "$SETTINGS")
 SUBSCRIBE_TOPICS="${TOPIC},${TOPIC}-heartbeat,${TOPIC}-${MACHINE_ROLE}"
+[[ -n "$TOPIC_LAOMOTO" ]] && SUBSCRIBE_TOPICS="${SUBSCRIBE_TOPICS},${TOPIC_LAOMOTO}"
 
 # Initialize inbox if not exists
 if [[ ! -f "$INBOX" ]]; then
@@ -555,6 +557,16 @@ except Exception:
     # FIX-006: 既存ファイル上書き保護（handle_report()と統一）
     if [[ -f "$task_file" ]]; then
         echo "[$(date)] [ntfy_listener] WARNING: Task file already exists: $task_file — skipping to prevent overwrite" >&2
+        # DESIGN-003: アイサツ:error を sender に返送（上書き保護でスキップした旨を通知）
+        local err_aisatsu_topic
+        case "$MACHINE_ROLE" in
+            neosaitama|mbp) err_aisatsu_topic="${TOPIC}-kyoto" ;;
+            kyoto|ryzen)    err_aisatsu_topic="${TOPIC}-neosaitama" ;;
+            *)              err_aisatsu_topic="${TOPIC}-kyoto" ;;
+        esac
+        curl -s -X POST "https://ntfy.sh/${err_aisatsu_topic}" \
+            "${AUTH_ARGS[@]}" -H 'Content-Type: text/plain' \
+            -d "aisatsu:${task_id}:error" --max-time 10 -o /dev/null 2>/dev/null || true
         return 1
     fi
 
@@ -569,6 +581,48 @@ except Exception:
     bash "$SCRIPT_DIR/scripts/inbox_write.sh" gryakuza \
         "ntfy dispatch受信: $task_id → $task_file 保存済み。確認して割り当てよ。" \
         report_received ntfy_listener "$task_file"
+
+    # cmd_330: アイサツ返送 — SSH経由 Kyoto gryakuza inbox書き込み（ntfyフォールバック付き）
+    local _aisatsu_sent=false
+    if [[ "$MACHINE_ROLE" == "kyoto" || "$MACHINE_ROLE" == "ryzen" ]]; then
+        # Kyoto上での実行: ローカルinbox_write（loopback防止）
+        if bash "$SCRIPT_DIR/scripts/inbox_write.sh" gryakuza \
+            "aisatsu受領: ${task_id} → NeoSaitama受領済み。ドーモ。" \
+            system_notice ntfy_listener "" P2 2>/dev/null; then
+            echo "[$(date)] [ntfy_listener] dispatch: アイサツ(ローカル) → gryakuza inbox (task_id=${task_id})" >&2
+            _aisatsu_sent=true
+        fi
+    else
+        # NeoSaitama上での実行: SSH経由でKyoto gryakuza inboxに書き込み
+        if bash "$SCRIPT_DIR/lib/ssh_inbox_write.sh" gryakuza \
+            "aisatsu受領: ${task_id} → NeoSaitama受領済み。ドーモ。" \
+            system_notice ntfy_listener "" P2 2>/dev/null; then
+            echo "[$(date)] [ntfy_listener] dispatch: アイサツ(SSH) → Kyoto gryakuza inbox (task_id=${task_id})" >&2
+            _aisatsu_sent=true
+        fi
+    fi
+    # SSH/ローカル失敗時のフォールバック: ntfy aisatsu: POST
+    if [[ "$_aisatsu_sent" == "false" ]]; then
+        local aisatsu_topic
+        case "$MACHINE_ROLE" in
+            neosaitama|mbp) aisatsu_topic="${TOPIC}-kyoto" ;;
+            kyoto|ryzen)    aisatsu_topic="${TOPIC}-neosaitama" ;;
+            *)              aisatsu_topic="${TOPIC}-kyoto" ;;
+        esac
+        if curl -s -X POST "https://ntfy.sh/${aisatsu_topic}" \
+            "${AUTH_ARGS[@]}" \
+            -H 'Content-Type: text/plain' \
+            -d "aisatsu:${task_id}:ok" \
+            --max-time 10 -o /dev/null 2>/dev/null; then
+            echo "[$(date)] [ntfy_listener] dispatch: アイサツ(ntfyフォールバック) → ${aisatsu_topic} (aisatsu:${task_id}:ok)" >&2
+        else
+            local aisatsu_err_payload="aisatsu:${task_id}:error"
+            curl -s -X POST "https://ntfy.sh/${aisatsu_topic}" \
+                "${AUTH_ARGS[@]}" -H 'Content-Type: text/plain' \
+                -d "$aisatsu_err_payload" --max-time 10 -o /dev/null 2>/dev/null || true
+            echo "[$(date)] [ntfy_listener] WARNING: dispatch: アイサツ送信失敗 (error送信試行) for ${task_id}" >&2
+        fi
+    fi
 }
 
 # suriken:{agent_id}:{count} → クロスマシンsuriken受信・ローカルペインにnudge (cmd_298)
@@ -614,6 +668,34 @@ handle_suriken() {
     fi
 }
 
+# aisatsu:{task_id}:{status} → dispatch アイサツ受信（ntfyフォールバック受信用）(cmd_328/cmd_330)
+# cmd_330以降: メインパスはSSH経由でKyoto gryakuza inboxに直接書き込み。
+# このハンドラはSSH失敗時のntfy経由フォールバック確認用として維持。
+handle_aisatsu() {
+    local payload="$1"
+    local task_id aisatsu_status
+    IFS=':' read -r task_id aisatsu_status <<< "$payload"
+
+    # task_id validation
+    if [[ ! "$task_id" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "[$(date)] [ntfy_listener] ERROR: aisatsu: invalid task_id: ${task_id:0:50}" >&2
+        return 1
+    fi
+
+    # aisatsu_status validation (ok|error only; unknown values sanitized)
+    if [[ ! "$aisatsu_status" =~ ^(ok|error)$ ]]; then
+        echo "[$(date)] [ntfy_listener] WARNING: aisatsu: invalid status '${aisatsu_status:0:30}', treating as unknown" >&2
+        aisatsu_status="unknown"
+    fi
+
+    echo "[$(date)] [ntfy_listener] aisatsu: task_id=$task_id status=$aisatsu_status" >&2
+
+    # Notify darkninja that dispatch アイサツ was received
+    bash "$SCRIPT_DIR/scripts/inbox_write.sh" darkninja \
+        "dispatch アイサツ確認: ${task_id} → ${aisatsu_status}" \
+        system_notice ntfy_listener
+}
+
 # activate:simultaneous → active_machine.yaml をsimultaneousモードに更新
 handle_activate_simultaneous() {
     echo "[$(date)] [ntfy_listener] activate:simultaneous received" >&2
@@ -638,6 +720,16 @@ EOF
         ntfy_received ntfy_listener "" P0
 }
 
+# laomotoトピックメッセージ → darkninja inbox転送（LINE直通チャット）
+handle_laomoto() {
+    local msg="$1"
+    bash "$SCRIPT_DIR/scripts/inbox_write.sh" darkninja \
+        "LINE: $msg" "laomoto_message" "ntfy_listener" "" P1
+    bash "$SCRIPT_DIR/scripts/inbox_write.sh" master_tortoise \
+        "LINE: $msg" "laomoto_message" "ntfy_listener" "" P1
+    echo "[$(date)] [ntfy_listener] laomoto message forwarded to darkninja and master_tortoise: ${msg:0:80}" >&2
+}
+
 # Route message by prefix. Returns 0 if handled, 1 if fallback needed.
 # Return code 2 means: handled but skip ntfy_inbox recording (e.g. ping:).
 route_message() {
@@ -651,6 +743,11 @@ route_message() {
         else
             echo "[$(date)] [ntfy_listener] WARNING: non-hb message on heartbeat topic: ${msg:0:50}" >&2
         fi
+        return 0
+    fi
+    # Laomoto topic: all messages forwarded directly to darkninja (bypass prefix routing)
+    if [[ -n "$TOPIC_LAOMOTO" && "$msg_topic" == "$TOPIC_LAOMOTO" ]]; then
+        handle_laomoto "$msg"
         return 0
     fi
     # Main/machine-specific topic: route by prefix
@@ -694,6 +791,11 @@ route_message() {
         suriken)
             handle_suriken "$payload"
             return 2
+            ;;
+        aisatsu)
+            # cmd_328: dispatch アイサツ受信 — darkninja通知、ntfy_inbox記録あり
+            handle_aisatsu "$payload"
+            return 0
             ;;
         activate)
             if [[ "$payload" == "simultaneous" ]]; then

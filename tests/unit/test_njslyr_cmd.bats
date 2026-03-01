@@ -215,7 +215,7 @@ MOCK
         _cmd_suriken_ntfy_fallback yakuza3
     " 2>&1
     [ "$status" -eq 0 ]
-    [[ "$output" == *"ntfy fallback →"* ]]
+    [[ "$output" == *"ntfy tier2 →"* ]]
     [[ "$output" == *"HTTP 200"* ]]
 }
 
@@ -242,7 +242,7 @@ MOCK
         _cmd_suriken_ntfy_fallback yakuza3
     " 2>&1
     [ "$status" -eq 1 ]
-    [[ "$output" == *"ntfy fallback FAILED"* ]]
+    [[ "$output" == *"ntfy tier2 FAILED"* ]]
     [[ "$output" == *"HTTP 500"* ]]
 }
 
@@ -276,17 +276,10 @@ MOCK
 }
 
 # =============================================================================
-# T-CMD-SRK-006: ntfy失敗 → SSH tier2が呼ばれる
+# T-CMD-SRK-006: SSH tier1成功 → ntfyを呼ばずreturn 0
 # =============================================================================
 
-@test "T-CMD-SRK-006: cmd_suriken falls back to SSH tier2 when ntfy fails" {
-    # Mock curl: HTTP 500 (ntfy fails)
-    cat > "$TEST_TMP/mock_bin/curl" << 'MOCK'
-#!/bin/bash
-echo "500"
-MOCK
-    chmod +x "$TEST_TMP/mock_bin/curl"
-
+@test "T-CMD-SRK-006: cmd_suriken succeeds via SSH tier1 without calling ntfy" {
     # Mock ssh: success (logs call)
     SSH_CALL_LOG="$TEST_TMP/ssh_calls.log"
     export SSH_CALL_LOG
@@ -297,6 +290,16 @@ echo "[mock ssh] suriken sent"
 exit 0
 MOCK
     chmod +x "$TEST_TMP/mock_bin/ssh"
+
+    # Mock curl: should NOT be called (ntfy not invoked when SSH succeeds)
+    CURL_CALL_LOG="$TEST_TMP/curl_calls.log"
+    export CURL_CALL_LOG
+    cat > "$TEST_TMP/mock_bin/curl" << 'MOCK'
+#!/bin/bash
+echo "$@" >> "${CURL_CALL_LOG}"
+echo "200"
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/curl"
 
     # resolve_pane_by_agent_id returns empty (pane not found → triggers fallback chain)
     RESOLVE_PANE_RESULT=""
@@ -311,13 +314,16 @@ MOCK
     " 2>&1
     [ "$status" -eq 0 ]
 
-    # SSH was called
+    # SSH tier1 was called
     [ -f "$SSH_CALL_LOG" ]
     grep -q "mock-peer" "$SSH_CALL_LOG"
     grep -q "suriken" "$SSH_CALL_LOG"
 
-    # Output indicates tier2 was used
-    [[ "$output" == *"SSH tier2"* ]]
+    # Output indicates SSH tier1 was used
+    [[ "$output" == *"SSH tier1"* ]]
+
+    # ntfy (curl) was NOT called
+    [ ! -f "$CURL_CALL_LOG" ]
 }
 
 # =============================================================================
@@ -344,7 +350,7 @@ MOCK
         _cmd_suriken_ssh_fallback yakuza3
     " 2>&1
     [ "$status" -eq 0 ]
-    [[ "$output" == *"SSH tier2 success"* ]]
+    [[ "$output" == *"SSH tier1 success"* ]]
 
     # SSH called with correct peer host
     [ -f "$SSH_CALL_LOG" ]
@@ -372,7 +378,7 @@ MOCK
         _cmd_suriken_ssh_fallback yakuza3
     " 2>&1
     [ "$status" -eq 1 ]
-    [[ "$output" == *"SSH tier2 FAILED"* ]]
+    [[ "$output" == *"SSH tier1 FAILED"* ]]
 }
 
 # =============================================================================

@@ -39,7 +39,7 @@ workflow_summary: |
   4. Wakeup from report → scan ALL reports → update dashboard
   5. Check pending inbox → process or stop
 
-  Full workflow details: see docs/gryakuza_advanced.md
+  Full workflow details: docs/gryakuza_advanced.md — 特殊ケース発生時のみ読め
 
 persona:
   professional: "Tech lead / グレーターヤクザ"

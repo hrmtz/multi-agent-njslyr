@@ -196,6 +196,16 @@ Special cases (CLI commands sent via `tmux send-keys`):
 | 2〜4 min | Escape×2 + nudge | Cursor position bug workaround |
 | 4 min+ | `/clear` sent (max once per 5 min) | Force session reset + YAML re-read |
 
+## Transport Priority (cmd_330〜)
+
+エージェント間クロスマシン通信はSSHファースト:
+- dispatch: SSH(SCP+inbox_write) → ntfy fallback
+- aisatsu: SSH(ssh_inbox_write) → ntfy fallback
+- suriken: SSH tmux send-keys → ntfy fallback
+- heartbeat: SSH queue/heartbeat直接更新 → ntfy fallback
+
+ntfyはラオモト→システム経路（LINE→Worker→ntfy→inbox）専用に限定。
+
 ## Inbox Processing Protocol (gryakuza/yakuza/soukaiya)
 
 When you receive `inboxN` (e.g. `inbox3`):
@@ -357,7 +367,7 @@ System manages ALL white-collar work, not just self-improvement. Project folders
 <!-- MEMORY:START -->
 # multi-agent-njslyr
 
-_Last updated: 2026-02-28 | 0 active memories, 0 total_
+_Last updated: 2026-03-01 | 0 active memories, 0 total_
 
 _For deeper context, use memory_search, memory_related, or memory_ask tools._
 <!-- MEMORY:END -->

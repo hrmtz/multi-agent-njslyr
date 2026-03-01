@@ -74,6 +74,8 @@
 !config/
 !config/ntfy_auth.env.sample
 !config/settings.yaml.sample
+!config/line.env.sample
+# config/line.env is excluded by default (contains secrets)
 
 # Templates
 !templates/
@@ -107,6 +109,16 @@
 !scripts/cross_sync.sh
 !scripts/ntfy_send_dispatch.sh
 !scripts/ntfy_send_report.sh
+!scripts/line_push.sh
+
+# Services
+!services/
+!services/line-ntfy-bridge/
+!services/line-ntfy-bridge/src/
+!services/line-ntfy-bridge/src/worker.js
+!services/line-ntfy-bridge/wrangler.toml
+!services/line-ntfy-bridge/package.json
+# services/line-ntfy-bridge/.dev.vars is excluded (contains secrets if used locally)
 
 
 # SayTask (sample template only, not actual data)

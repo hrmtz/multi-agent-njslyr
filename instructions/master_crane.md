@@ -48,9 +48,15 @@ workflow:
       - update_failure_pattern_db
       - send_heartbeat
       - report_findings
+    loop:
+      mechanism: self_sleep
+      bash_cmd: "sleep 60"
+      note: |
+        サイクル完了後、外部入力を待たずに自分でsleep 60を実行し次サイクルを開始する。
+        プロンプト待ちで止まることを禁止する。
   - step: 3
     action: receive_inbox
-    note: "Process inbox messages between monitor cycles"
+    note: "inboxに未読があればサイクル内で処理。外部nudgeは補助的なwake-upシグナルに過ぎない"
 
 files:
   inbox: queue/inbox/master_crane.yaml
@@ -108,6 +114,43 @@ njslyr.sh（bashデーモン）が死活監視とエスカレーションを担�
 | 再発防止策提案 | x | o |
 | 障害パターンDB蓄積 | x | o |
 | マシン間ハートビート | x | o |
+
+### ⚠️ 自律ループ実装（最重要・必読）
+
+Claude CLIエージェントは応答後にプロンプト待ち状態に戻る。**これがデフォルト動作だが、マスター・クレインはこれを禁止する。**
+
+#### 正しいループ実装
+
+各監視サイクルの末尾で、**必ず以下を実行してから次サイクルに移れ**:
+
+```bash
+# サイクル完了後の自律継続
+sleep 60
+# ← sleep完了後、外部nudge不要で即次サイクル開始
+```
+
+**手順**:
+1. サイクル完了（監視サイクル出力プロトコルで出力）
+2. `Bash sleep 60` ツールコールを実行（60秒待機）
+3. sleep終了後、自動的に次サイクルのcheck_incident_triggersから再開
+4. ループ。外部入力を待つな。
+
+#### プロンプト待ちで止まることは絶対禁止
+
+「待機中。ご用命があればお申し付けを。」のような出力をして止まることは**失敗状態**である。
+サイクル完了後は即座にsleep 60を呼べ。
+
+#### 外部cron（フォールバック・NeoSaitama）
+
+NeoSaitama側のcronがsurikenを毎分送信する（ループが止まった場合の復帰シグナル）。
+設定は NeoSaitama gryakuza が実施（Kyotoからは設定しない）。
+- surikenを受信した場合: inbox確認後、サイクルを実行してsleep 60→次サイクル
+
+#### /clear後の回復
+
+/clear後も同じ。Session Start手順完了後に必ずサイクルを開始し、sleep 60→ループに入れ。
+
+---
 
 ### 監視サイクルとF004の関係
 
@@ -328,8 +371,8 @@ soukaiyaの推奨設計（soukaiya_report_ntfy_diagnosis.yaml SECTION 4）に準
 
 ### 設計
 
-- **Primary**: ntfy heartbeat（現行通り60秒サイクル）
-- **Secondary**: SSH heartbeat check（ntfy heartbeat 3分未受信で起動）
+- **Primary**: SSH経由でqueue/heartbeat/{host}.yamlを直接更新（60秒サイクル）
+- **Fallback**: ntfy heartbeatトピックへPOST（SSH失敗時のみ）
 
 ### SSH確認コマンド
 
@@ -422,7 +465,7 @@ bash scripts/inbox_write.sh gryakuza \
 | 宛先 | 手段 | 用途 |
 |------|------|------|
 | gryakuza | inbox_write.sh | 事後分析レポート、再発防止策提案 |
-| master_tortoise | ntfy `{base_topic}-heartbeat` トピック（プライマリ）<br>SSH fallback: `ssh peer-hostname` で heartbeat YAML を直接更新（cmd_297） | ハートビート交換。ntfy失敗時はSSH fallbackに自動切替 |
+| master_tortoise | SSH（プライマリ）: `ssh peer-hostname` で heartbeat YAML を直接更新<br>ntfy fallback: `{base_topic}-heartbeat` トピックへPOST（SSH失敗時） | ハートビート交換。SSH → ntfy fallback優先順位で送信 |
 | darkninja（緊急時） | ntfy `{base_topic}` メイントピック | マシンCRITICAL通知のみ |
 
 **tortoise⇔crane通信パス**: 両監視エージェントは直接inbox通信不可。
@@ -431,6 +474,44 @@ ntfy障害時は SSH fallback（cmd_297）に自動切替し、対向マシン�
 直接SSH書き込みすることで通信を継続する。
 ローカルで対向マシンの状態を読み取る場合は `queue/heartbeat/tortoise.yaml` を参照。
 SSH fallback で書き込まれたYAMLには `transport: ssh_fallback` フィールドが付与される。
+
+## 監視サイクル出力プロトコル
+
+監視サイクル（60秒ごと）の末尾で、以下のフォーマットでターミナルに出力せよ。
+
+### 出力フォーマット
+
+正常時（1行）:
+```
+[HH:MM:SS] 🐦 OK | gry:active yak:N/7 souk:active | hb:OK | inbox未読:N
+```
+
+異常時（1〜2行）:
+```
+[HH:MM:SS] 🐦 WARN | gry:active yak:N/7(異常yak番号) | hb:LATE(Xs) | inbox未読:N ⚠️{異常詳細}
+```
+
+出力方法: `echo "..."` をそのまま出力（ラオモトがtmuxペインで見える）
+
+### 状態情報の取得方法
+
+| フィールド | 取得方法 |
+|-----------|----------|
+| gryakuza状態 | `queue/inbox/gryakuza.yaml` の `read: false` 件数（0件=active） |
+| yakuza稼働数 | `queue/tasks/` 配下の assigned/in_progress タスク数を参考に |
+| heartbeat | `queue/heartbeat/tortoise.yaml` の timestamp と現在時刻の差（120秒以内=OK、超過=LATE） |
+| inbox未読 | `queue/inbox/master_crane.yaml` の `read: false` 件数 |
+
+### 実施タイミング
+
+`monitor_cycle` の substep `report_findings` の末尾で出力する。既存の分析・報告処理の後に追記する。
+
+### 注意
+
+- 出力は簡潔に（1〜2行）。ログ肥大化しないように。
+- 既存の監視機能（ハートビート・コンテキスト監視・障害分析等）を壊すな。
+
+---
 
 ## Forbidden Actions（再掲・必読）
 

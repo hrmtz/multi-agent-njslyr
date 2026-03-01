@@ -180,12 +180,37 @@ inbox_write.sh → queue/inbox/yakuza3.yaml（flock保護）
 - プレフィックスルーティング:
 
 ```
-dispatch:{base64_yaml}    → ネオサイタマがタスクYAMLを受信
-report:{base64_yaml}      → キョートが完了レポートを受信
-cmd:cmd_xxx:内容          → ダークニンジャ＋グレーターヤクザのinboxに転送
-handover:kyoto|neosaitama → マシン切り替えトリガー
-hb:host:epoch:agents:...  → ハートビート（heartbeatトピックのみ）
+dispatch:{base64_yaml}        → ネオサイタマがタスクYAMLを受信
+aisatsu:{task_id}:{ok|error}  → dispatch受領確認（受信側が返送）
+report:{base64_yaml}          → キョートが完了レポートを受信
+cmd:cmd_xxx:内容              → ダークニンジャ＋グレーターヤクザのinboxに転送
+handover:kyoto|neosaitama     → マシン切り替えトリガー
+hb:host:epoch:agents:...      → ハートビート（heartbeatトピックのみ）
 ```
+
+### アイサツ（dispatch受領確認）
+
+dispatchを受け取ったら、**アイサツを返さなければならない**。アイサツを返さないのはスゴイシツレイ。古事記にもそう書いてある。
+
+```
+キョート                        ネオサイタマ
+  |                                |
+  |-- dispatch:{base64_yaml} ---->|  「ドーモ。タスクです。」
+  |                                |  （YAML保存 + inbox_write）
+  |<-- aisatsu:cmd_327:ok --------|  「ドーモ。受領しました。」
+  |                                |
+  OK ✓ アイサツ確認               |
+
+  --- 60秒以内にアイサツなし ---
+  |                                |
+  |  「シツレイ検知！」            |  （死亡？クラッシュ？）
+  |  SSH fallback 自動発動        |
+  |-- SCP + inbox_write -------->|  直接配信
+```
+
+- **送信側**（`ntfy_send_dispatch.sh`）: dispatch後60秒間 `aisatsu:{task_id}:ok` を待機。タイムアウト = シツレイ → SSH fallback自動実行。
+- **受信側**（`ntfy_listener.sh`）: タスクYAML保存 + inbox_write成功後、peerトピックに `aisatsu:{task_id}:ok` を返送。
+- **リスナー**（`ntfy_listener.sh`）: `aisatsu:` 受信時、ダークニンジャのinboxに通知。
 
 ### スリケン（起床シグナル）
 
@@ -242,6 +267,21 @@ SonnetエージェントをOpusに一時昇格させる。ペインが紫色（`
 - **キョート（スミス）**: Memory MCP書き込み権限
 - **ネオサイタマ（ヤマヒロ）**: 読み取り専用（cross_sync.shでキョートから同期）
 
+### コードベース検索（cocoindex-code MCP）
+
+[cocoindex-code](https://github.com/cocoindex/cocoindex-code)によるASTベースのインクリメンタルコードインデックス。エージェントが関数・クラス単位でセマンティック検索を実行する。
+
+- **トークン70%削減** — ファイル全体を読まずにピンポイント検索
+- **20言語以上対応** — Tree-sitter AST解析
+- **差分更新** — 変更ファイルのみ再インデックス（Rustエンジン）
+- **ローカル埋め込み** — `all-MiniLM-L6-v2`、APIキー不要
+
+```bash
+# セットアップ（両マシン）
+curl -LsSf https://astral.sh/uv/install.sh | sh
+claude mcp add cocoindex-code -- uvx --prerelease=explicit --with "cocoindex>=1.0.0a16" cocoindex-code@latest
+```
+
 ### スマホからの指揮（ntfy）
 
 スマホとダークニンジャの双方向通信 — SSH不要:
@@ -252,6 +292,28 @@ SonnetエージェントをOpusに一時昇格させる。ペインが紫色（`
 ```
 
 設定: `config/settings.yaml` に `ntfy_topic: "your-topic"` を追加し、[ntfyアプリ](https://ntfy.sh)で購読。
+
+### LINE日報 — オリジナル・エピソードオー形式
+
+ダークニンジャからラオモトへ、LINEプッシュ通知で毎日の日報が届く。ツイッタアー連載「エピソードオー」のフォーマットを踏襲したニンジャスレイヤーのオリジナルエピソードとして書かれる。戦況、完了cmd、稼働中タスク、ブロッカー警告——すべてがハードボイルドなサイバーパンク散文で配信される。
+
+```
+◆ネオサイタマ電脳IRC回線◆
+◆NJSLYR日報 3/1 02:00◆
+
+闇。キョートとネオサイタマを繋ぐntfy回線にノイズが走った。
+「……シツレイな」ダークニンジャはモニタを睨んだ。
+dispatchを投げた。返事がない。スゴイシツレイ。
+スミスは即座にモンジュを発動した。Opus3体。相互批判。
+
+■戦況
+[完了] cmd_329 crane/tortoise寝落ちバグ修正
+[稼働] cmd_328 アイサツ機構 Phase3統合中
+[稼働] cmd_327 インスタ4本 PhaseA並列生成中
+
+「アイサツせよ」ダークニンジャは呟いた。
+◆つづく◆
+```
 
 ### モバイルSSH（Tailscale + Termux）
 

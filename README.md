@@ -185,12 +185,37 @@ Zero CPU while idle. Zero API calls for coordination.
 - Prefix routing for message categorization:
 
 ```
-dispatch:{base64_yaml}    → NeoSaitama receives task YAML
-report:{base64_yaml}      → Kyoto receives completion report
-cmd:cmd_xxx:content       → Darkninja + Gryakuza inbox delivery
-handover:kyoto|neosaitama → Machine handover trigger
-hb:host:epoch:agents:...  → Heartbeat (heartbeat topic only)
+dispatch:{base64_yaml}        → NeoSaitama receives task YAML
+aisatsu:{task_id}:{ok|error}  → Dispatch receipt confirmation (returned by receiver)
+report:{base64_yaml}          → Kyoto receives completion report
+cmd:cmd_xxx:content           → Darkninja + Gryakuza inbox delivery
+handover:kyoto|neosaitama     → Machine handover trigger
+hb:host:epoch:agents:...      → Heartbeat (heartbeat topic only)
 ```
+
+### Aisatsu (Dispatch Acknowledgment)
+
+When a machine receives a dispatch, it **must** return an Aisatsu. Failing to return an Aisatsu is Sugoi Shitsurei. It is written so in the Kojiki.
+
+```
+Kyoto                          NeoSaitama
+  |                                |
+  |-- dispatch:{base64_yaml} ---->|  "Domo. Task desu."
+  |                                |  (save YAML + inbox_write)
+  |<-- aisatsu:cmd_327:ok --------|  "Domo. Received desu."
+  |                                |
+  OK ✓ Aisatsu confirmed          |
+
+  --- If no Aisatsu within 60s ---
+  |                                |
+  |  "Shitsurei detected!"        |  (dead? crashed?)
+  |  SSH fallback auto-triggered  |
+  |-- SCP + inbox_write -------->|  Direct delivery
+```
+
+- **Sender** (`ntfy_send_dispatch.sh`): After dispatch, waits 60s for `aisatsu:{task_id}:ok`. Timeout = Shitsurei → SSH fallback.
+- **Receiver** (`ntfy_listener.sh`): After saving task YAML + inbox_write, returns `aisatsu:{task_id}:ok` to peer topic.
+- **Listener** (`ntfy_listener.sh`): On receiving `aisatsu:`, notifies Darkninja inbox.
 
 ### Suriken (Wake-up Signal)
 
@@ -246,6 +271,21 @@ Preferences, rules, and lessons persist across sessions. Tell the AI once, it re
 - **Kyoto (Smith)**: Memory MCP write authority
 - **NeoSaitama (Yamahiro)**: Memory MCP read-only (synced from Kyoto via cross_sync.sh)
 
+### Codebase Search (cocoindex-code MCP)
+
+AST-based incremental code indexing via [cocoindex-code](https://github.com/cocoindex/cocoindex-code). Agents search code semantically — function/class-level chunks, not raw grep.
+
+- **70% token reduction** vs. reading full files
+- **20+ languages** via Tree-sitter AST parsing
+- **Incremental updates** — only re-indexes changed files (Rust engine)
+- **Local embedding** — `all-MiniLM-L6-v2`, no API key required
+
+```bash
+# Setup (both machines)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+claude mcp add cocoindex-code -- uvx --prerelease=explicit --with "cocoindex>=1.0.0a16" cocoindex-code@latest
+```
+
 ### Phone Control (ntfy)
 
 Bidirectional communication from your phone — no SSH required:
@@ -256,6 +296,28 @@ Smith/Yamahiro updates --> ntfy.sh --> Push notification to phone
 ```
 
 Setup: add `ntfy_topic: "your-secret-topic"` to `config/settings.yaml`, subscribe in the [ntfy app](https://ntfy.sh).
+
+### LINE Daily Report — Original Episode-Oh Style
+
+Darkninja sends a daily status report to Laomoto via LINE push notification, written as an original Ninja Slayer episode in the style of the Twitter serial format ("Episode-Oh"). Battle status, completed cmds, active tasks, and blocker alerts — all delivered as hard-boiled cyberpunk prose.
+
+```
+◆ネオサイタマ電脳IRC回線◆
+◆NJSLYR日報 3/1 02:00◆
+
+闇。キョートとネオサイタマを繋ぐntfy回線にノイズが走った。
+「……シツレイな」ダークニンジャはモニタを睨んだ。
+dispatchを投げた。返事がない。スゴイシツレイ。
+スミスは即座にモンジュを発動した。Opus3体。相互批判。
+
+■戦況
+[完了] cmd_329 crane/tortoise寝落ちバグ修正
+[稼働] cmd_328 アイサツ機構 Phase3統合中
+[稼働] cmd_327 インスタ4本 PhaseA並列生成中
+
+「アイサツせよ」ダークニンジャは呟いた。
+◆つづく◆
+```
 
 ### Mobile SSH (Tailscale + Termux)
 
