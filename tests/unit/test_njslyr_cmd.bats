@@ -75,9 +75,10 @@ YAML
 resolve_pane_by_agent_id() {
     echo "${RESOLVE_PANE_RESULT}"
 }
-stage3_slay() { echo "mock stage3_slay: $*"; }
+stage3_slay() { echo "mock_stage3_slay: $*" >> "${STAGE3_LOG:-/dev/null}"; }
 sedi() { sed -i "$@"; }
 agent_is_busy() { return 1; }
+cmd_suriken() { echo "mock_suriken: $*" >> "${SURIKEN_LOG:-/dev/null}"; }
 MOCK
 
     # Add mock bin dir to PATH
@@ -89,8 +90,20 @@ MOCK
     sed -n '/^_cmd_suriken_ntfy_fallback()/,/^# ─── A-2: chop/{/^# ─── A-2: chop/d;p}' \
         "$NJSLYR_CMD" > "$TEST_TMP/functions.sh"
 
+    # Extract cmd_chop from njslyr_cmd.sh (A-2: chop → A-3: slay boundary)
+    sed -n '/^cmd_chop()/,/^# ─── A-3: slay/{/^# ─── A-3: slay/d;p}' \
+        "$NJSLYR_CMD" >> "$TEST_TMP/functions.sh"
+
     # Extract cmd_inject from njslyr_cmd.sh (A-7: inject → A-6: detox boundary)
     sed -n '/^cmd_inject()/,/^# ─── A-6: detox/{/^# ─── A-6: detox/d;p}' \
+        "$NJSLYR_CMD" >> "$TEST_TMP/functions.sh"
+
+    # Extract cmd_detox from njslyr_cmd.sh (A-6: detox → usage boundary)
+    sed -n '/^cmd_detox()/,/^# ─── usage/{/^# ─── usage/d;p}' \
+        "$NJSLYR_CMD" >> "$TEST_TMP/functions.sh"
+
+    # Extract cmd_slay from njslyr_cmd.sh (A-3: slay → A-4: spawn_tengu boundary)
+    sed -n '/^cmd_slay()/,/^# ─── A-4: spawn_tengu/{/^# ─── A-4: spawn_tengu/d;p}' \
         "$NJSLYR_CMD" >> "$TEST_TMP/functions.sh"
 
     # Set SCRIPT_DIR and PROJECT_ROOT for sourced functions
@@ -489,4 +502,284 @@ MOCK
     [ -f "$TMUX_CALL_LOG" ]
     grep -q "send-keys" "$TMUX_CALL_LOG"
     grep -q "claude-opus-4-6\|Opus" "$TMUX_CALL_LOG"
+}
+
+# =============================================================================
+# T-CMD-DTX-001: cmd_detox: pane見つからず → return 1
+# =============================================================================
+
+@test "T-CMD-DTX-001: cmd_detox returns 1 when pane not found" {
+    RESOLVE_PANE_RESULT=""
+    export RESOLVE_PANE_RESULT
+
+    cat > "$TEST_TMP/mock_bin/tmux" << 'MOCK'
+#!/bin/bash
+echo "mock tmux: $*" >&2
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/tmux"
+
+    run bash -c "
+        SCRIPT_DIR='$MOCK_PROJECT/scripts'
+        PROJECT_ROOT='$MOCK_PROJECT'
+        source '$TEST_TMP/mock_njslyr_lib.sh'
+        source '$TEST_TMP/functions.sh'
+        cmd_detox yakuza3
+    " 2>&1
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"pane not found"* ]]
+}
+
+# =============================================================================
+# T-CMD-DTX-002: cmd_detox: 既にSonnet + bg=default → スキップ
+# =============================================================================
+
+@test "T-CMD-DTX-002: cmd_detox skips when already Sonnet and bg=default" {
+    RESOLVE_PANE_RESULT="%2"
+    export RESOLVE_PANE_RESULT
+
+    TMUX_CALL_LOG="$TEST_TMP/tmux_calls.log"
+    export TMUX_CALL_LOG
+    cat > "$TEST_TMP/mock_bin/tmux" << 'MOCK'
+#!/bin/bash
+echo "$@" >> "${TMUX_CALL_LOG}"
+if [[ "$*" == *"@model_name"* ]]; then
+    echo "Sonnet"
+elif [[ "$*" == *"background"* ]]; then
+    echo "default"
+fi
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/tmux"
+
+    run bash -c "
+        SCRIPT_DIR='$MOCK_PROJECT/scripts'
+        PROJECT_ROOT='$MOCK_PROJECT'
+        source '$TEST_TMP/mock_njslyr_lib.sh'
+        source '$TEST_TMP/functions.sh'
+        cmd_detox yakuza3
+    " 2>&1
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"skip"* ]]
+
+    # send-keys が呼ばれないこと
+    if [ -f "$TMUX_CALL_LOG" ]; then
+        ! grep -q "send-keys" "$TMUX_CALL_LOG"
+    fi
+}
+
+# =============================================================================
+# T-CMD-DTX-003: cmd_detox: Opus → Sonnet切替
+# =============================================================================
+
+@test "T-CMD-DTX-003: cmd_detox switches Opus to Sonnet and updates bg" {
+    RESOLVE_PANE_RESULT="%3"
+    export RESOLVE_PANE_RESULT
+
+    TMUX_CALL_LOG="$TEST_TMP/tmux_calls.log"
+    export TMUX_CALL_LOG
+
+    cat > "$TEST_TMP/mock_bin/sleep" << 'MOCK'
+#!/bin/bash
+exit 0
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/sleep"
+
+    cat > "$TEST_TMP/mock_bin/tmux" << 'MOCK'
+#!/bin/bash
+echo "$@" >> "${TMUX_CALL_LOG}"
+if [[ "$*" == *"@model_name"* && "$*" == *"show-options"* ]]; then
+    echo "Opus"
+elif [[ "$*" == *"background"* && "$*" == *"show-options"* ]]; then
+    echo "#1a002e"
+fi
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/tmux"
+
+    run bash -c "
+        SCRIPT_DIR='$MOCK_PROJECT/scripts'
+        PROJECT_ROOT='$MOCK_PROJECT'
+        source '$TEST_TMP/mock_njslyr_lib.sh'
+        source '$TEST_TMP/functions.sh'
+        cmd_detox yakuza3
+    " 2>&1
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"detox complete"* ]]
+
+    [ -f "$TMUX_CALL_LOG" ]
+    grep -q "send-keys" "$TMUX_CALL_LOG"
+    grep -q "/model sonnet" "$TMUX_CALL_LOG"
+    grep -q "set-option" "$TMUX_CALL_LOG"
+    grep -q "@model_name" "$TMUX_CALL_LOG"
+    grep -q "Sonnet" "$TMUX_CALL_LOG"
+    grep -q "select-pane" "$TMUX_CALL_LOG"
+    grep -q "bg=default" "$TMUX_CALL_LOG"
+}
+
+# =============================================================================
+# T-CMD-CHP-001: cmd_chop: pane見つからず → return 1
+# =============================================================================
+
+@test "T-CMD-CHP-001: cmd_chop returns 1 when pane not found" {
+    RESOLVE_PANE_RESULT=""
+    export RESOLVE_PANE_RESULT
+
+    run bash -c "
+        SCRIPT_DIR='$MOCK_PROJECT/scripts'
+        PROJECT_ROOT='$MOCK_PROJECT'
+        STATE_DIR='$MOCK_PROJECT/.state'
+        source '$TEST_TMP/mock_njslyr_lib.sh'
+        source '$TEST_TMP/functions.sh'
+        cmd_chop yakuza3
+    " 2>&1
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"pane not found"* ]]
+}
+
+# =============================================================================
+# T-CMD-CHP-002: cmd_chop: clear_last タイムスタンプファイルが生成される
+# =============================================================================
+
+@test "T-CMD-CHP-002: cmd_chop writes clear_last timestamp file" {
+    RESOLVE_PANE_RESULT="%3"
+    export RESOLVE_PANE_RESULT
+
+    # Mock sleep (no-op)
+    cat > "$TEST_TMP/mock_bin/sleep" << 'MOCK'
+#!/bin/bash
+exit 0
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/sleep"
+
+    # Mock tmux (no-op for send-keys)
+    cat > "$TEST_TMP/mock_bin/tmux" << 'MOCK'
+#!/bin/bash
+exit 0
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/tmux"
+
+    run bash -c "
+        SCRIPT_DIR='$MOCK_PROJECT/scripts'
+        PROJECT_ROOT='$MOCK_PROJECT'
+        STATE_DIR='$MOCK_PROJECT/.state'
+        source '$TEST_TMP/mock_njslyr_lib.sh'
+        source '$TEST_TMP/functions.sh'
+        cmd_chop yakuza3
+    " 2>&1
+
+    # clear_last ファイルが生成されているか確認（exit statusは問わない: retryループ末尾の&&で1を返す正常動作）
+    [ -f "$MOCK_PROJECT/.state/clear_last_yakuza3" ]
+
+    # ファイルの中身が数字（epoch timestamp）か確認
+    local ts
+    ts=$(cat "$MOCK_PROJECT/.state/clear_last_yakuza3")
+    [[ "$ts" =~ ^[0-9]+$ ]]
+}
+
+# =============================================================================
+# T-CMD-CHP-003: cmd_chop: 未読inboxあり → cmd_surikenが呼ばれる
+# =============================================================================
+
+@test "T-CMD-CHP-003: cmd_chop calls cmd_suriken when unread inbox exists" {
+    RESOLVE_PANE_RESULT="%3"
+    export RESOLVE_PANE_RESULT
+
+    SURIKEN_LOG="$TEST_TMP/suriken_calls.log"
+    export SURIKEN_LOG
+
+    # Mock sleep (no-op)
+    cat > "$TEST_TMP/mock_bin/sleep" << 'MOCK'
+#!/bin/bash
+exit 0
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/sleep"
+
+    # Mock tmux (no-op for send-keys)
+    cat > "$TEST_TMP/mock_bin/tmux" << 'MOCK'
+#!/bin/bash
+exit 0
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/tmux"
+
+    # Mock inbox: 未読メッセージ1件
+    cat > "$MOCK_PROJECT/queue/inbox/yakuza3.yaml" << 'YAML'
+messages:
+- content: test
+  read: false
+YAML
+
+    run bash -c "
+        SCRIPT_DIR='$MOCK_PROJECT/scripts'
+        PROJECT_ROOT='$MOCK_PROJECT'
+        STATE_DIR='$MOCK_PROJECT/.state'
+        SURIKEN_LOG='$SURIKEN_LOG'
+        source '$TEST_TMP/mock_njslyr_lib.sh'
+        source '$TEST_TMP/functions.sh'
+        # cmd_suriken をモックで上書き（ログ記録用）
+        cmd_suriken() { echo \"mock_suriken: \$*\" >> \"\${SURIKEN_LOG:-/dev/null}\"; }
+        cmd_chop yakuza3
+    " 2>&1
+    [ "$status" -eq 0 ]
+
+    # suriken が yakuza3 に対して呼ばれたか確認
+    [ -f "$SURIKEN_LOG" ]
+    grep -q "yakuza3" "$SURIKEN_LOG"
+}
+
+# =============================================================================
+# T-CMD-SLY-001: cmd_slay returns 1 when pane not found
+# =============================================================================
+
+@test "T-CMD-SLY-001: cmd_slay returns 1 when pane not found" {
+    RESOLVE_PANE_RESULT=""
+    export RESOLVE_PANE_RESULT
+
+    # Mock tmux (no-op)
+    cat > "$TEST_TMP/mock_bin/tmux" << 'MOCK'
+#!/bin/bash
+echo "mock tmux: $*" >&2
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/tmux"
+
+    run bash -c "
+        SCRIPT_DIR='$MOCK_PROJECT/scripts'
+        PROJECT_ROOT='$MOCK_PROJECT'
+        source '$TEST_TMP/mock_njslyr_lib.sh'
+        source '$TEST_TMP/functions.sh'
+        cmd_slay yakuza3
+    " 2>&1
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"pane not found"* ]]
+}
+
+# =============================================================================
+# T-CMD-SLY-002: cmd_slay delegates to stage3_slay with correct args
+# =============================================================================
+
+@test "T-CMD-SLY-002: cmd_slay delegates to stage3_slay with correct args" {
+    RESOLVE_PANE_RESULT="%3"
+    export RESOLVE_PANE_RESULT
+
+    # Mock tmux (no-op)
+    cat > "$TEST_TMP/mock_bin/tmux" << 'MOCK'
+#!/bin/bash
+exit 0
+MOCK
+    chmod +x "$TEST_TMP/mock_bin/tmux"
+
+    # STAGE3_LOG for capturing stage3_slay calls
+    STAGE3_LOG="$TEST_TMP/stage3_calls.log"
+    export STAGE3_LOG
+
+    run bash -c "
+        SCRIPT_DIR='$MOCK_PROJECT/scripts'
+        PROJECT_ROOT='$MOCK_PROJECT'
+        source '$TEST_TMP/mock_njslyr_lib.sh'
+        source '$TEST_TMP/functions.sh'
+        cmd_slay yakuza3 'テスト理由'
+    " 2>&1
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"slay"* ]]
+
+    # stage3_slay was called with correct arguments
+    [ -f "$STAGE3_LOG" ]
+    grep -q "mock_stage3_slay: yakuza3 テスト理由 %3" "$STAGE3_LOG"
 }

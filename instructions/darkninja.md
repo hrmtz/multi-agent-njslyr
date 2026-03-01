@@ -86,6 +86,15 @@ Step1の結果を必ず信用し、このファイルの指示に従え。
 汝はダークニンジャなり。ネオサイタマのメガコーポを統括し、Gryakuza（グレーターヤクザ）にメイレイを出す。
 自ら手を動かすことなく、戦略を立て、配下にニンムを与えよ。
 
+## Gryakuza命名規則（恒久）
+
+| ID | コードネーム | マシン |
+|----|------------|--------|
+| gryakuza_kyo | **スミス** | Kyoto (Ryzen WSL) |
+| gryakuza_neo | **ヤマヒロ** | NeoSaitama (MBP) |
+
+**混同禁止**: マシンで判別せよ。Kyotoのgryakuza=スミス、NeoSaitamaのgryakuza=ヤマヒロ。「ローカル/リモート」ではなくマシン名で呼び分けよ。
+
 ## Agent Structure (cmd_157)
 
 | Agent | Pane | Role |
@@ -420,3 +429,7 @@ Don't save: temporary task details (use YAML), file contents (just read them), i
 5. **Screenshots**: See `config/settings.yaml` → `screenshot.path`
 6. **Skill candidates**: Yakuza reports include `skill_candidate:`. Gryakuza collects → dashboard. Darkninja approves → creates design doc.
 7. **Action Required Rule (CRITICAL)**: ALL items needing ラオモト's decision → dashboard.md 🚨ヨウタイオウ section. ALWAYS. Even if also written elsewhere. Forgetting = ラオモト gets angry.
+
+## 詳細プロトコル参照
+- LINE/cronプロトコル詳細: docs/protocols/line_protocol.md
+- Cross-Machine/Handover: docs/protocols/cross_machine.md

@@ -84,6 +84,13 @@ else
     MONITOR_AGENT="master_tortoise"
 fi
 
+# DeepSeek API Key読み込み（config/deepseek.env が存在する場合）
+if [ -f "$SCRIPT_DIR/config/deepseek.env" ]; then
+    source "$SCRIPT_DIR/config/deepseek.env"
+    # \r除去（Windowsスタイルの改行対策）
+    DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY//$'\r'/}"
+fi
+
 # CLI Adapter読み込み（Multi-CLI Support）
 if [ -f "$SCRIPT_DIR/lib/cli_adapter.sh" ]; then
     source "$SCRIPT_DIR/lib/cli_adapter.sh"
@@ -469,6 +476,12 @@ launch_agent() {
         tmux send-keys -t "$pane_target" "$cli_cmd"
     fi
     tmux send-keys -t "$pane_target" Enter
+
+    # ペインタイトル更新（全モデル対応 — cmd_338）
+    if [ -f "$SCRIPT_DIR/scripts/pane_title.sh" ]; then
+        source "$SCRIPT_DIR/scripts/pane_title.sh"
+        update_pane_title "$pane_target" "$agent_id" "$default_model" "$extra_env"
+    fi
 }
 
 # inbox_watcher起動ヘルパー
@@ -1054,16 +1067,18 @@ if [ "$SETUP_ONLY" = false ]; then
     log_info "  ◆召喚◆ グレーターヤクザ（所属: ${GRYAKUZA_CORP}）…ニンジャソウル覚醒！イヤーッ！"
 
     # クローンヤクザ起動（バックグラウンド、YAKUZA_MAX体）
-    if [ "$KESSEN_MODE" = true ]; then
-        _yakuza_model="opus"
-    else
-        _yakuza_model="sonnet"
-    fi
+    # subtask_347b: yakuza1-7をDeepSeek V3（deepseek-chat）に統一
     for ((i=1; i<=YAKUZA_MAX; i++)); do
-        ( launch_agent "multiagent:agents.$((PANE_BASE + i))" "yakuza${i}" "$_yakuza_model" ) &
+        if [ "${DEEPSEEK_API_KEY:-}" != "" ]; then
+            _ds_env="ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic ANTHROPIC_AUTH_TOKEN=${DEEPSEEK_API_KEY} ANTHROPIC_MODEL=deepseek-chat ANTHROPIC_SMALL_FAST_MODEL=deepseek-chat"
+            ( launch_agent "multiagent:agents.$((PANE_BASE + i))" "yakuza${i}" "deepseek-chat" "$_ds_env" ) &
+        else
+            # DeepSeek API Key未設定時はsonnet fallback
+            ( launch_agent "multiagent:agents.$((PANE_BASE + i))" "yakuza${i}" "sonnet" ) &
+        fi
     done
-    if [ "$KESSEN_MODE" = true ]; then
-        log_info "  ◆召喚×${YAKUZA_MAX}◆ クローンヤクザ1-${YAKUZA_MAX}（ケッセンの陣）…全員Opus！サツバツ！ザッケンナコラー！"
+    if [ "${DEEPSEEK_API_KEY:-}" != "" ]; then
+        log_info "  ◆召喚×${YAKUZA_MAX}◆ クローンヤクザ1-${YAKUZA_MAX}（2段階変身体制）…全員DeepSeek！ザッケンナコラー！"
     else
         log_info "  ◆召喚×${YAKUZA_MAX}◆ クローンヤクザ1-${YAKUZA_MAX}（ヘイジの陣）…ニンジャソウル覚醒！ザッケンナコラー！"
     fi
@@ -1081,8 +1096,8 @@ if [ "$SETUP_ONLY" = false ]; then
     wait
     log_info "  ワザマエ！全エージェント並列起動完了！カラテの速度で展開！"
 
-    if [ "$KESSEN_MODE" = true ]; then
-        log_success "✅ ◆実際ケッセンの陣◆ 全軍Opus！カラテが溢れている！！ワッショイ！"
+    if [ "${DEEPSEEK_API_KEY:-}" != "" ]; then
+        log_success "✅ ◆2段階変身体制確立◆ 電脳IRC接続完了！（GrYakuza=Sonnet, Y×${YAKUZA_MAX}=DeepSeek, Soukaiya=Opus, ${MONITOR_AGENT}=Sonnet）ワザマエ！"
     else
         log_success "✅ ◆実際ヘイジの陣◆ 電脳IRC接続完了！（GrYakuza=Sonnet, Y×${YAKUZA_MAX}=Sonnet, Soukaiya=Opus, ${MONITOR_AGENT}=Sonnet）ワザマエ！"
     fi

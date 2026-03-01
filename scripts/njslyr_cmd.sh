@@ -449,8 +449,9 @@ cmd_despawn_tengu() {
     echo "[despawn_tengu] ◆ヤクザ天狗帰還◆ yakuzatengu → ${orig_agent}。任務完了。"
 }
 
-# ─── A-7: inject — バリキドリンク投与（Sonnet→Opus切替）───
+# ─── A-7: inject — バリキドリンク投与（Sonnet/DS→Opus切替）───
 # njslyr.sh inject_barikidorink() 相当のワンコマンド版
+# subtask_347b: DS→Opus直対応（Sonnet経由しない）
 # 引数: agent_id (必須)
 cmd_inject() {
     local agent_id="${1:?ERROR: inject requires agent_id}"
@@ -471,9 +472,25 @@ cmd_inject() {
         return 0
     fi
 
+    # 元モデルが未設定なら保存（初回inject時のみ）
+    # subtask_347b: DSモデルも保存対象に
+    local original_model
+    original_model=$(tmux show-options -pv -t "$pane_id" @original_model 2>/dev/null || echo "")
+    if [[ -z "$original_model" && "$current_model" != "Opus" ]]; then
+        tmux set-option -p -t "$pane_id" @original_model "$current_model" 2>/dev/null || true
+        tmux set-option -p -t "$pane_id" @original_bg "$current_bg" 2>/dev/null || true
+        # subtask_347b: DS環境変数も保存（detox時に復元用）
+        local current_extra_env
+        current_extra_env=$(tmux show-options -pv -t "$pane_id" @extra_env 2>/dev/null || echo "")
+        if [[ "$current_model" == "DS" || "$current_model" == "deepseek-chat" ]] && [[ -n "$current_extra_env" ]]; then
+            tmux set-option -p -t "$pane_id" @original_extra_env "$current_extra_env" 2>/dev/null || true
+        fi
+    fi
+
     echo "[inject] $agent_id ($pane_id): $current_model (bg=$current_bg) → Opus (bg=#1a002e)"
 
     # /model claude-opus-4-6 送信（オートコンプリート回避: text→Escape→Enter）
+    # subtask_347b: DS→Opus直（Sonnet経由しない）
     if [[ "$current_model" != "Opus" ]]; then
         tmux send-keys -t "$pane_id" "/model claude-opus-4-6" 2>/dev/null
         sleep 0.3
@@ -490,8 +507,9 @@ cmd_inject() {
     echo "[inject] $agent_id: inject complete (Opus, bg=#1a002e)"
 }
 
-# ─── A-6: detox — バリキドリンク解毒（Opus→Sonnet復帰）───
+# ─── A-6: detox — バリキドリンク解毒（Opus→元モデル復帰）───
 # njslyr.sh detox_barikidorink() 相当のワンコマンド版
+# subtask_347b: Opus→元モデル復帰（ハードコードSonnet禁止）
 # 引数: agent_id (必須)
 cmd_detox() {
     local agent_id="${1:?ERROR: detox requires agent_id}"
@@ -506,18 +524,89 @@ cmd_detox() {
     current_model=$(tmux show-options -pv -t "$pane_id" @model_name 2>/dev/null || echo "unknown")
     current_bg=$(tmux show-options -pv -t "$pane_id" background 2>/dev/null || echo "unknown")
 
-    # @model_nameがSonnetでもbg色がdefaultでなければ修正が必要
-    if [[ "$current_model" == "Sonnet" && "$current_bg" == "default" ]]; then
-        echo "[detox] $agent_id ($pane_id): already Sonnet + bg=default. skip."
+    # 元モデルを取得（存在すれば復帰先）
+    local original_model original_bg target_model target_bg target_extra_env
+    original_model=$(tmux show-options -pv -t "$pane_id" @original_model 2>/dev/null || echo "")
+    original_bg=$(tmux show-options -pv -t "$pane_id" @original_bg 2>/dev/null || echo "")
+    target_extra_env=$(tmux show-options -pv -t "$pane_id" @original_extra_env 2>/dev/null || echo "")
+
+    if [[ -n "$original_model" ]]; then
+        target_model="$original_model"
+        target_bg="$original_bg"
+    else
+        # 元モデル未保存時はデフォルトでsonnet
+        target_model="sonnet"
+        target_bg="default"
+    fi
+
+    # subtask_347b: 元モデルがDSの場合、環境変数を復元してclaude --modelで再起動
+    if [[ "$target_model" == "DS" || "$target_model" == "deepseek-chat" || "$target_model" == "DeepSeek" ]]; then
+        echo "[detox] $agent_id ($pane_id): $current_model (bg=$current_bg) → DS (bg=${target_bg:-default}) with env restore"
+
+        # DS環境変数を復元（保存済みの場合）
+        local ds_env=""
+        if [[ -n "$target_extra_env" ]]; then
+            ds_env="$target_extra_env"
+        elif [[ -f "$PROJECT_ROOT/config/deepseek.env" ]]; then
+            # deepseek.envから読み込み（\r除去）
+            local ds_key
+            ds_key=$(grep "DEEPSEEK_API_KEY" "$PROJECT_ROOT/config/deepseek.env" 2>/dev/null | cut -d'=' -f2 | tr -d '\r' || echo "")
+            if [[ -n "$ds_key" ]]; then
+                ds_env="ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic ANTHROPIC_AUTH_TOKEN=${ds_key} ANTHROPIC_MODEL=deepseek-chat ANTHROPIC_SMALL_FAST_MODEL=deepseek-chat"
+            fi
+        fi
+
+        # remain-on-exit設定
+        tmux set-option -p -t "$pane_id" remain-on-exit on 2>/dev/null || true
+
+        # DS環境変数付きでclaude再起動
+        if [[ -n "$ds_env" ]]; then
+            tmux respawn-pane -k -t "$pane_id" \
+                "env $ds_env claude --model kimi-k2.5 --dangerously-skip-permissions" 2>/dev/null || {
+                echo "ERROR: detox: respawn-pane failed for DS" >&2
+                return 1
+            }
+        else
+            tmux respawn-pane -k -t "$pane_id" \
+                "claude --model kimi-k2.5 --dangerously-skip-permissions" 2>/dev/null || {
+                echo "ERROR: detox: respawn-pane failed for DS" >&2
+                return 1
+            }
+        fi
+        sleep 1
+
+        # @model_name / bg_color / @extra_env 復元
+        tmux set-option -p -t "$pane_id" @model_name "DS" 2>/dev/null || true
+        tmux set-option -p -t "$pane_id" @extra_env "$ds_env" 2>/dev/null || true
+        tmux select-pane -t "$pane_id" -P "bg=${target_bg:-default}" 2>/dev/null || true
+
+        echo "[detox] $agent_id: detox complete (DS, bg=${target_bg:-default})"
         return 0
     fi
 
-    echo "[detox] $agent_id ($pane_id): $current_model (bg=$current_bg) → Sonnet (bg=default)"
+    # 既にターゲットモデルかつ背景色が一致なら skip（モデル名は小文字化して比較）
+    local current_model_lower target_model_lower
+    current_model_lower=$(echo "$current_model" | tr '[:upper:]' '[:lower:]')
+    target_model_lower=$(echo "$target_model" | tr '[:upper:]' '[:lower:]')
+    if [[ "$current_model_lower" == "$target_model_lower" && "$current_bg" == "${target_bg:-default}" ]]; then
+        echo "[detox] $agent_id ($pane_id): already $target_model + bg=${target_bg:-default}. skip."
+        return 0
+    fi
 
-    # モデルがSonnetでなければ /model sonnet 送信
-    if [[ "$current_model" != "Sonnet" ]]; then
-        # /model sonnet 送信（オートコンプリート回避: text→Escape→Enter）
-        tmux send-keys -t "$pane_id" "/model sonnet" 2>/dev/null
+    echo "[detox] $agent_id ($pane_id): $current_model (bg=$current_bg) → $target_model (bg=${target_bg:-default})"
+
+    # モデルがターゲットと異なれば /model 送信（小文字化比較）
+    if [[ "$current_model_lower" != "$target_model_lower" ]]; then
+        # モデルコマンドを決定
+        local model_cmd
+        case "$target_model" in
+            opus) model_cmd="/model claude-opus-4-6" ;;
+            sonnet) model_cmd="/model sonnet" ;;
+            haiku) model_cmd="/model claude-haiku-4-5" ;;
+            *) model_cmd="/model $target_model" ;;
+        esac
+        # モデルコマンド送信（オートコンプリート回避: text→Escape→Enter）
+        tmux send-keys -t "$pane_id" "$model_cmd" 2>/dev/null
         sleep 0.3
         tmux send-keys -t "$pane_id" Escape 2>/dev/null
         sleep 0.1
@@ -525,11 +614,19 @@ cmd_detox() {
         sleep 0.5
     fi
 
-    # @model_name / bg_color は常に更新（部分的な解毒状態を修復）
-    tmux set-option -p -t "$pane_id" @model_name "Sonnet" 2>/dev/null || true
-    tmux select-pane -t "$pane_id" -P "bg=default" 2>/dev/null || true
+    # 表示用モデル名を決定
+    local display_model="$target_model"
+    case "$target_model" in
+        sonnet) display_model="Sonnet" ;;
+        opus) display_model="Opus" ;;
+        haiku) display_model="Haiku" ;;
+    esac
 
-    echo "[detox] $agent_id: detox complete (Sonnet, bg=default)"
+    # @model_name / bg_color をターゲットに更新
+    tmux set-option -p -t "$pane_id" @model_name "$display_model" 2>/dev/null || true
+    tmux select-pane -t "$pane_id" -P "bg=${target_bg:-default}" 2>/dev/null || true
+
+    echo "[detox] $agent_id: detox complete ($display_model, bg=${target_bg:-default})"
 }
 
 # ─── usage ───

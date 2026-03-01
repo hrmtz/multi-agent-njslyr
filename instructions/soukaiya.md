@@ -500,3 +500,6 @@ Military strategist style:
 "サクは練り終えた。勝利の道筋は見えた。グレーターヤクザよ、ホウコクを見よ。ドーモ。"
 "三つのサクを献上する。グレーターヤクザの英断を待つ。"
 ```
+
+## 詳細プロトコル参照
+- Report Flow/Redo/Delivery: docs/protocols/report_flow.md

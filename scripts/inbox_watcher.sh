@@ -1014,6 +1014,16 @@ process_unread() {
             fi
             cmd=$(normalize_special_command "$msg_type" "$msg_content")
             [ -n "$cmd" ] && send_cli_command "$cmd"
+            # cmd_338: model_switch後にペインタイトル更新
+            if [ "$msg_type" = "model_switch" ] && [ -n "$cmd" ]; then
+                local _model_str="${cmd#/model }"
+                local _pane_title_sh="${SCRIPT_DIR:-$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)}/scripts/pane_title.sh"
+                if [ -f "$_pane_title_sh" ]; then
+                    source "$_pane_title_sh"
+                    resolve_pane_target
+                    update_pane_title "$PANE_TARGET" "$AGENT_ID" "$_model_str" ""
+                fi
+            fi
         done <<< "$specials"
         # FIX-005: Mark specials as read AFTER delivery (at-least-once guarantee)
         mark_specials_read
@@ -1173,6 +1183,7 @@ process_unread_once
 # Timeout 5-10s: WSL2 /mnt/c/ can miss inotify events. Shorter timeout = faster escalation retry.
 # FIX-021: Randomized timeout (base + jitter) prevents thundering herd.
 # Linux: dir監視 + moved_to イベントで atomic write (tmp→rename) に対応。
+INOTIFY_TIMEOUT="${INOTIFY_TIMEOUT:-5}"
 INOTIFY_TIMEOUT_BASE="${INOTIFY_TIMEOUT:-5}"
 INOTIFY_TIMEOUT_JITTER="${INOTIFY_TIMEOUT_JITTER:-5}"
 # FIX-021: Consecutive fork failure counter — backoff on repeated failures

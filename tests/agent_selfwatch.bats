@@ -78,7 +78,8 @@ teardown() {
 }
 
 @test "TC-FR-002: file-watch + timeout fallback is configured" {
-    grep -q "INOTIFY_TIMEOUT=" "$WATCHER_SCRIPT"
+    # FIX-021 renamed INOTIFY_TIMEOUT → INOTIFY_TIMEOUT_BASE (thundering herd fix)
+    grep -q "INOTIFY_TIMEOUT_BASE=" "$WATCHER_SCRIPT"
     grep -q "_wait_for_file_change" "$WATCHER_SCRIPT"
 }
 

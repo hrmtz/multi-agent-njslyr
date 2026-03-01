@@ -105,10 +105,11 @@ async function handleEvent(event, env) {
   const userId = event.source?.userId ?? "unknown";
   const replyToken = event.replyToken;
 
-  // Post to ntfy
-  await postToNtfy(text, userId);
-
-  // No auto-reply — darkninja replies manually via line_push.sh
+  // Immediate ACK + ntfy forward in parallel (replyToken expires within seconds)
+  await Promise.all([
+    replyToLine(replyToken, "受信しました。処理中...", env.LINE_CHANNEL_ACCESS_TOKEN),
+    postToNtfy(text, userId),
+  ]);
 }
 
 /**
