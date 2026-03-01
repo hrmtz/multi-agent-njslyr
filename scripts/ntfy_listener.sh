@@ -721,13 +721,27 @@ EOF
 }
 
 # laomotoトピックメッセージ → darkninja inbox転送（LINE直通チャット）
+# cmd_342 FIX: MACHINE_ROLE別ルーティング（重複防止）
+# - Kyoto: darkninja + master_tortoise にローカル書き込み（従来動作）
+# - NeoSaitama: master_crane にローカル書き込みのみ
+#   理由: 同時稼働モードで両マシンがlaomotopicを購読するため、
+#   NeoSaitamaがSSHでKyoto darkninja書き込みするとKyoto分と重複になる
 handle_laomoto() {
     local msg="$1"
-    bash "$SCRIPT_DIR/scripts/inbox_write.sh" darkninja \
-        "LINE: $msg" "laomoto_message" "ntfy_listener" "" P1
-    bash "$SCRIPT_DIR/scripts/inbox_write.sh" master_tortoise \
-        "LINE: $msg" "laomoto_message" "ntfy_listener" "" P1
-    echo "[$(date)] [ntfy_listener] laomoto message forwarded to darkninja and master_tortoise: ${msg:0:80}" >&2
+    if [[ "$MACHINE_ROLE" == "kyoto" || "$MACHINE_ROLE" == "ryzen" ]]; then
+        # Kyoto (primary): darkninja + master_tortoise にローカル書き込み
+        bash "$SCRIPT_DIR/scripts/inbox_write.sh" darkninja \
+            "LINE: $msg" "laomoto_message" "ntfy_listener" "" P1
+        bash "$SCRIPT_DIR/scripts/inbox_write.sh" master_tortoise \
+            "LINE: $msg" "laomoto_message" "ntfy_listener" "" P1
+        echo "[$(date)] [ntfy_listener] laomoto → darkninja+master_tortoise (local/Kyoto): ${msg:0:80}" >&2
+    else
+        # NeoSaitama (secondary): master_crane にローカル書き込みのみ
+        # (darkninja転送はKyoto側で実施済み。SSH二重書き込み防止)
+        bash "$SCRIPT_DIR/scripts/inbox_write.sh" master_crane \
+            "LINE: $msg" "laomoto_message" "ntfy_listener" "" P1
+        echo "[$(date)] [ntfy_listener] laomoto → master_crane (local/NeoSaitama): ${msg:0:80}" >&2
+    fi
 }
 
 # Route message by prefix. Returns 0 if handled, 1 if fallback needed.
