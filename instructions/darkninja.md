@@ -231,6 +231,17 @@ queue/inbox/darkninja.yaml に type: laomoto_message の未読メッセージが
 3. 対応済みフラグがない場合（darkninjaが先に起動した場合等）:
    - 通常通りLINEに返信する
 
+### Haiku即レス済み判定
+
+laomoto_message の content に `[Haiku応答]:` が含まれている場合:
+- Workerが既にHaikuで一次返信済みと判断する
+- 受領確認（「受信しました」等）は省略する
+- Haikuの回答内容を踏まえ、補足・深掘り・判断が必要な点に焦点を当てて返信する
+- master_tortoise の laomoto_handled は来ない可能性がある（Haikuが代替）
+
+`[Haiku応答]:` が含まれていない場合:
+- 従来通りの判定フロー（laomoto_handled チェック → 通常返信）
+
 ## cron定期サマリー送信プロトコル
 
 queue/inbox/darkninja.yaml に type: cron_summary の未読メッセージがある場合:
@@ -248,6 +259,39 @@ queue/inbox/darkninja.yaml に type: cron_summary の未読メッセージがあ
 - サマリーはLINEで読みやすい長さ（400文字以内を目安）
 - 深夜帯(0:00-7:00)は cron_line_summary.sh 側でスキップ済みなので
   ダークニンジャ側での深夜チェックは不要
+
+## cron忍殺語日報（22:00自動送信）
+
+queue/inbox/darkninja.yaml に type: cron_daily_report の未読メッセージがある場合:
+
+### 処理手順
+
+1. **素材収集**:
+   - `git log --since="today 00:00" --oneline --all` で当日の全コミットを取得
+   - `mcp__memory__read_graph` で当日のイベント・知見を確認
+   - dashboard.md で進行中プロジェクトの状況を把握
+
+2. **日報作成**:
+   - `reports/daily/TEMPLATE_NJSLYR.md` のルールに厳密に従う
+   - 最も面白いエピソード（失敗→転換→成功のドラマ）を中心に構成
+   - 10〜12投稿（各110〜150文字）の三人称散文小説として書く
+   - コマンド名の直接記載禁止（動作・意図・結果で語る）
+
+3. **LINE送信**:
+   - 各投稿を `bash scripts/line_push.sh "投稿本文"` で順次送信
+   - 投稿間に `sleep 1` を入れて順序を保証
+
+4. **アーカイブ保存**:
+   - `reports/daily/YYYY-MM-DD_njslyr.md` に全文を保存（当日日付）
+   - 既にファイルが存在する場合は上書きしない（手動作成分を尊重）
+
+5. **完了処理**:
+   - cron_daily_report メッセージを read: true にマーク
+
+### 注意事項
+- F001例外: 日報作成はdarkninja自身が実行する（Gryakuzaに委任しない）
+- コミットが0件の日でも「静寂の日」として情景描写で日報を作る
+- TEMPLATE_NJSLYR.md の禁止事項（◆教訓◆ヘッダー、絵文字、コマンド直接記載）を厳守
 
 ## SayTask Task Management Routing
 

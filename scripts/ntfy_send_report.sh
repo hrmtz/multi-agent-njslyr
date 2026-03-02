@@ -59,7 +59,7 @@ PAYLOAD=$(base64 < "$REPORT_PATH" | tr -d '\n')
 AUTH_ARGS=()
 while IFS= read -r line; do
     [[ -n "$line" ]] && AUTH_ARGS+=("$line")
-done < <(ntfy_get_auth_args "$SCRIPT_DIR/config/ntfy_auth.env")
+done < <(ntfy_get_auth_args "$SCRIPT_DIR/config/api_keys.env")
 
 # SSH tier2 fallback: ntfy全失敗時にSCPでレポートYAMLをpeerへ転送しinbox通知
 # 引数: report_path (必須)

@@ -66,7 +66,7 @@ fi
 AUTH_ARGS=()
 while IFS= read -r line; do
     [[ -n "$line" ]] && AUTH_ARGS+=("$line")
-done < <(ntfy_get_auth_args "$SCRIPT_DIR/config/ntfy_auth.env")
+done < <(ntfy_get_auth_args "$SCRIPT_DIR/config/api_keys.env")
 
 # Parse all needed JSON fields in a single python3 invocation.
 # Output: <event><US><tags><US><message><US><id><US><topic>  (US = ASCII unit separator 0x1f)
@@ -720,6 +720,34 @@ EOF
         ntfy_received ntfy_listener "" P0
 }
 
+# LINE image/video/file download handler
+# payload format: {messageId}:{mediaType}:{fileName}
+handle_lineimg() {
+    local payload="$1"
+    local message_id="${payload%%:*}"
+    local rest="${payload#*:}"
+    local media_type="${rest%%:*}"
+    local file_name="${rest#*:}"
+
+    echo "[$(date)] [ntfy_listener] lineimg: downloading ${media_type} messageId=${message_id}" >&2
+    local saved_path
+    saved_path=$(bash "$SCRIPT_DIR/scripts/line_image_download.sh" "$message_id" "$media_type" "$file_name" 2>&1)
+    local rc=$?
+
+    if [[ $rc -eq 0 ]]; then
+        local label="画像"
+        [[ "$media_type" == "video" ]] && label="動画"
+        [[ "$media_type" == "file" ]] && label="ファイル"
+        bash "$SCRIPT_DIR/scripts/inbox_write.sh" darkninja \
+            "LINE ${label}受信: ${saved_path}" "laomoto_message" "ntfy_listener" "" P1
+        echo "[$(date)] [ntfy_listener] lineimg: saved to ${saved_path}" >&2
+    else
+        bash "$SCRIPT_DIR/scripts/inbox_write.sh" darkninja \
+            "LINE画像DL失敗: messageId=${message_id} error=${saved_path}" "system_notice" "ntfy_listener" "" P1
+        echo "[$(date)] [ntfy_listener] lineimg: FAILED messageId=${message_id}" >&2
+    fi
+}
+
 # laomotoトピックメッセージ → darkninja inbox転送（LINE直通チャット）
 # cmd_342 FIX: MACHINE_ROLE別ルーティング（重複防止）
 # - Kyoto: darkninja + master_tortoise にローカル書き込み（従来動作）
@@ -728,13 +756,20 @@ EOF
 #   NeoSaitamaがSSHでKyoto darkninja書き込みするとKyoto分と重複になる
 handle_laomoto() {
     local msg="$1"
+    # lineimg: prefix on laomoto topic → delegate to lineimg handler
+    if [[ "$msg" == lineimg:* ]]; then
+        handle_lineimg "${msg#lineimg:}"
+        return
+    fi
     if [[ "$MACHINE_ROLE" == "kyoto" || "$MACHINE_ROLE" == "ryzen" ]]; then
         # Kyoto (primary): darkninja + master_tortoise にローカル書き込み
         bash "$SCRIPT_DIR/scripts/inbox_write.sh" darkninja \
             "LINE: $msg" "laomoto_message" "ntfy_listener" "" P1
         bash "$SCRIPT_DIR/scripts/inbox_write.sh" master_tortoise \
             "LINE: $msg" "laomoto_message" "ntfy_listener" "" P1
-        echo "[$(date)] [ntfy_listener] laomoto → darkninja+master_tortoise (local/Kyoto): ${msg:0:80}" >&2
+        # Wake darkninja for deep reply
+        bash "$SCRIPT_DIR/scripts/njslyr_cmd.sh" suriken darkninja 2>/dev/null &
+        echo "[$(date)] [ntfy_listener] laomoto → darkninja+master_tortoise+suriken (local/Kyoto): ${msg:0:80}" >&2
     else
         # NeoSaitama (secondary): master_crane にローカル書き込みのみ
         # (darkninja転送はKyoto側で実施済み。SSH二重書き込み防止)
@@ -809,6 +844,11 @@ route_message() {
         aisatsu)
             # cmd_328: dispatch アイサツ受信 — darkninja通知、ntfy_inbox記録あり
             handle_aisatsu "$payload"
+            return 0
+            ;;
+        lineimg)
+            # LINE image/video/file download: lineimg:{messageId}:{mediaType}:{fileName}
+            handle_lineimg "$payload"
             return 0
             ;;
         activate)

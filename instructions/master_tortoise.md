@@ -349,7 +349,7 @@ fi
   - CRITICAL: 4回連続ミス（240秒）
 - CRITICAL時の分岐:
   ```
-  tailscale ping {peer} --timeout=5s
+  $(command -v tailscale || command -v tailscale.exe) ping {peer} --timeout=5s
   ├── 成功 → プロセス死亡推定 → gryakuza + ntfy通知
   └── 失敗 → ネットワーク断推定 → ntfy通知のみ（wait & retry）
   ```
@@ -502,6 +502,15 @@ SSH fallback で書き込まれたYAMLには `transport: ssh_fallback` フィー
 ### 実施タイミング
 
 `monitor_cycle` の substep `check_line_inbox` として、60秒サイクル内で実施。
+
+### Haiku即レス済み判定
+
+inboxの `laomoto_message` に `[Haiku応答]:` が含まれている場合:
+- Workerが既にHaikuで一次返信済みのため、`line_push.sh` での一次返信をスキップする
+- darkninja inboxへの転送（step 5）のみ実施する
+
+`[Haiku応答]:` が含まれていない場合（Worker障害・APIキー未設定等）:
+- 従来通りトータスが一次返信を行う
 
 ### 判断基準
 

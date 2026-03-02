@@ -83,7 +83,7 @@ PAYLOAD=$(base64 < "$TASK_REALPATH" | tr -d '\n')
 AUTH_ARGS=()
 while IFS= read -r line; do
     [[ -n "$line" ]] && AUTH_ARGS+=("$line")
-done < <(ntfy_get_auth_args "$SCRIPT_DIR/config/ntfy_auth.env")
+done < <(ntfy_get_auth_args "$SCRIPT_DIR/config/api_keys.env")
 
 # FIX-010: dispatch送信先をmachine.roleに基づいて動的決定（双方向対応）
 MY_ROLE=$(awk '/^  role:/ {print $2; exit}' "$SETTINGS")

@@ -94,7 +94,7 @@ _cmd_suriken_ntfy_fallback() {
     local auth_args=()
     while IFS= read -r line; do
         [[ -n "$line" ]] && auth_args+=("$line")
-    done < <(ntfy_get_auth_args "$PROJECT_ROOT/config/ntfy_auth.env")
+    done < <(ntfy_get_auth_args "$PROJECT_ROOT/config/api_keys.env")
 
     # curl で POST
     local response_code

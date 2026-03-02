@@ -3,19 +3,19 @@
 #
 # Usage: bash scripts/line_push.sh "<message>"
 #
-# Required env vars (load from config/line.env or ~/.bashrc):
+# Required env vars (load from config/api_keys.env or ~/.bashrc):
 #   LINE_CHANNEL_ACCESS_TOKEN
 #   LINE_USER_ID
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LINE_ENV_FILE="${SCRIPT_DIR}/../config/line.env"
+API_KEYS_FILE="${SCRIPT_DIR}/../config/api_keys.env"
 
-# Load credentials from config/line.env if it exists
-if [[ -f "${LINE_ENV_FILE}" ]]; then
+# Load credentials from config/api_keys.env if it exists
+if [[ -f "${API_KEYS_FILE}" ]]; then
   # shellcheck source=/dev/null
-  source "${LINE_ENV_FILE}"
+  source "${API_KEYS_FILE}"
 fi
 
 # Validate arguments
