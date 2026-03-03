@@ -110,6 +110,10 @@
 !scripts/ntfy_send_dispatch.sh
 !scripts/ntfy_send_report.sh
 !scripts/line_push.sh
+!scripts/task_complete.sh
+!scripts/line_image_download.sh
+!scripts/cron_njslyr_report.sh
+!scripts/pane_title.sh
 
 # Services
 !services/
@@ -133,6 +137,14 @@
 !docs/njslyr_design.md
 !docs/diary_*.md
 !docs/blog_*.md
+!docs/gryakuza_workflow.md
+!docs/gryakuza_redo.md
+!docs/gryakuza_escalation.md
+!docs/gryakuza_slave.md
+
+# Protocols
+!docs/protocols/
+!docs/protocols/*.md
 
 # Screenshots (masked — no secrets)
 !images/
