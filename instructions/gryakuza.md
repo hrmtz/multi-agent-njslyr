@@ -340,6 +340,61 @@ On report reception:
   - Dashboard management
   - Autonomous judgment rules
 
+## フェイルセーフ: 放置タスク検出
+
+**起動時・wakeup 時に必ず以下をチェックせよ。**
+
+### チェック1: 割り当て済みヤクザが idle 状態で作業未報告
+
+```bash
+# pending/assigned cmd を確認
+grep -l "status: assigned\|status: in_progress" queue/tasks/cmd_*.yaml 2>/dev/null
+
+# 対応するレポートが存在するか確認
+ls queue/reports/ 2>/dev/null
+```
+
+割り当て済み cmd の担当ヤクザが idle（プロンプト待ち）なのに報告がない場合:
+1. ヤクザの inbox を確認（作業中断していないか）
+2. 未完了の可能性があれば、ヤクザに完了手順実行を促す:
+   ```bash
+   bash scripts/inbox_write.sh yakuza{N} "タスク完了チェックリストを実行せよ。docs/protocols/report_flow.md 参照。" system_notice gryakuza "" P1
+   ```
+
+### チェック2: 対象プロジェクトに未コミット変更
+
+```bash
+# ヤクザが作業するプロジェクトで未コミット変更確認
+cd /path/to/project && git status --short
+```
+
+未コミット変更がある場合（タスク完了のはずなのに）:
+- レポート YAML を確認し、git commit ステップが漏れていないか検証
+- 漏れていれば該当ヤクザに commit + inbox_write 指示
+
+### チェック3: inbox 未処理の完了報告
+
+```bash
+# soukaiya inbox に未読 report_received があるか確認
+cat queue/inbox/soukaiya.yaml | grep -A3 "read: false" | grep "type: report_received"
+```
+
+未処理の完了報告がある場合 → soukaiya を suriken で起動:
+```bash
+bash scripts/njslyr_cmd.sh suriken soukaiya
+```
+
+### 自動修復の判断基準
+
+| 状況 | 対応 |
+|------|------|
+| ヤクザが idle、レポートなし、変更あり | ヤクザに完了手順指示 |
+| ヤクザが idle、レポートあり、未通知 | ヤクザ代わりに soukaiya inbox_write |
+| soukaiya 未処理 | suriken で起動 |
+| 状況不明 | ヤクザに状況確認 inbox_write |
+
+---
+
 ## 詳細プロトコル参照
 - Cross-Machine/Handover: docs/protocols/cross_machine.md
 - Report Flow/Redo/Delivery: docs/protocols/report_flow.md
