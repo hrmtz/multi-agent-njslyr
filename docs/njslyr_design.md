@@ -131,7 +131,7 @@ inbox_watcher.shの既存エスカレーション機構をベースとする。
 ### 4.1 スクリプト配置
 
 - **ファイル名**: `scripts/njslyr.sh`
-- **配置場所**: `/Users/hrmtz/project/personal/multi-agent-njslyr/scripts/njslyr.sh`
+- **配置場所**: `/Users/hrmtz/project/multi-agent-njslyr/scripts/njslyr.sh`
 - **実行権限**: `chmod +x scripts/njslyr.sh`
 
 ### 4.1.1 実装済み追加機能（設計後追加）
@@ -191,7 +191,7 @@ done
 #### 方式2: cron（代替案）
 
 ```cron
-*/15 * * * * cd /Users/hrmtz/project/personal/multi-agent-njslyr && bash scripts/njslyr.sh once
+*/15 * * * * cd /Users/hrmtz/project/multi-agent-njslyr && bash scripts/njslyr.sh once
 ```
 
 - **利点**: システム再起動時に自動再開

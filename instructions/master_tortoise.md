@@ -439,7 +439,7 @@ soukaiyaの推奨設計（soukaiya_report_ntfy_diagnosis.yaml SECTION 4）に準
 ```bash
 SSH_OPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
 PEER_HOST="peer-hostname"  # MBP/crane の Tailscale ホスト名
-PEER_PROJECT="/Users/hrmtz/project/personal/multi-agent-njslyr"
+PEER_PROJECT="/Users/hrmtz/project/multi-agent-njslyr"
 
 ssh $SSH_OPTS $PEER_HOST "cat ${PEER_PROJECT}/queue/heartbeat/tortoise.yaml"
 ```

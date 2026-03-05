@@ -468,7 +468,7 @@ machine:
   role: kyoto                   # kyoto (Ryzen WSL) or neosaitama (MBP)
   operation_mode: kyoto_master  # kyoto_master | standalone | slave
   peer_host: peer-hostname          # Tailscale hostname of peer machine
-  peer_project_root: /Users/hrmtz/project/personal/multi-agent-njslyr
+  peer_project_root: /Users/hrmtz/project/multi-agent-njslyr
 
 ntfy_topic: "your-secret-topic"
 ```

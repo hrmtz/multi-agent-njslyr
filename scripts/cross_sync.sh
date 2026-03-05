@@ -11,6 +11,7 @@
 #   Code:          git push/pull (NOT handled here)
 #   State YAML:    queue/tasks/, queue/reports/, dashboard.md
 #   MCP memory:    ~/.claude/projects/.../memory/ (Ryzen→MBP one-way)
+#   Secrets:       config/*.env, cross-project .env files (bidirectional, --update)
 #   Not synced:    queue/inbox/, .state/, logs/, queue/heartbeat/
 #
 # Prerequisites:
@@ -37,6 +38,8 @@ PEER_HOST=$(awk '/^  peer_host:/ {print $2; exit}' "$SETTINGS")
 PEER_PROJECT_ROOT=$(awk '/^  peer_project_root:/ {print $2; exit}' "$SETTINGS")
 PEER_WSL=$(awk '/^  peer_wsl:/ {gsub(/"/, "", $2); print $2; exit}' "$SETTINGS")
 
+PEER_HOME=$(awk '/^  peer_home:/ {print $2; exit}' "$SETTINGS")
+
 MACHINE_ROLE="${MACHINE_ROLE:-kyoto}"
 
 # ─── Input validation (SEC-001) ──────────────────────────────
@@ -48,6 +51,10 @@ if [[ -z "$PEER_HOST" ]] || [[ ! "$PEER_HOST" =~ ^[a-zA-Z0-9._-]+$ ]]; then
 fi
 if [[ -z "$PEER_PROJECT_ROOT" ]] || [[ ! "$PEER_PROJECT_ROOT" =~ ^/[a-zA-Z0-9/_.-]+$ ]] || [[ "$PEER_PROJECT_ROOT" == *..* ]]; then
     echo "$LOG_TAG ERROR: Invalid PEER_PROJECT_ROOT: '$PEER_PROJECT_ROOT'" >&2
+    exit 1
+fi
+if [[ -n "$PEER_HOME" ]] && { [[ ! "$PEER_HOME" =~ ^/[a-zA-Z0-9/_.-]+$ ]] || [[ "$PEER_HOME" == *..* ]]; }; then
+    echo "$LOG_TAG ERROR: Invalid PEER_HOME: '$PEER_HOME'" >&2
     exit 1
 fi
 
@@ -264,6 +271,76 @@ sync_mcp_memory() {
     return 0
 }
 
+# ─── Sync secrets (bidirectional, --update) ──────────────────
+
+# Whitelist of secret files to sync between machines.
+# Format: "local_path|remote_path" — paths are absolute.
+# Security: explicit whitelist only, no glob/pattern matching.
+_build_secrets_list() {
+    local local_home="$HOME"
+    local remote_home="${PEER_HOME:-}"
+    if [[ -z "$remote_home" ]]; then
+        log_warn "peer_home not set in settings.yaml — skipping cross-project secrets"
+        # Only sync within project
+        echo "$SCRIPT_DIR/config/api_keys.env|$PEER_HOST:$PEER_PROJECT_ROOT/config/api_keys.env"
+        echo "$SCRIPT_DIR/config/ftp.env|$PEER_HOST:$PEER_PROJECT_ROOT/config/ftp.env"
+        echo "$SCRIPT_DIR/config/line.env|$PEER_HOST:$PEER_PROJECT_ROOT/config/line.env"
+        return
+    fi
+
+    # multi-agent-njslyr secrets
+    echo "$SCRIPT_DIR/config/api_keys.env|$PEER_HOST:$PEER_PROJECT_ROOT/config/api_keys.env"
+    echo "$SCRIPT_DIR/config/ftp.env|$PEER_HOST:$PEER_PROJECT_ROOT/config/ftp.env"
+    echo "$SCRIPT_DIR/config/line.env|$PEER_HOST:$PEER_PROJECT_ROOT/config/line.env"
+
+    # wp-publisher
+    echo "$local_home/project/wp-publisher/.env|$PEER_HOST:$remote_home/project/wp-publisher/.env"
+
+    # seo-research
+    echo "$local_home/project/seo-research/.env|$PEER_HOST:$remote_home/project/seo-research/.env"
+    echo "$local_home/project/seo-research/secrets/service_account.json|$PEER_HOST:$remote_home/project/seo-research/secrets/service_account.json"
+}
+
+sync_secrets() {
+    local direction="$1"
+    local failed=0
+    local ssh_opts="-o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
+
+    while IFS='|' read -r local_path remote_path; do
+        [[ -z "$local_path" ]] && continue
+
+        if [[ "$direction" == "push" ]]; then
+            # Push: local → peer (only if local file exists and is newer)
+            if [[ ! -f "$local_path" ]]; then
+                log_info "secrets push: skipping $local_path (not found locally)"
+                continue
+            fi
+            log_info "secrets push: $local_path → $remote_path"
+            if ! rsync -avz --update --timeout=30 \
+                -e "ssh $ssh_opts" \
+                ${PEER_RSYNC_EXTRA[@]:+"${PEER_RSYNC_EXTRA[@]}"} \
+                "$local_path" "$remote_path" 2>>"$LOG_FILE"; then
+                log_warn "secrets push failed: $local_path (peer dir may not exist)"
+            fi
+        else
+            # Pull: peer → local (only if remote file is newer)
+            local local_dir
+            local_dir="$(dirname "$local_path")"
+            mkdir -p "$local_dir"
+            log_info "secrets pull: $remote_path → $local_path"
+            if ! rsync -avz --update --timeout=30 \
+                -e "ssh $ssh_opts" \
+                ${PEER_RSYNC_EXTRA[@]:+"${PEER_RSYNC_EXTRA[@]}"} \
+                "$remote_path" "$local_path" 2>>"$LOG_FILE"; then
+                log_warn "secrets pull failed: $remote_path (may not exist on peer)"
+                # Not fatal — file may not exist on peer yet
+            fi
+        fi
+    done < <(_build_secrets_list)
+
+    return "$failed"
+}
+
 # ─── Main execution ───────────────────────────────────────────
 
 main() {
@@ -297,6 +374,13 @@ main() {
     log_info "=== Syncing MCP memory ($SUBCMD) ==="
     if ! sync_mcp_memory "$SUBCMD"; then
         log_error "MCP memory sync failed"
+        sync_failed=1
+    fi
+
+    # Sync secrets (bidirectional via --update)
+    log_info "=== Syncing secrets ($SUBCMD) ==="
+    if ! sync_secrets "$SUBCMD"; then
+        log_error "Secrets sync failed"
         sync_failed=1
     fi
 

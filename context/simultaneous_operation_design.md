@@ -269,7 +269,7 @@ ssh peer-hostname "cd ~/project/multi-agent-njslyr && \
   bash scripts/inbox_write.sh gryakuza '完了報告' report_received gryakuza@neo"
 
 # Kyoto gryakuza → Neo gryakuza (SSH direct)
-ssh {neo_host} "cd ~/project/personal/multi-agent-njslyr && \
+ssh {neo_host} "cd ~/project/multi-agent-njslyr && \
   bash scripts/inbox_write.sh gryakuza 'タスク割り当て' task_assigned gryakuza@kyoto"
 ```
 
@@ -306,7 +306,7 @@ ssh peer-hostname "cd ~/project/multi-agent-njslyr && \
   queue/reports/neo_report_xxx.yaml P1"
 
 # Kyoto → NeoSaitama (Kyoto gryakuza → Neo gryakuza)
-ssh {neo_tailscale_host} "cd ~/project/personal/multi-agent-njslyr && \
+ssh {neo_tailscale_host} "cd ~/project/multi-agent-njslyr && \
   bash scripts/inbox_write.sh gryakuza 'タスク割り当て' task_assigned gryakuza@kyoto \
   queue/tasks/neo_task_xxx.yaml P2"
 ```
@@ -320,7 +320,7 @@ rsync -avz --rsh=ssh queue/reports/neo_report_xxx.yaml \
 
 # Kyoto → Neo (rsync via SSH)
 rsync -avz --rsh=ssh queue/tasks/neo_task_xxx.yaml \
-  {neo_host}:~/project/personal/multi-agent-njslyr/queue/tasks/
+  {neo_host}:~/project/multi-agent-njslyr/queue/tasks/
 ```
 
 **gitプッシュ（SSHダイレクト）**:
