@@ -10,7 +10,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/hrmtz/multi-agent-njslyr?style=social)](https://github.com/hrmtz/multi-agent-njslyr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![v5.0 Cross-Machine](https://img.shields.io/badge/v5.0-Cross--Machine-ff6600?style=flat-square)](https://github.com/hrmtz/multi-agent-njslyr)
-[![BATS 123/123](https://img.shields.io/badge/BATS-123%2F123_PASS-brightgreen?style=flat-square)]()
+[![BATS 243/243](https://img.shields.io/badge/BATS-243%2F243_PASS-brightgreen?style=flat-square)]()
 
 [English](README.md) | [日本語](README_ja.md)
 

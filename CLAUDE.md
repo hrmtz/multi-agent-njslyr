@@ -129,52 +129,44 @@ System manages ALL white-collar work. `projects/` is git-ignored.
 <!-- MEMORY:START -->
 # multi-agent-njslyr
 
-_Last updated: 2026-03-06 | 33 active memories, 131 total_
+_Last updated: 2026-03-06 | 25 active memories, 788 total_
 
 ## Architecture
-- yakuza5 agent is a code-reading and bug-fixing specialist with cwd=/home/hrmtz/project/wp-publisher/ — operates under... [agent-roles, multi-agent-njslyr]
-- Zotero integration strategy for NLM-generated Japanese summaries: (1) Primary approach via Zotero Web API to add chil... [integration, zotero, api, nlm]
-- NLM MCP (NotebookLM MCP server) is callable from agent panes via `mcp__notebooklm__server_info` command. Darkninja in... [nlm-mcp, batch-distribution, parallel-execution]
-- multi-agent-njslyr system manages 9 active agents (darkninja, master_tortoise, gryakuza, yakuza1-7, soukaiya) via tmu... [multi-agent-system, tmux, inbox-architecture]
+- dotfiles zsh configuration uses OS-based file branching pattern with `.zsh/zshrc.linux` and `.zsh/zshrc.macos` for pl... [dotfiles, zsh, wsl]
+- instagram-slides/CLAUDE.md serves as operational reference document with structured sections including Kyoto Quick St... [instagram-slides, documentation, runbook]
+- surgery-log-app is a Flask application running on NeoSaitama (peer-hostname host) in Docker on port 18080 (internal 8000)... [architecture, surgery-log-app, flask, data-persistence]
+- Agent inbox architecture uses mixed directory structure: yakuza7 and soukaiya use /home/hrmtz/project/multi-agent-njs... [agent-architecture, inbox-structure, authentication]
 
 ## Key Decisions
-- Batch 1-5 JSON files are generated on-demand via nlm_batch_summarize.py (not pre-generated) before task YAML creation... [nlm, batch, generation]
-- Plan to implement Zotero write-back script for NLM Japanese summaries during yakuza parallel batch execution window —... [zotero, nlm, parallelization]
-- Proceeding with parallel batch distribution across all 7 yakuza clones for NLM batch summarization — distributing wor... [parallel-execution, yakuza-clones, NLM, architecture]
-- For NLM MCP tool unavailability recovery, use ToolSearch rediscovery pattern ('select:mcp__notebooklm__source_add') i... [error-recovery, mcp-tool, state-preservation]
-- yakuza1 issued REDO directive for cmd_360 fix with 3 critical/high/medium findings requiring remediation: (1) git rm ... [remediation, agent_dispatch, task_execution]
-- Use asynchronous source upload (wait=false) across yakuza clones during NLM batch processing to prioritize upload spe... [batch-processing, optimization]
+- Role separation and identity verification enforcement: darkninja refrains from direct NAS deployment, surgery-log-app... [role-separation, identity-verification, escalation-hierarchy]
+- NLM MCP tool unavailability recovery: use ToolSearch rediscovery pattern ('select:mcp__notebooklm__source_add') inste... [nlm, mcp-recovery, authentication, resilience]
+- surgery-log-app backup mechanism implemented: pre-save logic now copies source .md file to .md.bak before write_text(... [surgery-log-app, backup, deployment]
+- Agent environment management and credential distribution: after identifying and removing tmux global ANTHROPIC_API_KE... [agent-management, tmux, credentials, authentication]
 
 ## Patterns & Conventions
-- Agent task handoff uses inbox_write.sh script to queue messages to target agent panes, followed by njslyr_cmd.sh suri... [inter-agent, messaging]
-- Agent broadcast pattern: loop through agent list → inbox_write.sh to queue instruction to each agent → njslyr_cmd.sh ... [task-distribution, agents]
+- master_tortoise watchdog liveness cycle uses tmux list-panes capture loop checking pane_current_command field != 'cla... [watchdog, agent-notification, task-handoff, inbox, authentication, environment-management, remote-agents]
+- NLM batch processing architecture: Pro account supports 300 sources per notebook theoretically, but operational stabi... [nlm_batch, architecture, query_execution, rate_limiting]
+- master_tortoise monitoring status output format uses emoji suffix indicators for heartbeat health: 🐢 OK (heartbeat h... [master_tortoise, monitoring, heartbeat, status_output]
+- yakuza fleet task execution demonstrates operational resilience: sustained 415+ concurrent in_progress tasks across 7... [yakuza_resilience, concurrent_tasks, crane_independence, batch_operations]
 
 ## Gotchas & Pitfalls
-- Task machine field specification (e.g., machine:neosaitama) is not validated or enforced before dispatch — agents can... [task-dispatch, validation, cross-machine]
-- soukaiya QC detected node_modules (~150 files) committed to git in commit af31475 due to missing .gitignore entry — t... [git, build-artifacts, scripts]
-- claude-code-memory package has hardcoded deprecated model ID `claude-3-5-haiku-20241022` instead of current `claude-h... [package-config, model-versioning, authentication]
-- nlm CLI query command syntax requires `nlm query notebook <notebook-id> "<query>" --source-ids <id>` format with quer... [nlm-mcp, cli, query-syntax]
-- inbox0 command with numeric pane identifier '0' returns raw pane number (0) without resolving to named agent @agent_i... [inbox, suriken, agent-dispatch]
-- NLM MCP tool unavailability ('No such tool available' errors) is caused by Claude Code↔MCP session connection drops r... [nlm, mcp, session-management, recovery]
-- NLM batch processing has two distinct failure modes: (1) nlm CLI query command returns 'Completed' status with empty ... [nlm, batch-processing, cli-parsing]
-- Agent inbox read flag (read:true) does not guarantee message processing or response execution — marking messages as r... [inbox, task-execution]
+- master_tortoise 'スリケン！inbox0' message spam (30+ occurrences) is NOT anomalous — caused by crontab `* * * * *` suriken... [gotcha, cron, false-alarm]
+- darkninja agent pane auto-recovery mechanism functions correctly — master_tortoise detected pane_current_command=zsh ... [watchdog, auto-recovery, darkninja]
+- NLM batch upload failures: hanna2023 paper blocked by double-quote character in filename (BibTeX export artifact) and... [nlm, batch-upload, data-quality]
+- NLM Pro authentication systemic failures spanning token lifecycle, credential propagation, OAuth, and account access:... [nlm-auth, oauth, credential-management, account-isolation, systemd]
+- yakuza fleet maintains 415+ concurrent in_progress tasks across 7 agents independent of crane monitoring process—task... [yakuza, crane, resilience, task-execution]
 
 ## Current Progress
-- Wave 1 query method pivot in progress — yakuza1-3 received P0 emergency directive to abandon source_ids-specified que... [yakuza1, yakuza2, yakuza3, nlm, wave1]
-- yakuza7 completed asynchronous upload of all 26 PDFs for Batch 5 (100% complete) and is standing by in Wave 2, capabl... [yakuza7, batch5, nlm]
-- yakuza3 reported Batch 1 source upload progress (5/50 complete) and proposed asynchronous upload mode — proposal appr... [nlm-batch-execution, async-upload]
-- yakuza5 NLM Batch 3 execution encountered MCP server failure during source upload (3/50 PDFs uploaded). Notebook crea... [nlm-batch-execution, mcp-failure, p1-escalation]
-- soukaiya QC analysis of yakuza2_nlm_b0b revealed 2/20 sources successfully extracted Japanese summaries (james2008, r... [nlm-batch-execution, qc-analysis, backend-limitation]
-- yakuza1 completed cmd_360 report flow bug fix with all acceptance criteria satisfied (4 protocol docs, completion che... [bug-fix, qc-testing, task-complete]
-- yakuza4 NLM Batch 2 execution: notebook created (ID: 1faee0c7-8e30-4c77-b7c9-5ad540de4157), 7/50 PDFs queued for asyn... [nlm-batch-execution, batch-2]
-- yakuza6 NLM Batch 4 execution: notebook created (ID: c3b1f7fe-f04d-405f-a542-6edc09bfdb8d), 6/50 PDFs uploaded asynch... [nlm-batch-execution, batch-4]
-- yakuza5 preserved NLM Batch 3 checkpoint state during pause: notebook ID 795d8257-6b7e-40ce-bec2-48526d65b65b, 3 sour... [nlm, checkpoint, state_preservation]
-- darkninja initiated NLM MCP capability discovery and parallel batch summarization across yakuza1-7 clones. Capability... [nlm-mcp, capability-verification, batch-distribution]
+- NLM Wave 2 batch completion status finalized: yakuza1 B0 (50/50 upload, 50 query), yakuza2 B1 (49/50 upload with 1 de... [progress, nlm-batch, yakuza-fleet]
+- Kyoto yakuza authentication and infrastructure cleanup completed: darkninja restored `/login` command and Claude Max ... [authentication, infrastructure, deployment]
+- subtask_324a (instagram-slides CLAUDE.md improvement) completed with QC PASS verdict by soukaiya agent: all 8 accepta... [qc_pass, instagram_slides, soukaiya]
+- surgery-log-app edit and PDF download features completed and deployed to example-nas NAS: opnote_edit.html template wit... [surgery-log-app, deployment, feature-complete]
 
 ## Context
-- notebooklm-mcp-cli v0.3.16 is deployed on yakuza4 with mcp__notebooklm__server_info confirming operational status; v0... [nlm-mcp, version-tracking]
-- Zotero User ID is REDACTED_ID — stored in config/api_keys.env alongside API Key for write-back script integration during... [zotero, credentials]
-- Zotero User ID is displayed on https://www.zotero.org/settings/keys page as 'Your userID for use in API calls is **XX... [zotero, credentials]
+- master_tortoise heartbeat failure sustained at 7900+ seconds (131+ minutes) at 21:59:15 JST, critically exceeding cra... [monitoring, crane, critical]
+- NotebookLM source_add (batch upload) operations do not trigger rate-limiting even at scale (50 PDFs uploaded successf... [nlm, rate-limiting, batch-processing]
+- surgery-log-app web interface accessible at http://REDACTED_IP:18080 (example-nas NAS Tailscale IP + port 18080 mapp... [deployment, surgery_log_app, network]
+- Zotero User ID is REDACTED_ID, displayed on https://www.zotero.org/settings/keys page as 'Your userID for use in API cal... [zotero, api, configuration]
 
 _For deeper context, use memory_search, memory_related, or memory_ask tools._
 <!-- MEMORY:END -->
