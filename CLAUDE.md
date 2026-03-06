@@ -129,37 +129,51 @@ System manages ALL white-collar work. `projects/` is git-ignored.
 <!-- MEMORY:START -->
 # multi-agent-njslyr
 
-_Last updated: 2026-03-06 | 20 active memories, 57 total_
+_Last updated: 2026-03-06 | 32 active memories, 117 total_
 
 ## Architecture
-- NLM MCP (NotebookLM MCP server) is callable from agent panes via `mcp__notebooklm__server_info` command — darkninja i... [agents, mcp, nlm]
 - yakuza5 agent is a code-reading and bug-fixing specialist with cwd=/home/hrmtz/project/wp-publisher/ — operates under... [agent-roles, multi-agent-njslyr]
-- NLM batch task distribution uses split task pattern for source-pre-mapped batches — yakuza1 and yakuza2 receive ident... [nlm, batch, task-distribution]
-- multi-agent-njslyr system manages 9 active agents (darkninja, master_tortoise, gryakuza, yakuza1-7, soukaiya) via tmu... [agent-management, inbox-system, tmux-panes]
 - Zotero integration strategy for NLM-generated Japanese summaries: (1) Primary approach via Zotero Web API to add chil... [integration, zotero, api, nlm]
+- NLM MCP (NotebookLM MCP server) is callable from agent panes via `mcp__notebooklm__server_info` command. Darkninja in... [nlm-mcp, batch-distribution, parallel-execution]
+- multi-agent-njslyr system manages 9 active agents (darkninja, master_tortoise, gryakuza, yakuza1-7, soukaiya) via tmu... [multi-agent-system, tmux, inbox-architecture]
 
 ## Key Decisions
-- Plan to distribute NLM batch summarization work directly across all 7 yakuza clones in parallel rather than delegatin... [batch-processing, performance, parallelization]
-- Proceeding with parallel batch distribution across all 7 yakuza clones based on confirmed uniform NLM MCP v0.3.16 con... [nlm-mcp, parallel-batch, risk-acceptance]
 - Batch 1-5 JSON files are generated on-demand via nlm_batch_summarize.py (not pre-generated) before task YAML creation... [nlm, batch, generation]
+- Plan to implement Zotero write-back script for NLM Japanese summaries during yakuza parallel batch execution window —... [zotero, nlm, parallelization]
+- Proceeding with parallel batch distribution across all 7 yakuza clones for NLM batch summarization — distributing wor... [parallel-execution, yakuza-clones, NLM, architecture]
+- For NLM MCP tool unavailability recovery, use ToolSearch rediscovery pattern ('select:mcp__notebooklm__source_add') i... [error-recovery, mcp-tool, state-preservation]
+- Use asynchronous source upload (wait=false) across yakuza clones during NLM batch processing to prioritize upload spe... [batch-processing, upload-optimization, asynchronous]
+- yakuza1 issued REDO directive for cmd_360 fix with 3 critical/high/medium findings requiring remediation: (1) git rm ... [remediation, agent_dispatch, task_execution]
 
 ## Patterns & Conventions
 - Agent task handoff uses inbox_write.sh script to queue messages to target agent panes, followed by njslyr_cmd.sh suri... [inter-agent, messaging]
 - Agent broadcast pattern: loop through agent list → inbox_write.sh to queue instruction to each agent → njslyr_cmd.sh ... [task-distribution, agents]
 
 ## Gotchas & Pitfalls
-- ntfy tier2 notification backend returns HTTP 401 authentication errors (not just 429 rate limits) during SSH tier1 de... [notifications, auth, tier-fallback]
 - NLM batch summarization requires Claude Code MCP session active in target agent pane (gryakuza) — `nlm_batch_summariz... [nlm, mcp, workflow]
-- claude-code-memory package has hardcoded deprecated model ID `claude-3-5-haiku-20241022` in /lib/node_modules/claude-... [claude-code-memory, configuration, model-deprecation]
 - Task machine field specification (e.g., machine:neosaitama) is not validated or enforced before dispatch — agents can... [task-dispatch, validation, cross-machine]
-- Agent inbox read flag (read:true) does not guarantee message processing or response execution — marking messages as r... [inbox, message-lifecycle, status-tracking]
-- Suriken command routing with numeric pane identifiers (e.g., 'inbox0') fails silently without returning @agent_id — n... [suriken, pane-routing, tmux]
-- Suriken command routing with numeric pane identifiers continues to fail silently — user attempt 'スリケン！inbox0' returne... [suriken, routing, tmux]
+- soukaiya QC detected node_modules (~150 files) committed to git in commit af31475 due to missing .gitignore entry — t... [git, build-artifacts, scripts]
+- NLM MCP tool unavailability (mcp__notebooklm__source_add 'No such tool available' errors) is caused by Claude Code↔MC... [nlm_mcp, claude_code, tool_lifecycle]
+- claude-code-memory package has hardcoded deprecated model ID `claude-3-5-haiku-20241022` instead of current `claude-h... [package-config, model-versioning, authentication]
+- Agent inbox read flag (read:true) does not guarantee message processing or response execution — marking messages as r... [inbox-lifecycle, task-execution]
+- nlm CLI query command syntax requires `nlm query notebook <notebook-id> "<query>" --source-ids <id>` format with quer... [nlm-mcp, cli, query-syntax]
+- inbox0 command with numeric pane identifier '0' returns raw pane number (0) without resolving to named agent @agent_i... [inbox, suriken, agent-dispatch]
+- nlm CLI query command can return 'Completed' status with empty JSON results (12/20 sources in yakuza2_nlm_b0b batch) ... [nlm, batch-processing, json-extraction]
 
 ## Current Progress
-- darkninja initiated NLM MCP capability discovery across yakuza1-7 clones. yakuza6 confirmed functional with notebookl... [progress, nlm-mcp, batch-summarization, parallel-execution]
-- yakuza4 agent received two unread inbox messages from darkninja: (1) NLM MCP capability verification directive via mc... [progress, nlm-mcp, capability-verification, task-assignment]
-- soukaiya agent actively processing QC tasks: qc_316a and qc_345 assignments sequentially with @current_task pane attr... [task_execution, qc_workflow]
+- gryakuza relayed soukaiya QC FAIL verdict to darkninja with detailed analysis of yakuza2_nlm_b0b batch results (2/20 ... [nlm, qc, batch_processing, inter_agent_communication]
+- yakuza4 NLM Batch 2 execution: notebook created (ID: 1faee0c7-8e30-4c77-b7c9-5ad540de4157), 7/50 PDFs queued for asyn... [nlm, batch-processing]
+- soukaiya QC analysis of yakuza2_nlm_b0b reveals only 2/20 sources successfully extracted Japanese summaries (james200... [nlm, qc, yakuza2]
+- yakuza5 preserved NLM Batch 3 checkpoint state during pause: notebook ID 795d8257-6b7e-40ce-bec2-48526d65b65b, 3 sour... [nlm, checkpoint, state_preservation]
+- yakuza1 completed cmd_360 report flow bug fix with all acceptance criteria satisfied (4 protocol docs, completion che... [bug_fix, qa_testing, blockers]
+- yakuza5 NLM Batch 3 execution encountered MCP server failure during source upload (3/50 PDFs uploaded). Notebook crea... [nlm_batch_3, tool_failure, recovery, p1_escalation]
+- darkninja initiated NLM MCP capability discovery and parallel batch summarization across yakuza1-7 clones. Capability... [nlm-mcp, capability-verification, batch-distribution]
+- yakuza3 reported Batch 1 source upload progress (5/50 complete) and proposed asynchronous upload mode — proposal appr... [batch-execution, optimization]
+
+## Context
+- notebooklm-mcp-cli v0.3.16 is deployed on yakuza4 with mcp__notebooklm__server_info confirming operational status; v0... [nlm-mcp, version-tracking]
+- Zotero User ID is REDACTED_ID — stored in config/api_keys.env alongside API Key for write-back script integration during... [zotero, credentials]
+- Zotero User ID is displayed on https://www.zotero.org/settings/keys page as 'Your userID for use in API calls is **XX... [zotero, credentials]
 
 _For deeper context, use memory_search, memory_related, or memory_ask tools._
 <!-- MEMORY:END -->

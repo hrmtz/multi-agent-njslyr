@@ -197,3 +197,6 @@
 # Memory MCP
 .memory/
 tools/
+
+# Exclude node_modules in services/chatgpt-mcp
+services/chatgpt-mcp/node_modules/

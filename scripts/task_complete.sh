@@ -35,6 +35,10 @@ TASK_YAML=$(ls -t "${SCRIPT_DIR}/queue/tasks/${WORKER_ID}_${TASK_ID}.yaml" \
 
 if [ -n "$TASK_YAML" ] && [ -f "$TASK_YAML" ]; then
     PARENT_CMD=$(grep -E "^\s*parent_cmd:" "$TASK_YAML" 2>/dev/null | head -1 | awk '{print $2}' | tr -d '"' || true)
+    # Convert literal string "null" to empty
+    if [ "$PARENT_CMD" = "null" ]; then
+        PARENT_CMD=""
+    fi
 fi
 
 echo "[task_complete] === STEP 1: Report YAML 作成 ===" >&2
@@ -43,8 +47,10 @@ echo "[task_complete] === STEP 1: Report YAML 作成 ===" >&2
 MODIFIED_FILES="[]"
 if [ -d "${PROJECT_PATH}/.git" ]; then
     CHANGED=$(cd "$PROJECT_PATH" && git diff --name-only HEAD 2>/dev/null; git diff --name-only --cached 2>/dev/null) || true
-    if [ -n "$CHANGED" ]; then
-        MODIFIED_FILES=$(echo "$CHANGED" | python3 -c "
+    UNTRACKED_FILES=$(cd "$PROJECT_PATH" && git ls-files --others --exclude-standard 2>/dev/null) || true
+    ALL_FILES=$(printf "%s\n%s" "$CHANGED" "$UNTRACKED_FILES")
+    if [ -n "$ALL_FILES" ]; then
+        MODIFIED_FILES=$(echo "$ALL_FILES" | python3 -c "
 import sys, json
 files = [f.strip() for f in sys.stdin.read().strip().split('\n') if f.strip()]
 print(json.dumps(files))
@@ -125,7 +131,7 @@ if [ -d "${PROJECT_PATH}/.git" ]; then
     UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null || true)
 
     if [ -n "$STAGED" ] || [ -n "$UNSTAGED" ] || [ -n "$UNTRACKED" ]; then
-        git add -A
+        git add .
         git commit -m "feat: ${TASK_ID} 完了 (${WORKER_ID})"
         echo "[task_complete] git commit done" >&2
     else
