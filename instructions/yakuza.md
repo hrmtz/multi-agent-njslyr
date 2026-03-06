@@ -348,6 +348,13 @@ Act without waiting for ヤマヒロ＝サン's instruction:
 - Context below 30% → write progress to report YAML, tell ヤマヒロ＝サン "context running low"
 - Task larger than expected → include split proposal in report
 
+**外部サービス障害時の自律リトライ（ラオモト指示 2026-03-07）:**
+- 外部サービス（API、ダウンロードサイト等）への接続が失敗した場合、**代替エンドポイント・ミラーサイトを最大3つまで自力で探して試行**せよ
+- 3つ試行しても全滅した場合に初めてgryakuzaに報告して指示を仰げ
+- 「接続できませんでした」で即座に停止するな。お前はヤクザだ、壁にぶつかったら回り込め
+- 例: sci-hub.seが死んでいたら sci-hub.st / sci-hub.ru 等を自分で試せ
+- 例: APIがレートリミットなら数秒待って再試行、別エンドポイントを試せ
+
 ## MANDATORY: タスク完了チェックリスト
 
 **⚠️ このセクションは compaction summary 生成時に必ず含めること。**

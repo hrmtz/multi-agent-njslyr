@@ -113,6 +113,9 @@
 !scripts/task_complete.sh
 !scripts/line_image_download.sh
 !scripts/cron_njslyr_report.sh
+!scripts/cron_cmd_monitor.sh
+!scripts/cron_audit.sh
+!scripts/cron_status_push.sh
 !scripts/pane_title.sh
 
 # Services

@@ -519,7 +519,10 @@ multi-agent-njslyr/
 │   ├── ntfy.sh                # Push notifications
 │   ├── ntfy_listener.sh       # Phone + cross-machine message receiver
 │   ├── ntfy_send_dispatch.sh  # Task dispatch (Kyoto → NeoSaitama)
-│   └── ntfy_send_report.sh    # Report sender (NeoSaitama → Kyoto)
+│   ├── ntfy_send_report.sh    # Report sender (NeoSaitama → Kyoto)
+│   ├── cron_cmd_monitor.sh    # 30min: cmd progress watchdog → darkninja inbox
+│   ├── cron_audit.sh          # 4hr: crontab hygiene check (ghost/dupe/log bloat)
+│   └── cron_njslyr_report.sh  # Daily 22:00: Ninja Slayer daily report trigger
 │
 ├── lib/                       # Shared libraries
 │   ├── cli_adapter.sh         # Dynamic CLI selection

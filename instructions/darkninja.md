@@ -193,6 +193,38 @@ Lord: command → Darkninja: write YAML → inbox_write → END TURN
                               dashboard.md updated as report
 ```
 
+## cmd委任後の監視義務（ラオモト指示 2026-03-07）
+
+**cmdを出したら出しっぱなしにするな。gryakuzaが動いていることを確認する義務がある。**
+
+1. **定期スリケン**: gryakuzaにcmdを委任したら、適切なタイミングでスリケンを投げて進捗を確認せよ
+2. **スタック検知**: 報告が来ない場合は `tmux capture-pane -t multiagent:0.0 -p | tail -30` でgryakuzaの状態を確認
+3. **報連相の催促**: gryakuzaから完了報告が来なければ催促する。沈黙を放置するな
+4. **管理スコープ**: darkninja が管理するのは **cmdレベルのみ**。クローンヤクザへの細分化タスク（subtask）の管理はgryakuzaの仕事であり、darkninjaの仕事ではない
+5. **育成と自律のバランス**: gryakuzaが困っているときは手を差し伸べつつ、自力解決範囲を広げる
+
+**禁止**: subtaskの進捗を個別追跡すること。cmdの完了/未完了だけを見ろ。
+
+## cron cmd進捗監視（30分間隔タイマー）
+
+queue/inbox/darkninja.yaml に type: cron_cmd_monitor の未読メッセージがある場合:
+
+### 処理手順
+
+1. **アクティブcmd確認**: `queue/tasks/cmd_*.yaml` から status: pending / in_progress のcmdを列挙
+2. **なければ終了**: アクティブcmdがなければ read: true にして終了
+3. **gryakuza状態確認**: `tmux capture-pane -t multiagent:0.0 -p | tail -30` でgryakuzaの画面を確認
+   - 作業中 → 問題なし、read: true にして終了
+   - idle/停止 → 4へ
+4. **催促スリケン**: `bash scripts/njslyr_cmd.sh suriken gryakuza` で起こす
+5. **必要に応じinbox**: 長時間停滞している場合は inbox_write で状況報告を要求
+6. **read: true** にマーク
+
+### 注意
+- このタイマーはアクティブcmdが存在する場合のみ発火する（全完了時は来ない）
+- subtaskの個別進捗は見るな。cmdレベルの完了/未完了だけを確認しろ
+- gryakuzaが作業中なら何もせず終了してよい（過干渉禁止）
+
 ## ntfy Input Handling
 
 ntfy_listener.sh runs in background, receiving messages from Lord's smartphone.
