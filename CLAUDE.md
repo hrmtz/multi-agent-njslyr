@@ -129,7 +129,7 @@ System manages ALL white-collar work. `projects/` is git-ignored.
 <!-- MEMORY:START -->
 # multi-agent-njslyr
 
-_Last updated: 2026-03-06 | 32 active memories, 117 total_
+_Last updated: 2026-03-06 | 33 active memories, 131 total_
 
 ## Architecture
 - yakuza5 agent is a code-reading and bug-fixing specialist with cwd=/home/hrmtz/project/wp-publisher/ — operates under... [agent-roles, multi-agent-njslyr]
@@ -142,33 +142,34 @@ _Last updated: 2026-03-06 | 32 active memories, 117 total_
 - Plan to implement Zotero write-back script for NLM Japanese summaries during yakuza parallel batch execution window —... [zotero, nlm, parallelization]
 - Proceeding with parallel batch distribution across all 7 yakuza clones for NLM batch summarization — distributing wor... [parallel-execution, yakuza-clones, NLM, architecture]
 - For NLM MCP tool unavailability recovery, use ToolSearch rediscovery pattern ('select:mcp__notebooklm__source_add') i... [error-recovery, mcp-tool, state-preservation]
-- Use asynchronous source upload (wait=false) across yakuza clones during NLM batch processing to prioritize upload spe... [batch-processing, upload-optimization, asynchronous]
 - yakuza1 issued REDO directive for cmd_360 fix with 3 critical/high/medium findings requiring remediation: (1) git rm ... [remediation, agent_dispatch, task_execution]
+- Use asynchronous source upload (wait=false) across yakuza clones during NLM batch processing to prioritize upload spe... [batch-processing, optimization]
 
 ## Patterns & Conventions
 - Agent task handoff uses inbox_write.sh script to queue messages to target agent panes, followed by njslyr_cmd.sh suri... [inter-agent, messaging]
 - Agent broadcast pattern: loop through agent list → inbox_write.sh to queue instruction to each agent → njslyr_cmd.sh ... [task-distribution, agents]
 
 ## Gotchas & Pitfalls
-- NLM batch summarization requires Claude Code MCP session active in target agent pane (gryakuza) — `nlm_batch_summariz... [nlm, mcp, workflow]
 - Task machine field specification (e.g., machine:neosaitama) is not validated or enforced before dispatch — agents can... [task-dispatch, validation, cross-machine]
 - soukaiya QC detected node_modules (~150 files) committed to git in commit af31475 due to missing .gitignore entry — t... [git, build-artifacts, scripts]
-- NLM MCP tool unavailability (mcp__notebooklm__source_add 'No such tool available' errors) is caused by Claude Code↔MC... [nlm_mcp, claude_code, tool_lifecycle]
 - claude-code-memory package has hardcoded deprecated model ID `claude-3-5-haiku-20241022` instead of current `claude-h... [package-config, model-versioning, authentication]
-- Agent inbox read flag (read:true) does not guarantee message processing or response execution — marking messages as r... [inbox-lifecycle, task-execution]
 - nlm CLI query command syntax requires `nlm query notebook <notebook-id> "<query>" --source-ids <id>` format with quer... [nlm-mcp, cli, query-syntax]
 - inbox0 command with numeric pane identifier '0' returns raw pane number (0) without resolving to named agent @agent_i... [inbox, suriken, agent-dispatch]
-- nlm CLI query command can return 'Completed' status with empty JSON results (12/20 sources in yakuza2_nlm_b0b batch) ... [nlm, batch-processing, json-extraction]
+- NLM MCP tool unavailability ('No such tool available' errors) is caused by Claude Code↔MCP session connection drops r... [nlm, mcp, session-management, recovery]
+- NLM batch processing has two distinct failure modes: (1) nlm CLI query command returns 'Completed' status with empty ... [nlm, batch-processing, cli-parsing]
+- Agent inbox read flag (read:true) does not guarantee message processing or response execution — marking messages as r... [inbox, task-execution]
 
 ## Current Progress
-- gryakuza relayed soukaiya QC FAIL verdict to darkninja with detailed analysis of yakuza2_nlm_b0b batch results (2/20 ... [nlm, qc, batch_processing, inter_agent_communication]
-- yakuza4 NLM Batch 2 execution: notebook created (ID: 1faee0c7-8e30-4c77-b7c9-5ad540de4157), 7/50 PDFs queued for asyn... [nlm, batch-processing]
-- soukaiya QC analysis of yakuza2_nlm_b0b reveals only 2/20 sources successfully extracted Japanese summaries (james200... [nlm, qc, yakuza2]
+- Wave 1 query method pivot in progress — yakuza1-3 received P0 emergency directive to abandon source_ids-specified que... [yakuza1, yakuza2, yakuza3, nlm, wave1]
+- yakuza7 completed asynchronous upload of all 26 PDFs for Batch 5 (100% complete) and is standing by in Wave 2, capabl... [yakuza7, batch5, nlm]
+- yakuza3 reported Batch 1 source upload progress (5/50 complete) and proposed asynchronous upload mode — proposal appr... [nlm-batch-execution, async-upload]
+- yakuza5 NLM Batch 3 execution encountered MCP server failure during source upload (3/50 PDFs uploaded). Notebook crea... [nlm-batch-execution, mcp-failure, p1-escalation]
+- soukaiya QC analysis of yakuza2_nlm_b0b revealed 2/20 sources successfully extracted Japanese summaries (james2008, r... [nlm-batch-execution, qc-analysis, backend-limitation]
+- yakuza1 completed cmd_360 report flow bug fix with all acceptance criteria satisfied (4 protocol docs, completion che... [bug-fix, qc-testing, task-complete]
+- yakuza4 NLM Batch 2 execution: notebook created (ID: 1faee0c7-8e30-4c77-b7c9-5ad540de4157), 7/50 PDFs queued for asyn... [nlm-batch-execution, batch-2]
+- yakuza6 NLM Batch 4 execution: notebook created (ID: c3b1f7fe-f04d-405f-a542-6edc09bfdb8d), 6/50 PDFs uploaded asynch... [nlm-batch-execution, batch-4]
 - yakuza5 preserved NLM Batch 3 checkpoint state during pause: notebook ID 795d8257-6b7e-40ce-bec2-48526d65b65b, 3 sour... [nlm, checkpoint, state_preservation]
-- yakuza1 completed cmd_360 report flow bug fix with all acceptance criteria satisfied (4 protocol docs, completion che... [bug_fix, qa_testing, blockers]
-- yakuza5 NLM Batch 3 execution encountered MCP server failure during source upload (3/50 PDFs uploaded). Notebook crea... [nlm_batch_3, tool_failure, recovery, p1_escalation]
 - darkninja initiated NLM MCP capability discovery and parallel batch summarization across yakuza1-7 clones. Capability... [nlm-mcp, capability-verification, batch-distribution]
-- yakuza3 reported Batch 1 source upload progress (5/50 complete) and proposed asynchronous upload mode — proposal appr... [batch-execution, optimization]
 
 ## Context
 - notebooklm-mcp-cli v0.3.16 is deployed on yakuza4 with mcp__notebooklm__server_info confirming operational status; v0... [nlm-mcp, version-tracking]
