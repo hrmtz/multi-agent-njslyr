@@ -50,69 +50,6 @@ _get_operation_mode() {
     echo "${mode:-kyoto_master}"
 }
 
-# ─── helper: ntfy tier2 fallback for suriken (cross-machine) ───
-# SSH tier1失敗時にntfy経由でリモートマシンにスリケンを送る（tier2フォールバック）
-# 引数: agent_id (必須)
-_cmd_suriken_ntfy_fallback() {
-    local agent_id="$1"
-    if [[ "$(_get_operation_mode)" == "standalone" ]]; then
-        return 1  # fallback skip → local-only
-    fi
-
-    # inbox unread count を取得
-    local unread_count
-    unread_count=$(grep -c 'read: false' \
-        "$PROJECT_ROOT/queue/inbox/${agent_id}.yaml" 2>/dev/null || echo "0")
-
-    # settings.yaml から ntfy_topic と machine.role を読む
-    local ntfy_topic machine_role
-    ntfy_topic=$(awk '/^ntfy_topic:/ {gsub(/"/, ""); print $2; exit}' \
-        "$PROJECT_ROOT/config/settings.yaml")
-    machine_role=$(awk '/^  role:/ {print $2; exit}' \
-        "$PROJECT_ROOT/config/settings.yaml")
-
-    # legacy role name normalization (ryzen→kyoto, mbp→neosaitama)
-    case "$machine_role" in
-        mbp)   machine_role="neosaitama" ;;
-        ryzen) machine_role="kyoto" ;;
-    esac
-
-    # machine.role に基づいてpeer topicを決定
-    local peer_topic
-    case "$machine_role" in
-        kyoto|ryzen)     peer_topic="${ntfy_topic}-neosaitama" ;;
-        neosaitama|mbp)  peer_topic="${ntfy_topic}-kyoto" ;;
-        *)
-            echo "[suriken] ntfy fallback: unknown machine role: $machine_role" >&2
-            return 1
-            ;;
-    esac
-
-    # lib/ntfy_auth.sh を source して認証引数取得
-    # shellcheck source=lib/ntfy_auth.sh
-    source "$PROJECT_ROOT/lib/ntfy_auth.sh"
-    local auth_args=()
-    while IFS= read -r line; do
-        [[ -n "$line" ]] && auth_args+=("$line")
-    done < <(ntfy_get_auth_args "$PROJECT_ROOT/config/api_keys.env")
-
-    # curl で POST
-    local response_code
-    response_code=$(curl -s -o /dev/null -w "%{http_code}" \
-        "${auth_args[@]}" \
-        -H 'Title: suriken' \
-        -d "suriken:${agent_id}:${unread_count}" \
-        "https://ntfy.sh/${peer_topic}")
-
-    if [[ "$response_code" =~ ^2 ]]; then
-        echo "[suriken] ntfy tier2 → ${peer_topic}: suriken:${agent_id}:${unread_count} (HTTP ${response_code})"
-        return 0
-    else
-        echo "[suriken] ntfy tier2 FAILED: HTTP ${response_code}" >&2
-        return 1
-    fi
-}
-
 # ─── helper: SSH tier1 primary for suriken (cross-machine) ───
 # ローカルペインが見つからない場合にSSH経由でリモートマシンにスリケンを送る（tier1優先）
 # 引数: agent_id (必須)
@@ -184,9 +121,8 @@ cmd_suriken() {
         if _cmd_suriken_ssh_fallback "$agent_id"; then
             return 0
         fi
-        echo "[suriken] SSH tier1 failed → ntfy tier2..." >&2
-        _cmd_suriken_ntfy_fallback "$agent_id"
-        return $?
+        echo "[suriken] SSH tier1 failed. No further fallback (ntfy廃止済み)." >&2
+        return 1
     fi
 
     # メッセージがある場合はinbox_write（from="njslyr"固定）

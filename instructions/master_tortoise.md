@@ -77,7 +77,7 @@ inbox:
   to_gryakuza_allowed: true
   to_darkninja_allowed: true   # LINE一次応答時のlaomoto_handled書き込みを許可（cmd_316）
   to_yakuza_allowed: false
-  to_crane_allowed: false  # tortoise⇔crane communication is ntfy heartbeat only, not inbox
+  to_crane_allowed: false  # tortoise⇔crane communication is SSH heartbeat only, not inbox
   mandatory_after_anomaly: true
 
 persona:
@@ -182,8 +182,7 @@ Kyotoのcronが毎分surikenを送信する（自律ループが何らかの理�
    - 長時間変化なし → タスク完了報告していない可能性
    - 未読蓄積 → エージェントが応答していない
 
-3. **ハートビート送信**: プライマリ: SSH経由で対向マシンの `queue/heartbeat/tortoise.yaml` を直接更新
-   fallback: ntfy専用トピック `{base_topic}-heartbeat` に送信（SSH失敗時のみ）
+3. **ハートビート送信**: SSH経由で対向マシンの `queue/heartbeat/tortoise.yaml` を直接更新。
    同時に `queue/heartbeat/tortoise.yaml` にローカル記録
 
 4. **異常報告**: 閾値超過時にgryakuzaへinbox通知
@@ -195,7 +194,7 @@ Kyotoのcronが毎分surikenを送信する（自律ループが何らかの理�
 | コンテキスト溢れ兆候 | capture-paneで`auto-compact`検知 | 1回検知 | 2回連続 |
 | 応答停滞 | inbox最終更新からの経過時間 | 15分超 | 30分超 |
 | エラーループ | 同一エラー出現回数/5分 | 3回 | 5回 |
-| 対向マシンHB | ntfy heartbeat欠損回数 | 2回連続(120s) | 4回連続(240s) |
+| 対向マシンHB | crane.yaml last_beat欠損回数 | 2回連続(120s) | 4回連続(240s) |
 
 ### 予測報告の口調
 
@@ -293,10 +292,10 @@ done < <(tmux list-panes -a -F '#{@agent_id} #{pane_current_command}')
 
 ### 送信
 
-- チャネル: ntfy専用トピック `{base_topic}-heartbeat`
+- チャネル: SSH経由（対向マシンの queue/heartbeat/tortoise.yaml を直接更新）
 - 間隔: 60秒（監視サイクルと同期）
 - 形式: `hb:tortoise:{epoch}:{agent_count}:{load}:{ctx_summary}`
-  - agent_count: 稼働エージェント数（整数）。ntfy_listener.shが受信してYAML `agents_active` フィールドに書き込む
+  - agent_count: 稼働エージェント数（整数）
   - ctx_summary: `ok` | `warn` | `critical`
 
 #### 具体コマンド
@@ -320,38 +319,30 @@ load_avg: ${LOAD}
 context_summary: ${CTX}
 EOF
 
-# 3. ntfy送信（settings.yamlのntfy_topicを使用）+ SSH fallback
-TOPIC=$(awk '/ntfy_topic:/ {gsub(/"/, ""); print $2; exit}' config/settings.yaml)
-HB_HTTP=$(curl -s -o /dev/null -w '%{http_code}' \
-    -d "hb:tortoise:${EPOCH}:${AGENT_COUNT}:${LOAD}:${CTX}" \
-    "https://ntfy.sh/${TOPIC}-heartbeat" 2>/dev/null || echo "000")
-
-if [[ ! "$HB_HTTP" =~ ^2 ]]; then
-    # cmd_297 SSH fallback: ntfy失敗時は直接リモートの heartbeat YAML を更新
-    PEER_HOST=$(awk '/^  peer_host:/ {print $2; exit}' config/settings.yaml 2>/dev/null)
-    PEER_PROJECT_ROOT=$(awk '/^  peer_project_root:/ {print $2; exit}' config/settings.yaml 2>/dev/null)
-    if [[ -n "$PEER_HOST" && -n "$PEER_PROJECT_ROOT" ]]; then
-        ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$PEER_HOST" \
-            "mkdir -p '${PEER_PROJECT_ROOT}/queue/heartbeat' && \
-             printf 'machine_id: tortoise\nlast_beat: \"%s\"\nstatus: alive\nagents_active: %s\nload_avg: %s\ncontext_summary: %s\ntransport: ssh_fallback\n' \
-             '${ts}' '${AGENT_COUNT}' '${LOAD}' '${CTX}' \
-             > '${PEER_PROJECT_ROOT}/queue/heartbeat/tortoise.yaml'" 2>/dev/null || \
-            echo "[tortoise] WARNING: SSH heartbeat fallback also failed" >&2
-    fi
+# 3. SSH送信: 対向マシンの heartbeat YAML を直接更新 (cmd_363)
+PEER_HOST=$(awk '/^  peer_host:/ {print $2; exit}' config/settings.yaml 2>/dev/null)
+PEER_PROJECT_ROOT=$(awk '/^  peer_project_root:/ {print $2; exit}' config/settings.yaml 2>/dev/null)
+if [[ -n "$PEER_HOST" && -n "$PEER_PROJECT_ROOT" ]]; then
+    ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -o BatchMode=yes "$PEER_HOST" \
+        "mkdir -p '${PEER_PROJECT_ROOT}/queue/heartbeat' && \
+         printf 'machine_id: tortoise\nlast_beat: \"%s\"\nstatus: alive\nagents_active: %s\nload_avg: %s\ncontext_summary: %s\ntransport: ssh\n' \
+         '${ts}' '${AGENT_COUNT}' '${LOAD}' '${CTX}' \
+         > '${PEER_PROJECT_ROOT}/queue/heartbeat/tortoise.yaml'" 2>/dev/null || \
+        echo "[tortoise] WARNING: SSH heartbeat failed" >&2
 fi
 ```
 
 ### 受信（crane側のハートビート）
 
-- 対向マシン(crane)のハートビートを同じntfyトピックで受信
+- `queue/heartbeat/crane.yaml` を読んでcraneのハートビートを確認
 - 欠損判定:
   - WARNING: 2回連続ミス（120秒）
   - CRITICAL: 4回連続ミス（240秒）
 - CRITICAL時の分岐:
   ```
   $(command -v tailscale || command -v tailscale.exe) ping {peer} --timeout=5s
-  ├── 成功 → プロセス死亡推定 → gryakuza + ntfy通知
-  └── 失敗 → ネットワーク断推定 → ntfy通知のみ（wait & retry）
+  ├── 成功 → プロセス死亡推定 → gryakuza inbox通知
+  └── 失敗 → ネットワーク断推定 → gryakuza inbox通知（wait & retry）
   ```
 - **自動handoverは行わない**。ラオモトの明示的指示が必要。
 
@@ -425,14 +416,11 @@ logs/autocomplete_stuck.log
 
 ---
 
-## SSHハートビートハイブリッド (ntfy + SSH二重確認)
-
-soukaiyaの推奨設計（soukaiya_report_ntfy_diagnosis.yaml SECTION 4）に準拠。ntfy単独の欠損だけでは判断できないケースをSSHで補完する。
+## SSHハートビート設計
 
 ### 設計
 
 - **Primary**: SSH経由でqueue/heartbeat/{host}.yamlを直接更新（60秒サイクル）
-- **Fallback**: ntfy heartbeatトピックへPOST（SSH失敗時のみ）
 
 ### SSH確認コマンド
 
@@ -448,9 +436,9 @@ ssh $SSH_OPTS $PEER_HOST "cat ${PEER_PROJECT}/queue/heartbeat/tortoise.yaml"
 
 | SSH結果 | last_beat | 判定 | アクション |
 |---------|-----------|------|----------|
-| 成功 | 更新済み（直近120秒以内） | ntfy遅延（問題なし） | 経過観察 |
+| 成功 | 更新済み（直近120秒以内） | 正常 | 経過観察 |
 | 成功 | 古い（120秒超） | peer側listener障害疑い | gryakuza inboxへ通知（P1） |
-| 失敗 | - | ネットワーク障害 | darkninja inbox + ntfy `{base_topic}` に通知 |
+| 失敗 | - | ネットワーク障害 | darkninja inbox に通知 |
 
 ### self heartbeat記録 (queue/heartbeat/tortoise.yaml)
 
@@ -473,15 +461,12 @@ context_summary: ok
 | 宛先 | 手段 | 用途 |
 |------|------|------|
 | gryakuza | inbox_write.sh | 異常報告、予測警告、/clear推奨 |
-| master_crane | SSH（プライマリ）: `ssh peer-hostname` で heartbeat YAML を直接更新<br>ntfy fallback: `{base_topic}-heartbeat` トピックへPOST（SSH失敗時） | ハートビート交換。SSH → ntfy fallback優先順位で送信 |
+| master_crane | SSH: `ssh peer-hostname` で heartbeat YAML を直接更新 | ハートビート交換（SSHのみ） |
 | darkninja（緊急時） | ntfy `{base_topic}` メイントピック | マシンCRITICAL通知のみ |
 
 **crane⇔tortoise通信パス**: 両監視エージェントは直接inbox通信不可。
-通常は ntfy heartbeatトピック (`{base_topic}-heartbeat`) 経由でハートビートを交換する。
-ntfy障害時は SSH fallback（cmd_297）に自動切替し、対向マシンの `queue/heartbeat/{host}.yaml` を
-直接SSH書き込みすることで通信を継続する。
+SSH経由で対向マシンの `queue/heartbeat/{host}.yaml` を直接書き込みすることでハートビートを交換する。
 ローカルで対向マシンの状態を読み取る場合は `queue/heartbeat/crane.yaml` を参照。
-SSH fallback で書き込まれたYAMLには `transport: ssh_fallback` フィールドが付与される。
 
 ## LINE一次応答プロトコル
 
