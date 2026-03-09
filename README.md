@@ -81,7 +81,7 @@ A system that deploys up to 19 AI coding agents in parallel across two machines 
 **Why use it?**
 - One command spawns up to 19 parallel AI workers across two machines
 - Zero wait time — give your next order while tasks run in the background
-- Self-healing: 3-stage watchdog (Shuriken → Chop → Slay) + Yakuza Tengu emergency supervisor
+- Self-healing: 3-stage watchdog (Shuriken → Chop → Slay) + Claude Agent Tool auto-recovery
 - All communication is plain YAML on disk — fully transparent, diffable, version-controllable
 - CLI flat-rate subscriptions make 24/7 multi-agent operation economically viable
 
@@ -94,7 +94,7 @@ A system that deploys up to 19 AI coding agents in parallel across two machines 
 | **Parallelism** | Sequential | Graph nodes | Limited | **Up to 19 agents across 2 machines** |
 | **Coordination cost** | API calls per Task | API + infra (Postgres/Redis) | API + platform | **Zero** (YAML + tmux) |
 | **Observability** | Logs only | LangSmith | OpenTelemetry | **Live tmux panes** |
-| **Self-healing** | None | Manual | None | **3-stage escalation + Yakuza Tengu** |
+| **Self-healing** | None | Manual | None | **3-stage escalation + Agent Tool auto-recovery** |
 | **Cost (8 Opus agents)** | ~$100+/hour (API) | ~$100+/hour (API) | ~$100+/hour (API) | **~$200/month** (CLI flat-rate) |
 
 CLI subscriptions make 24/7 multi-agent operation economically viable. The cost is the same whether agents work 1 hour or 24 hours.
@@ -112,9 +112,8 @@ CLI subscriptions make 24/7 multi-agent operation economically viable. The cost 
 | **Yamahiro** (`gryakuza_neo`) | Taku Yamahiro. Kill-Elephant Yakuza Clan. Straight-laced, moral compass. Missing one finger. Elephant tattoo. Self-claimed Karate 20-dan. | NeoSaitama task distribution, local execution oversight | NeoSaitama |
 | **Soukaiya** (×2) | `soukaiya_kyo` / `soukaiya_neo` | Quality control, dashboard aggregation | Both |
 | **Clone Yakuza 1-7** | Senior Engineer, QA, DevOps, etc. | Implementation: code, research, file operations | Both (14 total) |
-| **Yakuza Tengu** | Emergency supervisor | Auto-spawns when manager overloaded, despawns on recovery | Either |
-| **Master Tortoise** | Predictive monitor | Context overflow prediction, response pattern analysis | Kyoto |
-| **Master Crane** | Post-mortem analyst | Failure root cause identification, prevention pattern DB | NeoSaitama |
+| **Master Tortoise** | Predictive monitor | Context overflow prediction, response pattern analysis (Haiku model, 3-min cycle) | Kyoto |
+| **Master Crane** | Post-mortem analyst | Failure root cause identification, prevention pattern DB (Haiku model, 3-min cycle) | NeoSaitama |
 
 ### Two Greater Yakuza System
 
@@ -240,7 +239,7 @@ Automatic agent health monitoring with three-stage escalation:
 | **Chop** | Still unresponsive 4 min | Force `/clear` session reset |
 | **Slay** | Unresponsive 6 min | `kill -9` + auto-restart |
 
-When Smith/Yamahiro is overloaded, **Yakuza Tengu** auto-spawns: takes over an idle Yakuza pane, distributes stacked tasks, then despawns when the manager recovers.
+When Smith/Yamahiro is overloaded, Claude **Agent Tool** auto-spawns subagents to handle tasks in parallel. Replaced Yakuza Tengu (legacy emergency supervisor) in v5.1.
 
 ### Monju — Opus 3-Body Review
 
@@ -646,12 +645,18 @@ mcp__memory__read_graph()
 
 ## Changelog
 
+### v5.1 — Infrastructure Optimization & Yakuza Tengu Retirement
+
+- **Monitor agents → Haiku** — Master Tortoise/Crane migrated from Sonnet to Haiku model. Mechanical monitoring tasks don't need Opus/Sonnet-class intelligence. Significant token savings.
+- **Cron cycle → 3 minutes** — Suriken/guardian/status_push intervals optimized from 60s to 180s. Token consumption reduced to ~1/3.
+- **Yakuza Tengu retired** — Claude Agent Tool enables managers to spawn subagents directly, making the dedicated emergency supervisor redundant. spawn_tengu/despawn_tengu commands retained for backward compatibility.
+
 ### v5.0 — Cross-Machine Distributed Operation
 
 - **Two Greater Yakuza system** — Smith (`gryakuza_kyo`, Kyoto) + Yamahiro (`gryakuza_neo`, NeoSaitama). Full fleet on each machine. Smith holds Master authority.
 - **Dual-machine architecture** (cmd_274) — Kyoto (server) + NeoSaitama (client). Up to 19 agents across two machines. Machine role auto-detection via `config/settings.yaml`.
 - **Cross-machine communication** (cmd_276-299) — SSH tier1 + ntfy tier2 fallback. `cross_sync.sh` for rsync-based state sync. `ntfy_send_dispatch.sh` / `ntfy_send_report.sh` for cross-machine task/report delivery.
-- **Monitoring agents** — Master Tortoise (Kyoto, predictive: context overflow, response patterns) + Master Crane (NeoSaitama, post-mortem: failure root cause, prevention DB). 60s heartbeat cycle.
+- **Monitoring agents** — Master Tortoise (Kyoto, predictive: context overflow, response patterns) + Master Crane (NeoSaitama, post-mortem: failure root cause, prevention DB). 60s heartbeat cycle (optimized to 3-min in v5.1, migrated to Haiku model).
 - **Monju 3-body review** (cmd_299) — Opus×3 independent code review + cross-critique for infrastructure scripts.
 - **Standalone mode** (cmd_301) — Single-machine operation with `operation_mode: standalone`. All cross-machine communication skipped automatically.
 - **Machine codenames** (cmd_279) — `kyoto` (formerly `ryzen`), `neosaitama` (formerly `mbp`). Backward compatible.
@@ -673,9 +678,9 @@ mcp__memory__read_graph()
 - Barikidorink failsafe — Idempotent Opus injection, auto re-nudge after model switch
 - Watcher supervisor — Dynamic pane discovery, atomic rescan signaling, auto-restart crashed watchers
 
-### v3.5 — Yakuza Tengu
+### v3.5 — Yakuza Tengu (retired in v5.1)
 
-- Yakuza Tengu emergency supervisor (auto-spawn on manager overload)
+- Yakuza Tengu emergency supervisor (auto-spawn on manager overload) — replaced by Agent Tool in v5.1
 - Named agents (Gryakuza → Yamahiro)
 - Yakuza persona enforcement after `/clear`
 
