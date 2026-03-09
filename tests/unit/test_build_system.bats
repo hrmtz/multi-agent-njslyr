@@ -206,15 +206,21 @@ setup() {
 # =============================================================================
 
 @test "idempotent: second build produces identical output" {
+    # クロスプラットフォーム: md5sum (GNU) or md5 -r (macOS)
+    local hash_cmd="md5sum"
+    if ! command -v md5sum &>/dev/null; then
+        hash_cmd="md5 -r"
+    fi
+
     # 1st build
     bash "$BUILD_SCRIPT" > /dev/null 2>&1
     local checksums_first
-    checksums_first=$(find "$OUTPUT_DIR" -name "*.md" -type f -exec md5sum {} \; | sort)
+    checksums_first=$(find "$OUTPUT_DIR" -name "*.md" -type f -exec $hash_cmd {} \; | sort)
 
     # 2nd build
     bash "$BUILD_SCRIPT" > /dev/null 2>&1
     local checksums_second
-    checksums_second=$(find "$OUTPUT_DIR" -name "*.md" -type f -exec md5sum {} \; | sort)
+    checksums_second=$(find "$OUTPUT_DIR" -name "*.md" -type f -exec $hash_cmd {} \; | sort)
 
     [ "$checksums_first" = "$checksums_second" ]
 }

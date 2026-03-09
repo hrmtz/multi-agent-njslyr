@@ -10,6 +10,12 @@
 
 set -u
 
+# macOS (Darwin): util-linux (flock) via Homebrew
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    _HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+    export PATH="${_HOMEBREW_PREFIX}/opt/util-linux/bin:$PATH"
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOCK_FILE="${SCRIPT_DIR}/../queue/.slim_yaml.lock"
 LOCK_TIMEOUT=10
@@ -21,9 +27,5 @@ if ! flock -w "$LOCK_TIMEOUT" 200; then
     exit 1
 fi
 
-# Call the Python implementation
-python3 "$(dirname "$0")/slim_yaml.py" "$@"
-exit_code=$?
-
-# Lock is automatically released when file descriptor is closed
-exit "$exit_code"
+# exec replaces shell with python3; fd 200 (lock) stays open until python3 exits
+exec python3 "$SCRIPT_DIR/slim_yaml.py" "$@"

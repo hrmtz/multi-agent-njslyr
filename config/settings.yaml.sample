@@ -1,0 +1,28 @@
+# multi-agent-njslyr settings
+# Copy to settings.yaml and adjust for your environment
+
+# Language: ja (Japanese only) | en (Japanese + English)
+language: ja
+
+# Shell: bash | zsh
+shell: bash
+
+# Skills
+skill:
+  save_path: "~/.claude/skills/"
+  local_path: "/path/to/multi-agent-njslyr/skills/"
+
+# Cross-machine configuration
+machine:
+  role: kyoto              # kyoto (server/primary) | neosaitama (client/secondary)
+                           # Legacy values also accepted: ryzen (=kyoto) | mbp (=neosaitama)
+  peer_host: <your-tailscale-hostname>  # Tailscale hostname of peer machine (e.g., "peer-hostname" or "peer-hostname")
+  peer_project_root: /Users/yourname/project/multi-agent-njslyr
+
+# ntfy notification topic (required for cross-machine heartbeat)
+# ntfy_topic: "your-secret-topic-name"
+
+# Logging
+logging:
+  level: info  # debug | info | warn | error
+  path: "/path/to/multi-agent-njslyr/logs/"

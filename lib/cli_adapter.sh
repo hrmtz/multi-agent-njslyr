@@ -144,7 +144,17 @@ build_cli_command() {
                 cmd="$cmd --model $model"
             fi
             cmd="$cmd --dangerously-bypass-approvals-and-sandbox --no-alt-screen"
-            echo "$cmd"
+            # base_url/api_key_env_var が設定されていれば環境変数プレフィックスを付加
+            local base_url api_key_env_var env_prefix=""
+            base_url=$(_cli_adapter_read_yaml "cli.agents.${agent_id}.base_url" "")
+            api_key_env_var=$(_cli_adapter_read_yaml "cli.agents.${agent_id}.api_key_env_var" "")
+            if [[ -n "$base_url" ]]; then
+                env_prefix="OPENAI_BASE_URL=${base_url} "
+            fi
+            if [[ -n "$api_key_env_var" ]]; then
+                env_prefix="${env_prefix}OPENAI_API_KEY=\${${api_key_env_var}} "
+            fi
+            echo "${env_prefix}${cmd}"
             ;;
         copilot)
             echo "copilot --yolo"

@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)"
 
 # ─── Read stdin (hook input JSON) ───
 INPUT=$(cat)
@@ -28,8 +28,9 @@ INPUT=$(cat)
 # ─── Infinite loop prevention ───
 # When stop_hook_active=true, the agent is already continuing from a
 # previous Stop hook block. Allow it to stop this time to prevent loops.
-STOP_HOOK_ACTIVE=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('stop_hook_active', False))" 2>/dev/null || echo "False")
-if [ "$STOP_HOOK_ACTIVE" = "True" ]; then
+# Use bash regex to avoid python3 fork for a simple boolean field check.
+_sa_pattern='"stop_hook_active"[[:space:]]*:[[:space:]]*true'
+if [[ "$INPUT" =~ $_sa_pattern ]]; then
     exit 0
 fi
 
@@ -48,10 +49,10 @@ fi
 ACTUAL_SESSION=""
 if [ -n "${TMUX:-}" ]; then
     # $TMUX format: socket_path,server_pid,session_id_num
-    SESSION_NUM=$(echo "$TMUX" | awk -F',' '{print $NF}')
+    SESSION_NUM="${TMUX##*,}"
     # tmux session_id format is "$N" (dollar sign + number)
     ACTUAL_SESSION=$(tmux list-sessions -F '#{session_id} #{session_name}' 2>/dev/null \
-        | grep "^\\\$${SESSION_NUM} " | awk '{print $2}' || true)
+        | awk -v n="$SESSION_NUM" '$1 == ("$" n) {print $2; exit}' || true)
 fi
 
 # If we can't identify the agent, approve (exit 0 with no output = approve)
@@ -67,7 +68,7 @@ if [ "$AGENT_ID" = "darkninja" ] || [ "$SESSION_NAME" = "darkninja" ] || [ "$ACT
     exit 0
 fi
 
-# If AGENT_ID is empty but we have an actual session, use session as fallback
+# AGENT_ID unknown (not darkninja but unidentifiable): can't locate inbox → approve
 if [ -z "$AGENT_ID" ]; then
     exit 0
 fi
@@ -87,11 +88,14 @@ if [ "${UNREAD_COUNT:-0}" -eq 0 ]; then
     exit 0
 fi
 
-# ─── Extract unread message summaries ───
-SUMMARY=$(python3 -c "
+# ─── Block the stop — extract summaries and feed inbox info back to agent ───
+# Single python3 invocation: summary extraction + JSON output merged.
+python3 -c "
 import yaml, sys, json
+count = $UNREAD_COUNT
+inbox_path = '$INBOX'
 try:
-    with open('$INBOX', 'r') as f:
+    with open(inbox_path, 'r') as f:
         data = yaml.safe_load(f)
     msgs = data.get('messages', []) if data else []
     unread = [m for m in msgs if not m.get('read', True)]
@@ -101,16 +105,9 @@ try:
         typ = m.get('type', '?')
         content = str(m.get('content', ''))[:80]
         parts.append(f'[{frm}/{typ}] {content}')
-    print(' | '.join(parts))
-except Exception as e:
-    print(f'inbox parse error: {e}')
-" 2>/dev/null || echo "inbox未読${UNREAD_COUNT}件あり")
-
-# ─── Block the stop — feed inbox info back to agent ───
-python3 -c "
-import json
-count = $UNREAD_COUNT
-summary = '''$SUMMARY'''
+    summary = ' | '.join(parts)
+except Exception:
+    summary = f'inbox未読{count}件あり'
 reason = f'inbox未読{count}件あり。queue/inbox/${AGENT_ID}.yamlを読んで処理せよ。内容: {summary}'
 print(json.dumps({'decision': 'block', 'reason': reason}))
 " 2>/dev/null || echo "{\"decision\":\"block\",\"reason\":\"inbox未読${UNREAD_COUNT}件あり。queue/inbox/${AGENT_ID}.yamlを読んで処理せよ。\"}"

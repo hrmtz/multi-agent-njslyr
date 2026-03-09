@@ -40,13 +40,60 @@ log_step() {
     echo -e "\n${CYAN}${BOLD}━━━ $1 ━━━${NC}\n"
 }
 
+# apt でパッケージをインストールし RESULTS/HAS_ERROR を更新する
+# 引数: <package> <display_name> <result_key>
+apt_install() {
+    local pkg="$1" display_name="$2" result_key="$3"
+    if command -v apt-get &> /dev/null; then
+        log_info "${display_name} をインストール中..."
+        if sudo apt-get install -y "$pkg" 2>/dev/null; then
+            log_success "${display_name} インストール完了"
+            RESULTS+=("${result_key}: インストール完了")
+        else
+            log_error "${display_name} のインストールに失敗しました"
+            RESULTS+=("${result_key}: インストール失敗")
+            HAS_ERROR=true
+        fi
+    else
+        log_error "apt-get が見つかりません。手動で ${display_name} をインストールしてください"
+        RESULTS+=("${result_key}: 未インストール (手動インストール必要)")
+        HAS_ERROR=true
+    fi
+}
+
 # スクリプトのディレクトリを取得
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -z "$SCRIPT_DIR" ]; then
+    echo "[ERROR] スクリプトのディレクトリを特定できませんでした" >&2
+    exit 1
+fi
 cd "$SCRIPT_DIR"
+
+# クロスプラットフォーム sed -i (BSD vs GNU)
+sedi() {
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
 
 # 結果追跡用変数
 RESULTS=()
 HAS_ERROR=false
+
+# 同時実行防止 + 中断時クリーンアップ
+LOCK_FILE="$SCRIPT_DIR/.first_setup.lock"
+if ! mkdir "$LOCK_FILE" 2>/dev/null; then
+    log_error "first_setup.sh は既に実行中です"
+    echo "        完了後も表示される場合: rm -rf '$LOCK_FILE'"
+    exit 1
+fi
+cleanup() {
+    rm -rf "$LOCK_FILE" 2>/dev/null
+}
+trap cleanup EXIT
+trap 'echo ""; log_error "セットアップが中断されました"; exit 130' INT TERM
 
 echo ""
 echo "  ╔══════════════════════════════════════════════════════════════╗"
@@ -153,10 +200,12 @@ TMUX_MOUSE_SETTING="set -g mouse on"
 if [ -f "$TMUX_CONF" ] && grep -qF "$TMUX_MOUSE_SETTING" "$TMUX_CONF" 2>/dev/null; then
     log_info "tmux マウス設定は既に ~/.tmux.conf に存在します"
 else
-    log_info "~/.tmux.conf に '$TMUX_MOUSE_SETTING' を追加中..."
-    echo "" >> "$TMUX_CONF"
-    echo "# マウススクロール有効化 (added by first_setup.sh)" >> "$TMUX_CONF"
-    echo "$TMUX_MOUSE_SETTING" >> "$TMUX_CONF"
+    log_info "$HOME/.tmux.conf に '$TMUX_MOUSE_SETTING' を追加中..."
+    {
+        echo ""
+        echo "# マウススクロール有効化 (added by first_setup.sh)"
+        echo "$TMUX_MOUSE_SETTING"
+    } >> "$TMUX_CONF"
     log_success "tmux マウス設定を追加しました"
 fi
 
@@ -184,8 +233,8 @@ if command -v node &> /dev/null; then
     log_success "Node.js がインストール済みです ($NODE_VERSION)"
 
     # バージョンチェック（18以上推奨）
-    NODE_MAJOR=$(echo $NODE_VERSION | cut -d'.' -f1 | tr -d 'v')
-    if [ "$NODE_MAJOR" -lt 18 ]; then
+    NODE_MAJOR=$(echo "$NODE_VERSION" | cut -d'.' -f1 | tr -d 'v')
+    if [[ "$NODE_MAJOR" =~ ^[0-9]+$ ]] && [ "$NODE_MAJOR" -lt 18 ]; then
         log_warn "Node.js 18以上を推奨します（現在: $NODE_VERSION）"
         RESULTS+=("Node.js: OK (v$NODE_MAJOR - 要アップグレード推奨)")
     else
@@ -199,12 +248,14 @@ else
     export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
     if [ -s "$NVM_DIR/nvm.sh" ]; then
         log_info "nvm が既にインストール済みです。Node.js をセットアップ中..."
+        # shellcheck source=/dev/null
         \. "$NVM_DIR/nvm.sh"
     else
         # nvm 自動インストール
         log_info "nvm をインストール中..."
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
         export NVM_DIR="$HOME/.nvm"
+        # shellcheck source=/dev/null
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
     fi
 
@@ -283,21 +334,7 @@ if python3 -c "import yaml" 2>/dev/null; then
     RESULTS+=("PyYAML: OK")
 else
     log_warn "PyYAML がインストールされていません"
-    if command -v apt-get &> /dev/null; then
-        log_info "python3-yaml をインストール中..."
-        if sudo apt-get install -y python3-yaml 2>/dev/null; then
-            log_success "python3-yaml インストール完了"
-            RESULTS+=("PyYAML: インストール完了")
-        else
-            log_error "python3-yaml のインストールに失敗しました"
-            RESULTS+=("PyYAML: インストール失敗")
-            HAS_ERROR=true
-        fi
-    else
-        log_error "apt-get が見つかりません。手動で python3-yaml をインストールしてください"
-        RESULTS+=("PyYAML: 未インストール (手動インストール必要)")
-        HAS_ERROR=true
-    fi
+    apt_install "python3-yaml" "python3-yaml" "PyYAML"
 fi
 
 # --- inotify-tools (inotifywait) ---
@@ -306,21 +343,7 @@ if command -v inotifywait &> /dev/null; then
     RESULTS+=("inotify-tools: OK")
 else
     log_warn "inotify-tools がインストールされていません"
-    if command -v apt-get &> /dev/null; then
-        log_info "inotify-tools をインストール中..."
-        if sudo apt-get install -y inotify-tools 2>/dev/null; then
-            log_success "inotify-tools インストール完了"
-            RESULTS+=("inotify-tools: インストール完了")
-        else
-            log_error "inotify-tools のインストールに失敗しました"
-            RESULTS+=("inotify-tools: インストール失敗")
-            HAS_ERROR=true
-        fi
-    else
-        log_error "apt-get が見つかりません。手動で inotify-tools をインストールしてください"
-        RESULTS+=("inotify-tools: 未インストール (手動インストール必要)")
-        HAS_ERROR=true
-    fi
+    apt_install "inotify-tools" "inotify-tools" "inotify-tools"
 fi
 
 # ============================================================
@@ -341,7 +364,7 @@ if command -v claude &> /dev/null; then
     CLAUDE_VERSION=$(claude --version 2>&1)
     CLAUDE_PATH=$(which claude 2>/dev/null)
 
-    if [ $? -eq 0 ] && [ "$CLAUDE_VERSION" != "unknown" ] && [[ "$CLAUDE_VERSION" != *"not found"* ]]; then
+    if [ -n "$CLAUDE_PATH" ] && [ "$CLAUDE_VERSION" != "unknown" ] && [[ "$CLAUDE_VERSION" != *"not found"* ]]; then
         # 動作する claude が見つかった → npm版かネイティブ版かを判定
         if echo "$CLAUDE_PATH" | grep -qi "npm\|node_modules\|AppData"; then
             # npm版が動いている
@@ -356,7 +379,7 @@ if command -v claude &> /dev/null; then
             if [ ! -t 0 ]; then
                 REPLY="Y"
             else
-                read -p "  ネイティブ版をインストールしますか? [Y/n]: " REPLY
+                read -r -p "  ネイティブ版をインストールしますか? [Y/n]: " REPLY
             fi
             REPLY=${REPLY:-Y}
             if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -408,10 +431,12 @@ if [ "$NEED_CLAUDE_INSTALL" = true ]; then
 
     # .bashrc に永続化（重複追加を防止）
     if ! grep -q 'export PATH="\$HOME/.local/bin:\$PATH"' "$HOME/.bashrc" 2>/dev/null; then
-        echo '' >> "$HOME/.bashrc"
-        echo '# Claude Code CLI PATH (added by first_setup.sh)' >> "$HOME/.bashrc"
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
-        log_info "~/.local/bin を ~/.bashrc の PATH に追加しました"
+        {
+            echo ''
+            echo '# Claude Code CLI PATH (added by first_setup.sh)'
+            echo 'export PATH="$HOME/.local/bin:$PATH"'
+        } >> "$HOME/.bashrc"
+        log_info "$HOME/.local/bin を $HOME/.bashrc の PATH に追加しました"
     fi
 
     if command -v claude &> /dev/null; then
@@ -434,7 +459,7 @@ if [ "$NEED_CLAUDE_INSTALL" = true ]; then
         fi
     else
         log_error "インストールに失敗しました。パスを確認してください"
-        log_info "~/.local/bin がPATHに含まれているか確認してください"
+        log_info "$HOME/.local/bin がPATHに含まれているか確認してください"
         RESULTS+=("Claude Code CLI: インストール失敗")
         HAS_ERROR=true
     fi
@@ -641,11 +666,11 @@ ALIAS_ADDED=false
 if [ -f "$BASHRC_FILE" ]; then
     # 古い alias 形式を削除（存在する場合）
     if grep -q "alias css=" "$BASHRC_FILE" 2>/dev/null; then
-        sed -i '/alias css=/d' "$BASHRC_FILE"
+        sedi '/alias css=/d' "$BASHRC_FILE"
         log_info "旧 alias css を削除しました"
     fi
     if grep -q "alias csm=" "$BASHRC_FILE" 2>/dev/null; then
-        sed -i '/alias csm=/d' "$BASHRC_FILE"
+        sedi '/alias csm=/d' "$BASHRC_FILE"
         log_info "旧 alias csm を削除しました"
     fi
 
@@ -660,7 +685,7 @@ if [ -f "$BASHRC_FILE" ]; then
         ALIAS_ADDED=true
     else
         # 関数は存在する → 最新版に更新
-        sed -i '/^css()/d' "$BASHRC_FILE"
+        sedi '/^css()/d' "$BASHRC_FILE"
         echo "$CSS_FUNC" >> "$BASHRC_FILE"
         log_info "css 関数を更新しました"
         ALIAS_ADDED=true
@@ -672,7 +697,7 @@ if [ -f "$BASHRC_FILE" ]; then
         log_info "csm 関数を追加しました（グレーターヤクザ・ヤクザウィンドウ — 自動掃除付き）"
         ALIAS_ADDED=true
     else
-        sed -i '/^csm()/d' "$BASHRC_FILE"
+        sedi '/^csm()/d' "$BASHRC_FILE"
         echo "$CSM_FUNC" >> "$BASHRC_FILE"
         log_info "csm 関数を更新しました"
         ALIAS_ADDED=true
@@ -711,11 +736,13 @@ if [ "$IS_WSL" = true ]; then
                 # [experimental] セクションがあるか確認
                 if grep -q "\[experimental\]" "$WSLCONFIG_PATH" 2>/dev/null; then
                     # [experimental] セクションの直後に追加
-                    sed -i '/\[experimental\]/a autoMemoryReclaim=gradual' "$WSLCONFIG_PATH"
+                    sedi '/\[experimental\]/a autoMemoryReclaim=gradual' "$WSLCONFIG_PATH"
                 else
-                    echo "" >> "$WSLCONFIG_PATH"
-                    echo "[experimental]" >> "$WSLCONFIG_PATH"
-                    echo "autoMemoryReclaim=gradual" >> "$WSLCONFIG_PATH"
+                    {
+                        echo ""
+                        echo "[experimental]"
+                        echo "autoMemoryReclaim=gradual"
+                    } >> "$WSLCONFIG_PATH"
                 fi
                 log_success ".wslconfig に autoMemoryReclaim=gradual を追加しました"
                 log_warn "反映には 'wsl --shutdown' 後の再起動が必要です"

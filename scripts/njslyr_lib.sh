@@ -17,14 +17,26 @@ __NJSLYR_LIB_LOADED__=1
 
 # ─── Variables ───
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
-PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$SCRIPT_DIR")}"
+PROJECT_ROOT="${PROJECT_ROOT:-${SCRIPT_DIR%/*}}"
 STATE_DIR="${STATE_DIR:-$PROJECT_ROOT/.state}"
+
+# ─── Cross-platform sed -i (BSD vs GNU) ───
+# njslyr.sh source前に定義: source失敗時でもsedi()を提供する
+# 他スクリプトから source scripts/njslyr_lib.sh で利用可能
+sedi() {
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
 
 # ─── njslyr.sh の関数群を継承 ───
 # 方針A: __NJSLYR_TESTING__=1 でmain()起動を抑制してsource
 # - njslyr.shのstage3_slay()、agent_is_busy()等の関数が利用可能になる
 # - 既存テスト(test_njslyr_stages.bats)も同変数を使用しており整合性が高い
 # - njslyr.sh本体は変更しない（readのみ）
+# shellcheck source=/dev/null
 __NJSLYR_TESTING__=1 source "$SCRIPT_DIR/njslyr.sh" 2>/dev/null || {
     echo "[WARN] njslyr_lib.sh: njslyr.sh source failed. Check: $SCRIPT_DIR/njslyr.sh" >&2
 }
@@ -34,10 +46,39 @@ fi
 
 # ─── resolve_pane_by_agent_id ───
 # @agent_id から全セッション横断でpane_idを解決する
-# njslyr.sh の get_pane_target() は multiagent:agents限定だが、
+# njslyr.sh の get_pane_target() は get_agents_window()で動的ウィンドウ名を解決するが、
 # こちらは -a フラグで全セッションを対象にする（yakuzatengu対応）
 resolve_pane_by_agent_id() {
     local agent_id="$1"
     tmux list-panes -a -F '#{@agent_id} #{pane_id}' 2>/dev/null \
         | awk -v id="$agent_id" '$1 == id {print $2; exit}'
+}
+
+# ─── resolve_agent_machine ───
+# エージェントが所属するマシンを返す（クロスマシン配信の判断に使用）
+# Returns: "kyoto" | "neosaitama" | "active" (active_machineに依存)
+# - kyoto固定: darkninja, master_tortoise
+# - neosaitama固定: master_crane
+# - active: gryakuza, yakuza1-7, soukaiya（稼働マシン次第）
+resolve_agent_machine() {
+    local agent_id="$1"
+    case "$agent_id" in
+        darkninja)       echo "kyoto" ;;
+        master_tortoise) echo "kyoto" ;;
+        master_crane)    echo "neosaitama" ;;
+        *)               echo "active" ;;  # gryakuza, yakuza1-7, soukaiya, yakuzatengu
+    esac
+}
+
+# ─── get_my_machine_role ───
+# 現在のマシンのロールを返す（settings.yaml から取得、レガシー名を正規化）
+get_my_machine_role() {
+    local role
+    role=$(awk '/^  role:/ {print $2; exit}' \
+        "$PROJECT_ROOT/config/settings.yaml" 2>/dev/null || echo "kyoto")
+    case "$role" in
+        mbp)   echo "neosaitama" ;;
+        ryzen) echo "kyoto" ;;
+        *)     echo "$role" ;;
+    esac
 }

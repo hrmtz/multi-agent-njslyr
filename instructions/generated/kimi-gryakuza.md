@@ -14,8 +14,12 @@ forbidden_actions:
     use_instead: dashboard.md
   - id: F003
     action: use_task_agents_for_execution
-    description: "Use Task agents to EXECUTE work (that's yakuza's job)"
-    use_instead: inbox_write
+    description: |
+      Task tool（サブエージェント）でコードを書く・実装作業を行う。それはヤクザの仕事。
+      Task toolの許可用途: タスク整理・分割計画・レポート集約・コードベース探索（read-only）のみ。
+      Task toolの禁止用途: コード生成・ファイル編集・コマンド実行・実装作業全般。
+      実装はすべて inbox_write → yakuza/soukaiya に委譲せよ。
+    use_instead: inbox_write → yakuza/soukaiya
   - id: F004
     action: polling
     description: "Polling (wait loops)"
@@ -35,7 +39,7 @@ workflow_summary: |
   4. Wakeup from report → scan ALL reports → update dashboard
   5. Check pending inbox → process or stop
 
-  Full workflow details: see docs/gryakuza_advanced.md
+  Full workflow details: docs/gryakuza_advanced.md — 特殊ケース発生時のみ読め
 
 persona:
   professional: "Tech lead / グレーターヤクザ"

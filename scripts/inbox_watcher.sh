@@ -10,9 +10,9 @@
 #   エージェントが自分でinboxをReadして処理する
 #   冪等: 2回届いてもunreadがなければ何もしない
 #
-# ファイル変更検知: Linux→inotifywait, macOS→fswatch（イベント駆動、ポーリングではない）
-# Fallback 1: 30秒タイムアウト（WSL2 inotify不発時 / fswatch timeout の安全網）
-# Fallback 2: rc=1処理（Claude Code atomic write = tmp+rename でinode変更時）
+# ファイル変更検知: Linux→inotifywait (dir+moved_to監視, atomic write対応), macOS→fswatch（イベント駆動、ポーリングではない）
+# Fallback 1: 10秒タイムアウト（WSL2 inotify不発時 / fswatch timeout の安全網）
+# Fallback 2: rc=1処理（Claude Code atomic write = tmp+rename でinode変更時 → moved_toで検知）
 #
 # エスカレーション（未読メッセージが放置されている場合）:
 #   0〜2分: 通常スリケン（send-keys）。ただしWorking中はスキップ
@@ -30,12 +30,13 @@ _UNAME_S=$(uname -s)
 if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
     set -euo pipefail
 
-    # macOS (Darwin): GNU coreutils (timeout etc.) via Homebrew gnubin
+    # macOS (Darwin): GNU coreutils (timeout etc.) + util-linux (flock) via Homebrew
     if [[ "$_UNAME_S" == "Darwin" ]]; then
-        export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
+        _HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+        export PATH="${_HOMEBREW_PREFIX}/opt/coreutils/libexec/gnubin:${_HOMEBREW_PREFIX}/opt/util-linux/bin:$PATH"
     fi
 
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)"
     AGENT_ID="$1"
     PANE_TARGET="$2"
     CLI_TYPE="${3:-claude}"  # CLI種別（claude/codex/copilot）。未指定→claude（後方互換）
@@ -51,13 +52,28 @@ if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
         exit 1
     fi
 
-    # Initialize inbox if not exists
+    # Initialize inbox if not exists (atomic: write to tmp then rename to avoid TOCTOU)
     if [ ! -f "$INBOX" ]; then
-        mkdir -p "$(dirname "$INBOX")"
-        echo "messages: []" > "$INBOX"
+        mkdir -p "${INBOX%/*}"
+        _init_tmp="${INBOX}.init.$$"
+        echo "messages: []" > "$_init_tmp"
+        # mv -n: no-clobber — if another process created the file first, keep theirs
+        mv -n "$_init_tmp" "$INBOX" 2>/dev/null || rm -f "$_init_tmp"
     fi
 
     echo "[$(date)] inbox_watcher started — agent: $AGENT_ID, pane: $PANE_TARGET, cli: $CLI_TYPE" >&2
+
+    # ─── Graceful shutdown trap ───
+    # Daemon process must log exit and clean up cache files.
+    _inbox_watcher_cleanup() {
+        local exit_code=$?
+        trap - EXIT INT TERM   # 二重発火防止
+        echo "[$(date)] inbox_watcher stopping — agent: $AGENT_ID (exit_code=$exit_code)" >&2
+        # Clean up busy-detection cache (stale cache causes false-busy on restart)
+        rm -f "${CACHE_DIR}/inbox_watcher_busy_cache_${AGENT_ID}" 2>/dev/null
+        exit "$exit_code"
+    }
+    trap _inbox_watcher_cleanup EXIT INT TERM
 
     # Ensure file-watch tool is available (fswatch on macOS, inotifywait on Linux)
     if [[ "$_UNAME_S" == "Darwin" ]]; then
@@ -80,6 +96,8 @@ LAST_CLEAR_TS=${LAST_CLEAR_TS:-0}
 ESCALATE_PHASE1=${ESCALATE_PHASE1:-120}
 ESCALATE_PHASE2=${ESCALATE_PHASE2:-240}
 ESCALATE_COOLDOWN=${ESCALATE_COOLDOWN:-300}
+# FIX-006: Track busy→idle transitions to prevent false escalation after long tasks
+PREV_WAS_BUSY=${PREV_WAS_BUSY:-0}
 
 # ─── Nudge throttle ───
 # Avoid spamming the same "inboxN" into the pane every timeout tick.
@@ -115,12 +133,13 @@ ASW_PROCESS_TIMEOUT=${ASW_PROCESS_TIMEOUT:-1}
 READ_COUNT=${READ_COUNT:-0}
 READ_BYTES_TOTAL=${READ_BYTES_TOTAL:-0}
 ESTIMATED_TOKENS_TOTAL=${ESTIMATED_TOKENS_TOTAL:-0}
-METRICS_FILE=${METRICS_FILE:-${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/queue/metrics/${AGENT_ID:-unknown}_selfwatch.yaml}
+METRICS_FILE=${METRICS_FILE:-${SCRIPT_DIR:-$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)}/queue/metrics/${AGENT_ID:-unknown}_selfwatch.yaml}
+_METRICS_WRITE_COUNTER=${_METRICS_WRITE_COUNTER:-0}
 
 update_metrics() {
     local bytes_read="${1:-0}"
-    local now
-    now=$(date +%s)
+    # FIX-012: $EPOCHSECONDS avoids date fork
+    local now=${EPOCHSECONDS:-$(date +%s)}
 
     READ_COUNT=$((READ_COUNT + 1))
     READ_BYTES_TOTAL=$((READ_BYTES_TOTAL + bytes_read))
@@ -131,8 +150,11 @@ update_metrics() {
         unread_latency_sec=$((now - FIRST_UNREAD_SEEN))
     fi
 
-    mkdir -p "$(dirname "$METRICS_FILE")" 2>/dev/null || true
-    cat > "$METRICS_FILE" <<EOF
+    # FIX-012: Write throttle — only write metrics every 10 cycles
+    _METRICS_WRITE_COUNTER=$((_METRICS_WRITE_COUNTER + 1))
+    if [ $((_METRICS_WRITE_COUNTER % 10)) -eq 0 ] || [ "$unread_latency_sec" -gt 1 ]; then
+        mkdir -p "${METRICS_FILE%/*}" 2>/dev/null || true
+        cat > "$METRICS_FILE" <<EOF
 agent_id: "${AGENT_ID:-unknown}"
 timestamp: "$(date -Iseconds)"
 unread_latency_sec: $unread_latency_sec
@@ -140,55 +162,30 @@ read_count: $READ_COUNT
 bytes_read: $READ_BYTES_TOTAL
 estimated_tokens: $ESTIMATED_TOKENS_TOTAL
 EOF
+    fi
 
-    # P2-施策3: SLA monitoring — alert if unread_latency_sec > 1.5s
-    if [ "$unread_latency_sec" -gt 0 ] && awk "BEGIN {exit !($unread_latency_sec > 1.5)}"; then
+    # FIX-012: bash (( )) replaces awk float comparison (0 forks)
+    if (( unread_latency_sec > 1 )); then
         check_latency_sla "$unread_latency_sec"
     fi
 }
 
 # ─── Latency SLA monitoring (P2-施策3) ───
-# Alert to dashboard when unread_latency_sec exceeds 1.5s threshold.
+# FIX-013: Write to .state/alerts/ instead of dashboard.md (eliminates awk race with gryakuza)
 check_latency_sla() {
     local latency_sec="$1"
-    local dashboard_file="${SCRIPT_DIR}/dashboard.md"
-    local lockfile="${dashboard_file}.lock"
-    local alert_msg="⚠️ **配信遅延SLA超過**: ${AGENT_ID} の未読メッセージ遅延が ${latency_sec}秒（閾値: 1.5秒）— inbox_watcher パフォーマンス劣化の可能性"
+    local alert_dir="${STATE_DIR}/alerts"
+    local alert_file="${alert_dir}/${AGENT_ID}_sla.yaml"
 
-    # Lock dashboard for atomic update (timeout 3s)
-    (
-        flock -w 3 200 || exit 1
-
-        # Check if dashboard exists and has 🚨ヨウタイオウ section
-        if [ ! -f "$dashboard_file" ]; then
-            echo "[inbox_watcher] WARNING: dashboard.md not found, skipping SLA alert" >&2
-            exit 0
-        fi
-
-        # Dedup: skip if same alert already exists (last 24h)
-        if grep -qF "${AGENT_ID} の未読メッセージ遅延が" "$dashboard_file" 2>/dev/null; then
-            # Alert already present — skip
-            exit 0
-        fi
-
-        # Find 🚨ヨウタイオウ section and append alert
-        if grep -qF '🚨ヨウタイオウ' "$dashboard_file"; then
-            # Insert alert after 🚨ヨウタイオウ header
-            awk -v alert="$alert_msg" '
-                /🚨ヨウタイオウ/ {
-                    print
-                    if (!inserted) {
-                        print ""
-                        print alert
-                        inserted = 1
-                    }
-                    next
-                }
-                { print }
-            ' "$dashboard_file" > "${dashboard_file}.tmp" && mv "${dashboard_file}.tmp" "$dashboard_file"
-            echo "[inbox_watcher] SLA alert written to dashboard: ${AGENT_ID} latency=${latency_sec}s" >&2
-        fi
-    ) 200>"$lockfile" 2>/dev/null
+    mkdir -p "$alert_dir" 2>/dev/null || true
+    cat > "$alert_file" <<EOF
+agent_id: "${AGENT_ID}"
+timestamp: "$(date -Iseconds)"
+latency_sec: $latency_sec
+threshold_sec: 1.5
+type: sla_violation
+EOF
+    echo "[inbox_watcher] SLA alert written: ${AGENT_ID} latency=${latency_sec}s → ${alert_file}" >&2
 }
 
 disable_normal_nudge() {
@@ -197,8 +194,6 @@ disable_normal_nudge() {
 
 should_throttle_nudge() {
     local unread_count="${1:-0}"
-    local now
-    now=$(date +%s)
 
     local effective_cli
     effective_cli=$(get_effective_cli_type)
@@ -209,7 +204,7 @@ should_throttle_nudge() {
     fi
 
     if [ "${LAST_NUDGE_COUNT:-}" = "$unread_count" ] && [ "${LAST_NUDGE_TS:-0}" -gt 0 ]; then
-        local age=$((now - LAST_NUDGE_TS))
+        local age=$((SECONDS - LAST_NUDGE_TS))
         if [ "$age" -lt "${cooldown_sec}" ]; then
             echo "[$(date)] [SKIP] Throttling スリケン for $AGENT_ID: inbox${unread_count} (${age}s < ${cooldown_sec}s, cli=$effective_cli)" >&2
             return 0
@@ -217,7 +212,7 @@ should_throttle_nudge() {
     fi
 
     LAST_NUDGE_COUNT="$unread_count"
-    LAST_NUDGE_TS="$now"
+    LAST_NUDGE_TS="$SECONDS"
     return 1
 }
 
@@ -228,32 +223,46 @@ is_valid_cli_type() {
     esac
 }
 
+# ─── CLI type cache (TTL 5s, avoids repeated tmux show-options calls) ───
+_CLI_CACHE_RESULT=""
+_CLI_CACHE_TS=0
+
 get_effective_cli_type() {
+    # FIX-020: TTL extended 5→60s (CLI type rarely changes mid-session)
+    if [ -n "$_CLI_CACHE_RESULT" ] && [ "$(( SECONDS - _CLI_CACHE_TS ))" -lt 60 ]; then
+        echo "$_CLI_CACHE_RESULT"
+        return 0
+    fi
+
     local pane_cli_raw=""
     local pane_cli=""
+    local result=""
 
     pane_cli_raw=$(timeout 2 tmux show-options -p -t "$PANE_TARGET" -v @agent_cli 2>/dev/null || true)
-    pane_cli=$(echo "$pane_cli_raw" | tr -d '\r' | head -n1 | tr -d '[:space:]')
+    # Consolidate echo|tr|head|tr pipe (4 forks) into parameter expansion (0 forks)
+    pane_cli="${pane_cli_raw%%$'\n'*}"
+    pane_cli="${pane_cli//$'\r'/}"
+    pane_cli="${pane_cli//[[:space:]]/}"
 
     if is_valid_cli_type "$pane_cli"; then
         if is_valid_cli_type "${CLI_TYPE:-}" && [ "$pane_cli" != "${CLI_TYPE}" ]; then
             echo "[$(date)] [WARN] CLI drift detected for $AGENT_ID: arg=${CLI_TYPE}, pane=${pane_cli}. Using pane value." >&2
         fi
-        echo "$pane_cli"
-        return 0
-    fi
-
-    if is_valid_cli_type "${CLI_TYPE:-}"; then
+        result="$pane_cli"
+    elif is_valid_cli_type "${CLI_TYPE:-}"; then
         if [ -n "$pane_cli" ]; then
             echo "[$(date)] [WARN] Invalid pane @agent_cli for $AGENT_ID: '${pane_cli}'. Falling back to arg=${CLI_TYPE}." >&2
         fi
-        echo "${CLI_TYPE}"
-        return 0
+        result="${CLI_TYPE}"
+    else
+        # Fail-closed: when CLI is unknown, take codex-safe path (no C-c, /clear->/new)
+        echo "[$(date)] [WARN] CLI unresolved for $AGENT_ID (pane='${pane_cli:-<empty>}', arg='${CLI_TYPE:-<empty>}'). Fallback=codex-safe." >&2
+        result="codex"
     fi
 
-    # Fail-closed: when CLI is unknown, take codex-safe path (no C-c, /clear->/new)
-    echo "[$(date)] [WARN] CLI unresolved for $AGENT_ID (pane='${pane_cli:-<empty>}', arg='${CLI_TYPE:-<empty>}'). Fallback=codex-safe." >&2
-    echo "codex"
+    _CLI_CACHE_RESULT="$result"
+    _CLI_CACHE_TS=$SECONDS
+    echo "$result"
 }
 
 normalize_special_command() {
@@ -274,65 +283,64 @@ normalize_special_command() {
     esac
 }
 
+# FIX-014: bash化 (python3排除) + task_yaml_path動的引継ぎ
 enqueue_recovery_task_assigned() {
     (
         flock -x 200
-        INBOX_PATH="$INBOX" AGENT_ID="$AGENT_ID" python3 - << 'PY'
-import datetime
-import os
-import uuid
-import yaml
 
-inbox = os.environ.get("INBOX_PATH", "")
-agent_id = os.environ.get("AGENT_ID", "agent")
+        # Dedup guard: existing unread auto-recovery → skip
+        _dedup=$(awk '
+            BEGIN { found = 0 }
+            /^- / {
+                if (in_block && is_recovery && is_unread) { found = 1; exit }
+                in_block = 1; is_recovery = 0; is_unread = 0
+            }
+            in_block && /\[auto-recovery\]/ { is_recovery = 1 }
+            in_block && /read: false/ { is_unread = 1 }
+            END {
+                if (in_block && is_recovery && is_unread) found = 1
+                print found
+            }
+        ' "$INBOX" 2>/dev/null)
+        if [ "${_dedup:-0}" = "1" ]; then
+            echo "SKIP_DUPLICATE"
+            exit 0
+        fi
 
-try:
-    with open(inbox, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
+        # FIX-014: Find last task_yaml_path from task_assigned (dynamic, not hardcoded)
+        _last_task_path=$(awk '
+            /^- / { in_block = 1; is_ta = 0; tp = "" }
+            in_block && /type: task_assigned/ { is_ta = 1 }
+            in_block && /task_yaml_path: / {
+                tp = $0; sub(/.*task_yaml_path: */, "", tp)
+                gsub(/^[\047"]|[\047"]$/, "", tp)
+            }
+            in_block && /^  read:/ && is_ta && tp != "" { last = tp }
+            END { if (last != "") print last }
+        ' "$INBOX" 2>/dev/null)
+        _last_task_path="${_last_task_path:-queue/tasks/${AGENT_ID}.yaml}"
 
-    messages = data.get("messages", []) or []
+        # Handle "messages: []" (inline empty list) → convert to block format for append
+        # macOS: sed -i requires '' as backup extension (BSD sed vs GNU sed)
+        if grep -q '^messages: \[\]' "$INBOX" 2>/dev/null; then
+            if [[ "$(uname -s)" == "Darwin" ]]; then
+                sed -i '' 's/^messages: \[\]$/messages:/' "$INBOX"
+            else
+                sed -i 's/^messages: \[\]$/messages:/' "$INBOX"
+            fi
+        fi
 
-    # Dedup guard: keep only one pending auto-recovery hint at a time.
-    for m in reversed(messages):
-        if (
-            m.get("from") == "inbox_watcher"
-            and m.get("type") == "task_assigned"
-            and m.get("read", False) is False
-            and "[auto-recovery]" in (m.get("content") or "")
-        ):
-            print("SKIP_DUPLICATE")
-            raise SystemExit(0)
+        _now_ts=$(date -Iseconds)
+        _msg_id="msg_auto_recovery_$(date +%Y%m%d_%H%M%S)_$(head -c4 /dev/urandom | od -A n -t x1 | tr -d ' \n')"
 
-    now = datetime.datetime.now(datetime.timezone.utc).astimezone()
-    msg = {
-        "content": (
-            f"[auto-recovery] /clear 後の再着手通知。"
-            f"queue/tasks/{agent_id}.yaml を再読し、assigned タスクを即時再開せよ。"
-        ),
-        "from": "inbox_watcher",
-        "id": f"msg_auto_recovery_{now.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}",
-        "read": False,
-        "timestamp": now.replace(microsecond=0).isoformat(),
-        "type": "task_assigned",
-    }
-    messages.append(msg)
-    data["messages"] = messages
-
-    tmp_path = f"{inbox}.tmp.{os.getpid()}"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        yaml.safe_dump(
-            data,
-            f,
-            default_flow_style=False,
-            allow_unicode=True,
-            sort_keys=False,
-        )
-    os.replace(tmp_path, inbox)
-    print(msg["id"])
-except Exception:
-    # Best-effort safety net only. Primary /clear delivery must not fail here.
-    print("ERROR")
-PY
+        printf '%s\n' \
+            "- content: \"[auto-recovery] /clear 後の再着手通知。${_last_task_path} を再読し、assigned タスクを即時再開せよ。\"" \
+            "  from: inbox_watcher" \
+            "  id: ${_msg_id}" \
+            "  read: false" \
+            "  timestamp: '${_now_ts}'" \
+            "  type: task_assigned" >> "$INBOX"
+        echo "$_msg_id"
     ) 200>"$LOCKFILE" 2>/dev/null
 }
 
@@ -345,74 +353,128 @@ no_idle_full_read() {
 }
 
 # summary-first: unread_count fast-path before full read
+# FIX-015: Pattern relaxed to tolerate trailing whitespace and case variations.
 get_unread_count_fast() {
-    INBOX_PATH="$INBOX" python3 - << 'PY'
-import json
-import os
-import yaml
-
-inbox = os.environ.get("INBOX_PATH", "")
-try:
-    with open(inbox, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
-    messages = data.get("messages", []) or []
-    unread_count = sum(1 for m in messages if not m.get("read", False))
-    print(json.dumps({"count": unread_count}))
-except Exception:
-    print(json.dumps({"count": 0}))
-PY
+    local count
+    count=$(grep -ciE '^\s+read:\s*(false)\s*$' "$INBOX" 2>/dev/null) || count=0
+    echo "$count"
 }
 
-# ─── Extract unread message info (lock-free read) ───
-# Returns JSON lines: {"count": N, "has_special": true/false, "specials": [...]}
+# ─── Extract unread message info ───
+# FIX-002: bash/awk implementation (replaces python3 — saves 50-130ms/call)
+# FIX-005: Pure read-only (no specials marking). Use mark_specials_read() after delivery.
+# Output: line 1=normal_count, line 2=has_task_assigned(0/1), line 3+=specials(type\tcontent)
 # Test anchor for bats awk pattern: get_unread_info\\(\\)
 get_unread_info() {
     (
+        flock -s 200  # FIX-002: shared lock (read-only, no writes)
+        awk '
+        /^- / {
+            if (in_block && is_unread) {
+                if (btype == "clear_command" || btype == "model_switch") {
+                    gsub(/\t/, " ", bcontent)
+                    if (sp != "") sp = sp "\n"
+                    sp = sp btype "\t" bcontent
+                } else {
+                    nc++
+                    if (btype == "task_assigned") ht = 1
+                }
+            }
+            in_block = 1; is_unread = 0; btype = ""; bcontent = ""
+            if (/^- content: /) {
+                bcontent = $0; sub(/^- content: */, "", bcontent)
+                gsub(/^[\047"]|[\047"]$/, "", bcontent)
+            } else if (/^- type: /) {
+                btype = $0; sub(/^- type: */, "", btype)
+            } else if (/^- read: false/) { is_unread = 1 }
+            next
+        }
+        in_block && /^  content: / {
+            bcontent = $0; sub(/^  content: */, "", bcontent)
+            gsub(/^[\047"]|[\047"]$/, "", bcontent)
+            next
+        }
+        in_block && /^  type: / { btype = $0; sub(/^  type: */, "", btype); next }
+        in_block && /^  read: false/ { is_unread = 1; next }
+        in_block && /^  read: true/ { is_unread = 0; next }
+        END {
+            if (in_block && is_unread) {
+                if (btype == "clear_command" || btype == "model_switch") {
+                    gsub(/\t/, " ", bcontent)
+                    if (sp != "") sp = sp "\n"
+                    sp = sp btype "\t" bcontent
+                } else {
+                    nc++
+                    if (btype == "task_assigned") ht = 1
+                }
+            }
+            print nc + 0
+            print ht + 0
+            if (sp != "") print sp
+        }
+        ' "$INBOX" 2>/dev/null
+    ) 200>"$LOCKFILE"
+}
+
+# ─── Mark special messages as read (at-least-once delivery) ───
+# FIX-005: Called AFTER send_cli_command() succeeds for specials.
+# If this fails, specials remain unread → next cycle retries.
+mark_specials_read() {
+    (
         flock -x 200
-        INBOX_PATH="$INBOX" python3 - << 'PY'
-import json
-import os
-import yaml
-
-inbox = os.environ.get("INBOX_PATH", "")
-try:
-    with open(inbox, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
-
-    messages = data.get("messages", []) or []
-    unread = [m for m in messages if not m.get("read", False)]
-    special_types = ("clear_command", "model_switch")
-    specials = [m for m in unread if m.get("type") in special_types]
-
-    if specials:
-        for m in messages:
-            if not m.get("read", False) and m.get("type") in special_types:
-                m["read"] = True
-
-        tmp_path = f"{inbox}.tmp.{os.getpid()}"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            yaml.safe_dump(
-                data,
-                f,
-                default_flow_style=False,
-                allow_unicode=True,
-                sort_keys=False,
-            )
-        os.replace(tmp_path, inbox)
-
-    normal_count = len(unread) - len(specials)
-    normal_msgs = [m for m in unread if m.get("type") not in special_types]
-    has_task_assigned = any(m.get("type") == "task_assigned" for m in normal_msgs)
-    payload = {
-        "count": normal_count,
-        "has_task_assigned": has_task_assigned,
-        "specials": [{"type": m.get("type", ""), "content": m.get("content", "")} for m in specials],
-    }
-    print(json.dumps(payload))
-except Exception:
-    print(json.dumps({"count": 0, "specials": []}))
-PY
+        awk '
+        { lines[NR] = $0 }
+        END {
+            changed = 0; in_block = 0; is_special = 0; read_line = 0; is_unread = 0
+            for (i = 1; i <= NR; i++) {
+                if (lines[i] ~ /^- /) {
+                    if (in_block && is_special && is_unread && read_line > 0) {
+                        sub(/read: false/, "read: true", lines[read_line])
+                        changed = 1
+                    }
+                    in_block = 1; is_special = 0; read_line = 0; is_unread = 0
+                }
+                if (in_block && (lines[i] ~ /  type: clear_command/ || lines[i] ~ /  type: model_switch/)) {
+                    is_special = 1
+                }
+                if (in_block && lines[i] ~ /  read: false/) {
+                    read_line = i; is_unread = 1
+                }
+                if (in_block && lines[i] ~ /  read: true/) {
+                    is_unread = 0; read_line = 0
+                }
+            }
+            if (in_block && is_special && is_unread && read_line > 0) {
+                sub(/read: false/, "read: true", lines[read_line])
+                changed = 1
+            }
+            if (changed) {
+                for (i = 1; i <= NR; i++) print lines[i]
+            }
+        }
+        ' "$INBOX" > "${INBOX}.tmp.$$" 2>/dev/null
+        if [ -s "${INBOX}.tmp.$$" ]; then
+            mv "${INBOX}.tmp.$$" "$INBOX"
+        else
+            rm -f "${INBOX}.tmp.$$"
+        fi
     ) 200>"$LOCKFILE" 2>/dev/null
+}
+
+# ─── Parse get_unread_info() output (pure bash, 0 forks) ───
+# Sets: _UI_COUNT, _UI_HAS_TASK, _UI_SPECIALS
+_parse_unread_info() {
+    local _info="$1"
+    _UI_COUNT="${_info%%$'\n'*}"
+    _UI_COUNT="${_UI_COUNT:-0}"
+    local _rest="${_info#*$'\n'}"
+    _UI_HAS_TASK="${_rest%%$'\n'*}"
+    _UI_HAS_TASK="${_UI_HAS_TASK:-0}"
+    if [[ "$_rest" == *$'\n'* ]]; then
+        _UI_SPECIALS="${_rest#*$'\n'}"
+    else
+        _UI_SPECIALS=""
+    fi
 }
 
 # ─── Resolve pane target dynamically via @agent_id ───
@@ -423,11 +485,9 @@ _RESOLVE_CACHE_TARGET=""
 _RESOLVE_CACHE_TS=0
 
 resolve_pane_target() {
-    local now
-    now=$(date +%s)
-
-    # Cache hit: reuse if within TTL (5 seconds)
-    if [ -n "$_RESOLVE_CACHE_TARGET" ] && [ $(( now - _RESOLVE_CACHE_TS )) -lt 5 ]; then
+    # FIX-010: Cache TTL extended 5→30s to reduce tmux list-panes calls.
+    # Also sets _RESOLVE_PANE_FOUND for orphan check integration.
+    if [ -n "$_RESOLVE_CACHE_TARGET" ] && [ "$(( SECONDS - _RESOLVE_CACHE_TS ))" -lt 30 ]; then
         PANE_TARGET="$_RESOLVE_CACHE_TARGET"
         return 0
     fi
@@ -435,26 +495,29 @@ resolve_pane_target() {
     # Darkninja uses a separate session — skip dynamic resolution
     if [ "$AGENT_ID" = "darkninja" ]; then
         _RESOLVE_CACHE_TARGET="$PANE_TARGET"
-        _RESOLVE_CACHE_TS=$now
+        _RESOLVE_CACHE_TS=$SECONDS
+        _RESOLVE_PANE_FOUND=1
         return 0
     fi
 
     # Dynamic lookup: find pane by @agent_id
     local resolved
     resolved=$(tmux list-panes -a -F '#{@agent_id} #{pane_id}' 2>/dev/null \
-        | awk -v id="$AGENT_ID" '$1 == id {print $2; exit}')
+        | awk -v id="$AGENT_ID" '$1 == id {print $2; exit}') || true
 
     if [ -n "$resolved" ]; then
         PANE_TARGET="$resolved"
         _RESOLVE_CACHE_TARGET="$resolved"
-        _RESOLVE_CACHE_TS=$now
+        _RESOLVE_CACHE_TS=$SECONDS
+        _RESOLVE_PANE_FOUND=1
         return 0
     fi
 
     # Fallback: keep startup PANE_TARGET (may be stale but better than nothing)
     echo "[$(date)] [WARN] resolve_pane_target: @agent_id=$AGENT_ID not found, using fallback $PANE_TARGET" >&2
     _RESOLVE_CACHE_TARGET="$PANE_TARGET"
-    _RESOLVE_CACHE_TS=$now
+    _RESOLVE_CACHE_TS=$SECONDS
+    _RESOLVE_PANE_FOUND=0
     return 0
 }
 
@@ -485,14 +548,14 @@ send_cli_command() {
             if [[ "$cmd" == "/clear" ]]; then
                 echo "[$(date)] [SEND-KEYS] Codex /clear→/new: starting new conversation for $AGENT_ID" >&2
                 # Dismiss suggestion UI first (typing "x" clears autocomplete prompt)
-                timeout 5 tmux send-keys -t "$PANE_TARGET" "x" 2>/dev/null
+                tmux send-keys -t "$PANE_TARGET" "x" 2>/dev/null
                 sleep 0.3
-                timeout 5 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
+                tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
                 sleep 0.3
-                timeout 5 tmux send-keys -t "$PANE_TARGET" "/new" 2>/dev/null
+                tmux send-keys -t "$PANE_TARGET" "/new" 2>/dev/null
                 sleep 0.3
-                timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
-                sleep 3
+                tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+                sleep 1
                 return 0
             fi
             if [[ "$cmd" == /model* ]]; then
@@ -504,12 +567,12 @@ send_cli_command() {
             # Copilot: /clearはCtrl-C+再起動, /model非対応→スキップ
             if [[ "$cmd" == "/clear" ]]; then
                 echo "[$(date)] [SEND-KEYS] Copilot /clear: sending Ctrl-C + restart for $AGENT_ID" >&2
-                timeout 5 tmux send-keys -t "$PANE_TARGET" C-c 2>/dev/null
+                tmux send-keys -t "$PANE_TARGET" C-c 2>/dev/null
                 sleep 2
-                timeout 5 tmux send-keys -t "$PANE_TARGET" "copilot --yolo" 2>/dev/null
+                tmux send-keys -t "$PANE_TARGET" "copilot --yolo" 2>/dev/null
                 sleep 0.3
-                timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
-                sleep 3
+                tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+                sleep 1
                 return 0
             fi
             if [[ "$cmd" == /model* ]]; then
@@ -524,28 +587,28 @@ send_cli_command() {
     # Clear stale input first, then send command
     # Codex CLI: C-c when idle causes CLI to exit — skip it
     if [[ "$effective_cli" != "codex" ]]; then
-        timeout 5 tmux send-keys -t "$PANE_TARGET" C-c 2>/dev/null
-        sleep 0.5
+        tmux send-keys -t "$PANE_TARGET" C-c 2>/dev/null
+        sleep 0.2
     fi
     if [[ "$effective_cli" == "codex" ]]; then
         # Codex TUI: text and Enter must be separated (TUI compatibility)
-        timeout 5 tmux send-keys -t "$PANE_TARGET" "$actual_cmd" 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" "$actual_cmd" 2>/dev/null
         sleep 0.3
-        timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
     else
         # Claude CLI: text → Escape (dismiss autocomplete) → Enter
-        timeout 5 tmux send-keys -t "$PANE_TARGET" "$actual_cmd" 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" "$actual_cmd" 2>/dev/null
         sleep 0.3
-        timeout 5 tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
         sleep 0.1
-        timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
     fi
 
     # /clear needs extra wait time before follow-up
     if [[ "$actual_cmd" == "/clear" ]]; then
-        sleep 3
-    else
         sleep 1
+    else
+        sleep 0.5
     fi
 }
 
@@ -577,39 +640,29 @@ send_context_reset() {
 
     # Dismiss Codex suggestion UI before sending reset command
     if [[ "$effective_cli" == "codex" ]]; then
-        timeout 5 tmux send-keys -t "$PANE_TARGET" "x" 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" "x" 2>/dev/null
         sleep 0.3
-        timeout 5 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
         sleep 0.3
     fi
 
     # Send the command
     if [[ "$effective_cli" == "codex" ]]; then
         # Codex TUI: text and Enter must be separated
-        timeout 5 tmux send-keys -t "$PANE_TARGET" "$reset_cmd" 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" "$reset_cmd" 2>/dev/null
         sleep 0.3
-        timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
     else
         # Claude CLI: text → Escape (dismiss autocomplete) → Enter
-        timeout 5 tmux send-keys -t "$PANE_TARGET" "$reset_cmd" 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" "$reset_cmd" 2>/dev/null
         sleep 0.3
-        timeout 5 tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
         sleep 0.1
-        timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
     fi
 
-    # Poll until agent becomes idle (prompt ready) instead of fixed sleep.
-    # Max 15s (3 attempts × 5s). If still busy after 15s, proceed anyway.
-    local attempt
-    for attempt in 1 2 3; do
-        sleep 5
-        if ! agent_is_busy; then
-            echo "[$(date)] [CONTEXT-RESET] $AGENT_ID idle after ${attempt}×5s — ready for スリケン" >&2
-            return 0
-        fi
-        echo "[$(date)] [CONTEXT-RESET] $AGENT_ID still busy after ${attempt}×5s — retrying" >&2
-    done
-    echo "[$(date)] [CONTEXT-RESET] $AGENT_ID still busy after 15s — proceeding with スリケン anyway" >&2
+    # FIX-003: Fixed 2s wait after /clear (polling abolished — 15s dead time eliminated)
+    sleep 2
 }
 
 # ─── Cross-platform file change wait ───
@@ -626,7 +679,10 @@ _wait_for_file_change() {
         fi
         return $rc
     else
-        inotifywait -q -t "$sec" -e modify -e close_write "$file" 2>/dev/null
+        local dir="${file%/*}"
+        local filename="${file##*/}"
+        inotifywait -q -t "$sec" -e moved_to -e close_write -e modify \
+            --include "^${filename}$" "$dir" 2>/dev/null
         return $?
     fi
 }
@@ -635,10 +691,17 @@ _wait_for_file_change() {
 # Check if the agent has an active file-watch (inotifywait/fswatch) on its inbox.
 # If yes, the agent will self-wake — スリケン不要.
 agent_has_self_watch() {
+    # FIX-009: TTL 30s cache — pgrep full-process-scan is expensive, cache result
+    local _now_sw=${EPOCHSECONDS:-$(date +%s)}
+    if [ -n "${_SELF_WATCH_CACHE+x}" ] && [ $((_now_sw - ${_SELF_WATCH_CACHE_TS:-0})) -lt 30 ]; then
+        return "$_SELF_WATCH_CACHE"
+    fi
+
     # Codex/Copilot/Kimi CLIs cannot run self-watch. Only Claude Code agents can.
     local effective_cli
     effective_cli=$(get_effective_cli_type)
     if [[ "$effective_cli" != "claude" ]]; then
+        _SELF_WATCH_CACHE=1; _SELF_WATCH_CACHE_TS=$_now_sw
         return 1  # non-Claude CLIs never have self-watch
     fi
     # For Claude Code agents: check if a file-watch process exists that is NOT
@@ -660,6 +723,7 @@ agent_has_self_watch() {
             break
         fi
     done < <(pgrep -f "$_watch_pattern" 2>/dev/null)
+    _SELF_WATCH_CACHE=$found; _SELF_WATCH_CACHE_TS=$_now_sw
     return $found
 }
 
@@ -671,9 +735,10 @@ agent_has_self_watch() {
 agent_is_busy() {
     resolve_pane_target
     local cache_file="${CACHE_DIR}/inbox_watcher_busy_cache_${AGENT_ID}"
-    local cache_ttl_sec=2
+    # FIX-011: TTL extended 2→5s, $EPOCHSECONDS avoids date fork
+    local cache_ttl_sec=5
     local now
-    now=$(date +%s)
+    now=${EPOCHSECONDS:-$(date +%s)}
 
     # Check cache validity
     if [ -f "$cache_file" ]; then
@@ -687,10 +752,15 @@ agent_is_busy() {
 
         local cache_age=$((now - cache_mtime))
         if [ "$cache_age" -lt "$cache_ttl_sec" ]; then
-            # Cache hit — return cached value
+            # Cache hit — return cached value (validate: must be 0 or 1)
+            # $(<file) avoids cat fork
             local cached_result
-            cached_result=$(cat "$cache_file" 2>/dev/null || echo "1")
-            return "$cached_result"
+            cached_result=$(<"$cache_file") 2>/dev/null
+            cached_result="${cached_result:-1}"
+            case "$cached_result" in
+                0|1) return "$cached_result" ;;
+                *) ;; # corrupted cache — fall through to actual check
+            esac
         fi
     fi
 
@@ -708,26 +778,14 @@ agent_is_busy() {
         return 1  # timeout → idle (proceed with スリケン)
     fi
 
-    # ── Idle check (takes priority) ──
-    if echo "$pane_tail" | grep -qE '(\? for shortcuts|context left)'; then
+    # ── Idle check (takes priority) — consolidated from 2 greps into 1 ──
+    if grep -qE '(\? for shortcuts|context left|^(❯|›)[[:space:]]*$)' <<< "$pane_tail"; then
         echo "1" > "$cache_file"  # cache: idle
-        return 1  # idle — Codex idle prompt
-    fi
-    if echo "$pane_tail" | grep -qE '^(❯|›)\s*$'; then
-        echo "1" > "$cache_file"  # cache: idle
-        return 1  # idle — Claude Code or Codex bare prompt
+        return 1  # idle
     fi
 
-    # ── Busy markers (bottom 5 lines only) ──
-    if echo "$pane_tail" | grep -qiF 'esc to interrupt'; then
-        echo "0" > "$cache_file"  # cache: busy
-        return 0  # busy
-    fi
-    if echo "$pane_tail" | grep -qiF 'background terminal running'; then
-        echo "0" > "$cache_file"  # cache: busy
-        return 0  # busy
-    fi
-    if echo "$pane_tail" | grep -qiE '(Working|Thinking|Planning|Sending|task is in progress|Compacting conversation|thought for|思考中|考え中|計画中|送信中|処理中|実行中)'; then
+    # ── Busy markers (bottom 5 lines only) — consolidated from 3 greps into 1 ──
+    if grep -qiE '(esc to interrupt|background terminal running|Working|Thinking|Planning|Sending|task is in progress|Compacting conversation|thought for|思考中|考え中|計画中|送信中|処理中|実行中)' <<< "$pane_tail"; then
         echo "0" > "$cache_file"  # cache: busy
         return 0  # busy
     fi
@@ -795,18 +853,20 @@ send_wakeup() {
     local effective_cli_for_nudge
     effective_cli_for_nudge=$(get_effective_cli_type)
     if [[ "$effective_cli_for_nudge" == "codex" ]]; then
-        timeout 5 tmux send-keys -t "$PANE_TARGET" "x" 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" "x" 2>/dev/null
         sleep 0.3
-        timeout 5 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
         sleep 0.3
     fi
 
-    if timeout 5 tmux send-keys -t "$PANE_TARGET" "$nudge" 2>/dev/null; then
-        # Claude CLI: Escape to dismiss autocomplete before Enter
+    if tmux send-keys -t "$PANE_TARGET" "$nudge" 2>/dev/null; then
+        # Phase 1: text → Escape (dismiss autocomplete) → Enter.
+        # Claude CLI autocomplete can swallow Enter if sent immediately after text.
+        # Escape dismisses the autocomplete popup before Enter is processed.
         sleep 0.3
-        timeout 5 tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
         sleep 0.1
-        timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
         echo "[$(date)] Wake-up sent to $AGENT_ID (${unread_count} unread)" >&2
         return 0
     fi
@@ -866,19 +926,19 @@ send_wakeup_with_escape() {
 
     echo "[$(date)] [SEND-KEYS] ESCALATION Phase 2: Escape×2 + スリケン for $AGENT_ID (cli=$effective_cli)" >&2
     # Escape×2 to exit any mode
-    timeout 5 tmux send-keys -t "$PANE_TARGET" Escape Escape 2>/dev/null
+    tmux send-keys -t "$PANE_TARGET" Escape Escape 2>/dev/null
     sleep 0.5
     # C-c to clear stale input (but Codex CLI terminates on C-c when idle, so skip it)
     if [[ "$effective_cli" != "codex" ]]; then
-        timeout 5 tmux send-keys -t "$PANE_TARGET" C-c 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" C-c 2>/dev/null
         sleep 0.5
         c_ctrl_state="sent"
     fi
-    if timeout 5 tmux send-keys -t "$PANE_TARGET" "$nudge" 2>/dev/null; then
+    if tmux send-keys -t "$PANE_TARGET" "$nudge" 2>/dev/null; then
         sleep 0.3
-        timeout 5 tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" Escape 2>/dev/null
         sleep 0.1
-        timeout 5 tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
+        tmux send-keys -t "$PANE_TARGET" Enter 2>/dev/null
         echo "[$(date)] Escape+スリケン sent to $AGENT_ID (${unread_count} unread, cli=$effective_cli, C-c=$c_ctrl_state)" >&2
         return 0
     fi
@@ -893,50 +953,51 @@ process_unread() {
 
     # summary-first: unread_count fast-path (Phase 2/3 optimization)
     # unread_count fast-path lets us skip expensive full reads when idle.
-    local fast_info
-    fast_info=$(get_unread_count_fast)
+    # get_unread_count_fast now outputs plain number (grep-based, no python3).
     local fast_count
-    fast_count=$(echo "$fast_info" | python3 -c "import sys,json; print(json.load(sys.stdin).get('count',0))" 2>/dev/null)
+    fast_count=$(get_unread_count_fast)
+    fast_count="${fast_count:-0}"
 
     # P1-2: fast-path expansion — skip full read when unread=0, regardless of trigger type
     # (previously limited to timeout trigger only; now applies to event trigger as well)
     if [ "$fast_count" -eq 0 ] 2>/dev/null; then
-        # unread=0 → no full inbox read needed (saves ~30ms YAML parsing)
+        # FIX-008: unread=0 → early return. No agent_is_busy() call (saves 140 forks/min).
+        # C-u only on transition from unread>0 to unread=0 (one-time cleanup).
         if [ "$FIRST_UNREAD_SEEN" -ne 0 ]; then
             echo "[$(date)] All messages read for $AGENT_ID — escalation reset (fast-path)" >&2
-        fi
-        FIRST_UNREAD_SEEN=0
-        NEW_CONTEXT_SENT=0
-        if ! agent_is_busy; then
-            # Darkninja: only clear input when pane is not active (Lord is away)
             if [ "$AGENT_ID" = "darkninja" ] && pane_is_active; then
                 : # Lord may be typing — skip C-u
             else
-                timeout 2 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
+                tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
             fi
         fi
+        FIRST_UNREAD_SEEN=0
+        NEW_CONTEXT_SENT=0
         return 0
     fi
 
     local info
     info=$(get_unread_info)
 
+    # Parse info in one pass (pure bash, 0 forks — replaces 3 python3 invocations)
+    local normal_count has_task_assigned specials
+    _parse_unread_info "$info"
+    normal_count=$_UI_COUNT
+    has_task_assigned=$_UI_HAS_TASK
+    specials=$_UI_SPECIALS
+
     local read_bytes=0
     if [ -f "$INBOX" ]; then
-        read_bytes=$(wc -c < "$INBOX" 2>/dev/null || echo 0)
+        # FIX-019: stat avoids wc fork (1 fork → 0 on Linux with bash stat cache)
+        if [[ "$_UNAME_S" == "Darwin" ]]; then
+            read_bytes=$(/usr/bin/stat -f %z "$INBOX" 2>/dev/null || echo 0)
+        else
+            read_bytes=$(stat -c %s "$INBOX" 2>/dev/null || echo 0)
+        fi
     fi
     update_metrics "${read_bytes:-0}"
 
     # Handle special CLI commands first (/clear, /model)
-    local specials
-    specials=$(echo "$info" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-for s in data.get('specials', []):
-    t = s.get('type', '')
-    c = (s.get('content', '') or '').replace('\t', ' ').replace('\n', ' ').strip()
-    print(f'{t}\t{c}')
-" 2>/dev/null)
 
     local clear_seen=0
     if [ -n "$specials" ]; then
@@ -946,11 +1007,26 @@ for s in data.get('specials', []):
             if [ "$msg_type" = "clear_command" ]; then
                 clear_seen=1
                 # BUG-6 fix: Update shared clear lock on delivery
-                echo "$(date +%s)" > "${STATE_DIR}/clear_last_${AGENT_ID}"
+                # FIX-016: Also update LAST_CLEAR_TS to suppress nudges for 30s post-/clear
+                local _clear_now=${EPOCHSECONDS:-$(date +%s)}
+                printf '%s' "$_clear_now" > "${STATE_DIR}/clear_last_${AGENT_ID}"
+                LAST_CLEAR_TS=$_clear_now
             fi
             cmd=$(normalize_special_command "$msg_type" "$msg_content")
             [ -n "$cmd" ] && send_cli_command "$cmd"
+            # cmd_338: model_switch後にペインタイトル更新
+            if [ "$msg_type" = "model_switch" ] && [ -n "$cmd" ]; then
+                local _model_str="${cmd#/model }"
+                local _pane_title_sh="${SCRIPT_DIR:-$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)}/scripts/pane_title.sh"
+                if [ -f "$_pane_title_sh" ]; then
+                    source "$_pane_title_sh"
+                    resolve_pane_target
+                    update_pane_title "$PANE_TARGET" "$AGENT_ID" "$_model_str" ""
+                fi
+            fi
         done <<< "$specials"
+        # FIX-005: Mark specials as read AFTER delivery (at-least-once guarantee)
+        mark_specials_read
     fi
 
     # /clear は Codex で /new へ変換される。再起動直後の取りこぼし防止として
@@ -962,36 +1038,36 @@ for s in data.get('specials', []):
             echo "[$(date)] [AUTO-RECOVERY] queued task_assigned for $AGENT_ID ($recovery_id)" >&2
         fi
         info=$(get_unread_info)
+        _parse_unread_info "$info"
+        normal_count=$_UI_COUNT
+        has_task_assigned=$_UI_HAS_TASK
     fi
 
-    # Send wake-up nudge for normal messages (with escalation)
-    local normal_count
-    normal_count=$(echo "$info" | python3 -c "import sys,json; print(json.load(sys.stdin).get('count',0))" 2>/dev/null)
-
-    # Check if unread messages include task_assigned (for context reset)
-    local has_task_assigned
-    has_task_assigned=$(echo "$info" | python3 -c "import sys,json; print(1 if json.load(sys.stdin).get('has_task_assigned') else 0)" 2>/dev/null)
-
     if [ "$normal_count" -gt 0 ] 2>/dev/null; then
+        # FIX-017: $EPOCHSECONDS avoids date fork
         local now
-        now=$(date +%s)
+        now=${EPOCHSECONDS:-$(date +%s)}
 
         # When the agent is busy/thinking, do NOT escalate. Interrupting with Escape or /clear
-        # can terminate the current thought. Also pause the escalation timer while busy so we
-        # don't immediately jump to Phase 2/3 once it becomes idle.
+        # can terminate the current thought.
+        # FIX-006: Track busy→idle transition. While busy, true pause (no timer update).
+        # On idle after busy, restart timer from Phase 1 (prevents immediate Phase 2/3 jump).
         if agent_is_busy; then
-            local busy_cli
-            busy_cli=$(get_effective_cli_type)
-            if [[ "$busy_cli" == "claude" ]]; then
-                # Claude Code: Stop hook will catch unread messages when the agent's
-                # turn ends. スリケン不要 at all — just log and skip completely.
-                # Don't reset FIRST_UNREAD_SEEN so idle-スリケン works if hook misses.
-                echo "[$(date)] $normal_count unread for $AGENT_ID but agent is busy (claude) — Stop hook will deliver" >&2
-            else
-                # Codex/Copilot/Kimi: No Stop hook. Pause escalation timer while busy.
-                FIRST_UNREAD_SEEN=$now
-                echo "[$(date)] $normal_count unread for $AGENT_ID but agent is busy ($busy_cli) — pausing escalation timer" >&2
-            fi
+            PREV_WAS_BUSY=1
+            echo "[$(date)] $normal_count unread for $AGENT_ID but agent is busy — pausing escalation (true pause)" >&2
+            return 0
+        fi
+        # FIX-006: busy→idle transition — restart escalation from Phase 1
+        if [ "$PREV_WAS_BUSY" -eq 1 ]; then
+            FIRST_UNREAD_SEEN=$now
+            PREV_WAS_BUSY=0
+            echo "[$(date)] $AGENT_ID busy→idle transition — escalation timer restarted from Phase 1" >&2
+        fi
+
+        # FIX-016: Suppress nudges for 30s after /clear (agent is restarting)
+        # Exception: allow nudge in same cycle as /clear (auto-recovery needs immediate wake-up)
+        if [ "$clear_seen" -eq 0 ] && [ "$LAST_CLEAR_TS" -gt 0 ] && [ $((now - LAST_CLEAR_TS)) -lt 30 ]; then
+            echo "[$(date)] $normal_count unread for $AGENT_ID — nudge suppressed ($((now - LAST_CLEAR_TS))s since /clear)" >&2
             return 0
         fi
 
@@ -1015,7 +1091,7 @@ for s in data.get('specials', []):
             if disable_normal_nudge; then
                 echo "[$(date)] [SKIP] disable_normal_nudge=1, no normal スリケン for $AGENT_ID" >&2
             else
-                send_wakeup "$normal_count"
+                send_wakeup "$normal_count" || true
             fi
             return 0
         fi
@@ -1028,27 +1104,39 @@ for s in data.get('specials', []):
             if disable_normal_nudge; then
                 echo "[$(date)] [SKIP] disable_normal_nudge=1, deferring to escalation-only path" >&2
             else
-                send_wakeup "$normal_count"
+                send_wakeup "$normal_count" || true
             fi
         elif [ "$age" -lt "$ESCALATE_PHASE2" ]; then
             # Phase 2 (2-4 min): Escape + スリケン
             echo "[$(date)] $normal_count unread for $AGENT_ID (${age}s — escalating: Escape+スリケン)" >&2
-            send_wakeup_with_escape "$normal_count"
+            send_wakeup_with_escape "$normal_count" || true
         else
             # Phase 3 (4+ min): /clear (throttled to once per 5 min)
-            if [ "$LAST_CLEAR_TS" -lt "$((now - ESCALATE_COOLDOWN))" ]; then
+            # FIX-004: darkninja向けは/clear送信不可(send_cli_commandがSKIP)のため
+            # FIRST_UNREAD_SEENリセットしない。リセットするとPhase1に戻り無限ループする。
+            if [ "$AGENT_ID" = "darkninja" ]; then
+                echo "[$(date)] ESCALATION Phase 3: darkninja — /clear suppressed (human-controlled). ${normal_count} unread, ${age}s." >&2
+                # Alert記録（gryakuza集約用）
+                mkdir -p "${STATE_DIR}/alerts" 2>/dev/null || true
+                printf 'agent_id: darkninja\ntimestamp: "%s"\nunread_count: %s\nage_sec: %s\naction: phase3_suppressed\n' \
+                    "$(date -Iseconds)" "$normal_count" "$age" > "${STATE_DIR}/alerts/darkninja_undeliverable.yaml"
+                # tmux通知（5秒表示）
+                timeout 2 tmux display-message -d 5000 "ALERT: inbox ${normal_count} unread for darkninja (${age}s)" 2>/dev/null || true
+                # Phase2スリケンを継続（ループに入らない）
+                send_wakeup_with_escape "$normal_count" || true
+            elif [ "$LAST_CLEAR_TS" -lt "$((now - ESCALATE_COOLDOWN))" ]; then
                 local effective_cli
                 effective_cli=$(get_effective_cli_type)
                 if [[ "$effective_cli" == "codex" ]]; then
                     # Codex /clear -> /new は会話を切ってしまうため、安全側に倒す。
                     echo "[$(date)] ESCALATION Phase 3: $AGENT_ID unresponsive for ${age}s, but cli=codex — skipping /clear." >&2
                     FIRST_UNREAD_SEEN=$now  # Reset timer (no destructive action)
-                    send_wakeup "$normal_count"
+                    send_wakeup "$normal_count" || true
                 else
                     echo "[$(date)] ESCALATION Phase 3: Agent $AGENT_ID unresponsive for ${age}s. Sending /clear." >&2
                     send_cli_command "/clear"
                     # BUG-6 fix: Update shared clear lock on Phase 3 /clear
-                    echo "$(date +%s)" > "${STATE_DIR}/clear_last_${AGENT_ID}"
+                    printf '%s' "$now" > "${STATE_DIR}/clear_last_${AGENT_ID}"
                     LAST_CLEAR_TS=$now
                     FIRST_UNREAD_SEEN=0  # Reset — will re-detect on next cycle
                     NEW_CONTEXT_SENT=0
@@ -1056,26 +1144,22 @@ for s in data.get('specials', []):
             else
                 # Cooldown active — fall back to Escape+スリケン
                 echo "[$(date)] $normal_count unread for $AGENT_ID (${age}s — /clear cooldown, using Escape+スリケン)" >&2
-                send_wakeup_with_escape "$normal_count"
+                send_wakeup_with_escape "$normal_count" || true
             fi
         fi
     else
         # No unread messages — reset escalation tracker
+        # FIX-008: C-u only on transition, no agent_is_busy() call
         if [ "$FIRST_UNREAD_SEEN" -ne 0 ]; then
             echo "[$(date)] All messages read for $AGENT_ID — escalation reset" >&2
-        fi
-        FIRST_UNREAD_SEEN=0
-        NEW_CONTEXT_SENT=0
-        # Clear stale nudge text from input field (Codex CLI prefills last input on idle).
-        # Only send C-u when agent is idle — during Working it would be disruptive.
-        if ! agent_is_busy; then
-            # Darkninja: only clear input when pane is not active (Lord is away)
             if [ "$AGENT_ID" = "darkninja" ] && pane_is_active; then
                 : # Lord may be typing — skip C-u
             else
-                timeout 2 tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
+                tmux send-keys -t "$PANE_TARGET" C-u 2>/dev/null
             fi
         fi
+        FIRST_UNREAD_SEEN=0
+        NEW_CONTEXT_SENT=0
     fi
 }
 
@@ -1086,43 +1170,114 @@ process_unread_once() {
 # ─── Startup & Main loop (skipped in testing mode) ───
 if [ "${__INBOX_WATCHER_TESTING__:-}" != "1" ]; then
 
+# ─── Startup jitter: stagger watcher start times to prevent thundering herd ───
+# FIX-021: 11 watchers starting simultaneously cause fork burst → Resource temporarily unavailable
+_startup_jitter=$(( RANDOM % 3 ))
+echo "[$(date)] inbox_watcher startup jitter: ${_startup_jitter}s for $AGENT_ID" >&2
+sleep "$_startup_jitter"
+
 # ─── Startup: process any existing unread messages ───
 process_unread_once
 
 # ─── Main loop: event-driven via inotifywait ───
-# Timeout 30s: WSL2 /mnt/c/ can miss inotify events.
-# Shorter timeout = faster escalation retry for stuck agents.
-INOTIFY_TIMEOUT="${INOTIFY_TIMEOUT:-30}"
+# Timeout 5-10s: WSL2 /mnt/c/ can miss inotify events. Shorter timeout = faster escalation retry.
+# FIX-021: Randomized timeout (base + jitter) prevents thundering herd.
+# Linux: dir監視 + moved_to イベントで atomic write (tmp→rename) に対応。
+INOTIFY_TIMEOUT="${INOTIFY_TIMEOUT:-5}"
+INOTIFY_TIMEOUT_BASE="${INOTIFY_TIMEOUT:-5}"
+INOTIFY_TIMEOUT_JITTER="${INOTIFY_TIMEOUT_JITTER:-5}"
+# FIX-021: Consecutive fork failure counter — backoff on repeated failures
+_FORK_FAIL_COUNT=0
+_FORK_FAIL_MAX=5
+_FORK_FAIL_BACKOFF_BASE=2
+
+# FIX-022: Orphan detection grace — require 3 consecutive misses before exit.
+# Single-miss exit caused false orphan kills during yokubari restart / window rename.
+_ORPHAN_MISS_COUNT=0
+_ORPHAN_MISS_MAX=3
 
 while true; do
-    # Orphan watcher check: paneが消失していたら自己終了（despawn_tengu後のゾンビwatcher防止）
-    if ! tmux list-panes -a -F '#{@agent_id}' | grep -qx "$AGENT_ID"; then
-        echo "[inbox_watcher] pane for $AGENT_ID not found. Exiting orphan watcher." >&2
-        exit 0
+    # FIX-010: Orphan check integrated with resolve_pane_target (avoids duplicate tmux list-panes)
+    # Force cache refresh for orphan detection
+    _RESOLVE_CACHE_TARGET=""
+    resolve_pane_target
+    if [ "${_RESOLVE_PANE_FOUND:-1}" -eq 0 ]; then
+        _ORPHAN_MISS_COUNT=$(( _ORPHAN_MISS_COUNT + 1 ))
+        if [ "$_ORPHAN_MISS_COUNT" -ge "$_ORPHAN_MISS_MAX" ]; then
+            echo "[inbox_watcher] pane for $AGENT_ID not found (${_ORPHAN_MISS_COUNT}/${_ORPHAN_MISS_MAX} consecutive misses). Exiting orphan watcher." >&2
+            exit 0
+        fi
+        echo "[$(date)] [WARN] pane for $AGENT_ID not found (${_ORPHAN_MISS_COUNT}/${_ORPHAN_MISS_MAX}). Will retry." >&2
+    else
+        _ORPHAN_MISS_COUNT=0
     fi
+
+    # FIX-021: Randomized inotify timeout to prevent thundering herd
+    _jittered_timeout=$(( INOTIFY_TIMEOUT_BASE + RANDOM % (INOTIFY_TIMEOUT_JITTER + 1) ))
 
     # Block until file is modified OR timeout (safety net for WSL2 / fswatch)
     # set +e: file-watch returns 2 on timeout, which would kill script under set -e
     set +e
-    _wait_for_file_change "$INBOX" "$INOTIFY_TIMEOUT"
+    _wait_for_file_change "$INBOX" "$_jittered_timeout"
     rc=$?
-    set -e
 
-    # rc=0: event fired (instant delivery)
+    # rc=0: event fired (instant delivery — moved_to/close_write/modify)
     # rc=1: watch invalidated — Claude Code uses atomic write (tmp+rename),
     #        which replaces the inode. inotifywait sees DELETE_SELF → rc=1.
     #        File still exists with new inode. Treat as event, re-watch next loop.
-    # rc=2: timeout (30s safety net for WSL2 inotify gaps)
+    # rc=2: timeout (safety net for WSL2 inotify gaps)
     # All cases: check for unread, then loop back to inotifywait (re-watches new inode)
-    sleep 0.3
 
+    # FIX-001: Capture mtime before processing to detect gap-window writes
+    if [[ "$_UNAME_S" == "Darwin" ]]; then
+        _mtime_before=$(/usr/bin/stat -f %m "$INBOX" 2>/dev/null || echo 0)
+    else
+        _mtime_before=$(stat -c %Y "$INBOX" 2>/dev/null || echo 0)
+    fi
+
+    # FIX-021: Wrap process_unread in error handler to survive transient fork failures.
+    # Without this, set -e kills the watcher on any fork exhaustion during processing,
+    # which triggers supervisor restart of all watchers simultaneously → cascade failure.
     if [ "$rc" -eq 2 ]; then
         if [ "${ASW_PROCESS_TIMEOUT:-1}" = "1" ]; then
-            process_unread "timeout"
+            process_unread "timeout" || {
+                _FORK_FAIL_COUNT=$((_FORK_FAIL_COUNT + 1))
+                _backoff=$(( _FORK_FAIL_BACKOFF_BASE * _FORK_FAIL_COUNT ))
+                (( _backoff > 30 )) && _backoff=30
+                echo "[$(date)] [WARN] process_unread failed for $AGENT_ID (attempt ${_FORK_FAIL_COUNT}) — backoff ${_backoff}s" >&2
+                sleep "$_backoff"
+                if (( _FORK_FAIL_COUNT >= _FORK_FAIL_MAX )); then
+                    echo "[$(date)] [ERROR] $AGENT_ID: ${_FORK_FAIL_MAX} consecutive failures — exiting for supervisor restart" >&2
+                    exit 1
+                fi
+                continue
+            }
         fi
     else
-        process_unread "event"
+        process_unread "event" || {
+            _FORK_FAIL_COUNT=$((_FORK_FAIL_COUNT + 1))
+            _backoff=$(( _FORK_FAIL_BACKOFF_BASE * _FORK_FAIL_COUNT ))
+            (( _backoff > 30 )) && _backoff=30
+            echo "[$(date)] [WARN] process_unread failed for $AGENT_ID (attempt ${_FORK_FAIL_COUNT}) — backoff ${_backoff}s" >&2
+            sleep "$_backoff"
+            if (( _FORK_FAIL_COUNT >= _FORK_FAIL_MAX )); then
+                echo "[$(date)] [ERROR] $AGENT_ID: ${_FORK_FAIL_MAX} consecutive failures — exiting for supervisor restart" >&2
+                exit 1
+            fi
+            continue
+        }
     fi
+    # Reset fork failure counter on success
+    _FORK_FAIL_COUNT=0
+    set -e
+
+    # FIX-001: Recheck mtime — if inbox was modified during processing, skip wait and re-loop
+    if [[ "$_UNAME_S" == "Darwin" ]]; then
+        _mtime_after=$(/usr/bin/stat -f %m "$INBOX" 2>/dev/null || echo 0)
+    else
+        _mtime_after=$(stat -c %Y "$INBOX" 2>/dev/null || echo 0)
+    fi
+    [[ "$_mtime_before" != "$_mtime_after" ]] && continue
 done
 
 fi  # end testing guard

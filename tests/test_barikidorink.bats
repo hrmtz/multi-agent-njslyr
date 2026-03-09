@@ -93,7 +93,10 @@ teardown() {
     run bash -c "source '$TEST_HARNESS' && inject_barikidorink 'multiagent:0.1'"
     [ "$status" -eq 0 ]
 
-    grep -q 'send-keys -t multiagent:0.1 /model opus Enter' "$MOCK_LOG"
+    # オートコンプリート回避: text→Escape→Enter（3ステップ）
+    grep -q 'send-keys -t multiagent:0.1 /model opus$' "$MOCK_LOG"
+    grep -q 'send-keys -t multiagent:0.1 Escape' "$MOCK_LOG"
+    grep -q 'send-keys -t multiagent:0.1 Enter' "$MOCK_LOG"
 }
 
 @test "T-BK-006: inject_barikidorink sets @model_name to Opus" {
@@ -114,7 +117,8 @@ teardown() {
     run bash -c "source '$TEST_HARNESS' && inject_barikidorink 'multiagent:0.1'"
     [ "$status" -eq 0 ]
 
-    grep -q 'send-keys -t multiagent:0.1 /clear Enter' "$MOCK_LOG"
+    # オートコンプリート回避: text→Escape→Enter（3ステップ）
+    grep -q 'send-keys -t multiagent:0.1 /clear$' "$MOCK_LOG"
 }
 
 # =============================================================================
@@ -125,7 +129,10 @@ teardown() {
     run bash -c "source '$TEST_HARNESS' && detox_barikidorink 'multiagent:0.1'"
     [ "$status" -eq 0 ]
 
-    grep -q 'send-keys -t multiagent:0.1 /model sonnet Enter' "$MOCK_LOG"
+    # オートコンプリート回避: text→Escape→Enter（3ステップ）
+    grep -q 'send-keys -t multiagent:0.1 /model sonnet$' "$MOCK_LOG"
+    grep -q 'send-keys -t multiagent:0.1 Escape' "$MOCK_LOG"
+    grep -q 'send-keys -t multiagent:0.1 Enter' "$MOCK_LOG"
 }
 
 @test "T-BK-010: detox_barikidorink sets @model_name to Sonnet" {
@@ -146,7 +153,8 @@ teardown() {
     run bash -c "source '$TEST_HARNESS' && detox_barikidorink 'multiagent:0.1'"
     [ "$status" -eq 0 ]
 
-    grep -q 'send-keys -t multiagent:0.1 /clear Enter' "$MOCK_LOG"
+    # オートコンプリート回避: text→Escape→Enter（3ステップ）
+    grep -q 'send-keys -t multiagent:0.1 /clear$' "$MOCK_LOG"
 }
 
 # =============================================================================
@@ -194,7 +202,8 @@ teardown() {
     [ "$status" -eq 0 ]
 
     # Function runs with empty $1 — tmux commands get empty -t target
-    grep -q 'send-keys -t  /model opus Enter' "$MOCK_LOG"
+    # オートコンプリート回避: text→Escape→Enter（3ステップ）
+    grep -q 'send-keys -t  /model opus$' "$MOCK_LOG"
 }
 
 @test "T-BK-016: detox_barikidorink with no argument uses empty pane target" {
@@ -202,7 +211,8 @@ teardown() {
     [ "$status" -eq 0 ]
 
     # Function runs with empty $1 — tmux commands get empty -t target
-    grep -q 'send-keys -t  /model sonnet Enter' "$MOCK_LOG"
+    # オートコンプリート回避: text→Escape→Enter（3ステップ）
+    grep -q 'send-keys -t  /model sonnet$' "$MOCK_LOG"
 }
 
 # =============================================================================

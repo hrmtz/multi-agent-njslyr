@@ -35,17 +35,60 @@ set -euo pipefail
 
 # ─── Variables ───
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="${SCRIPT_DIR%/*}"
 STATE_DIR="$PROJECT_ROOT/.state"
+mkdir -p "$STATE_DIR"
 
 # ─── 共有ライブラリ読み込み（njslyr.sh関数群を継承）───
+# shellcheck source=scripts/njslyr_lib.sh
 source "$SCRIPT_DIR/njslyr_lib.sh"
+
+# ─── helper: operation mode check (standalone guard) ───
+_get_operation_mode() {
+    local mode
+    mode=$(awk '/operation_mode:/ {print $2; exit}' "$PROJECT_ROOT/config/settings.yaml" 2>/dev/null)
+    echo "${mode:-kyoto_master}"
+}
+
+# ─── helper: SSH tier1 primary for suriken (cross-machine) ───
+# ローカルペインが見つからない場合にSSH経由でリモートマシンにスリケンを送る（tier1優先）
+# 引数: agent_id (必須)
+_cmd_suriken_ssh_fallback() {
+    local agent_id="$1"
+    if [[ "$(_get_operation_mode)" == "standalone" ]]; then
+        return 1  # fallback skip → local-only
+    fi
+    # shellcheck source=lib/ssh_fallback.sh
+    source "$PROJECT_ROOT/lib/ssh_fallback.sh"
+    echo "[suriken] SSH tier1 → $agent_id" >&2
+    if ssh_send_suriken "$agent_id"; then
+        echo "[suriken] SSH tier1 success → $agent_id"
+        return 0
+    else
+        echo "[suriken] SSH tier1 FAILED → $agent_id" >&2
+        return 1
+    fi
+}
 
 # ─── A-1: suriken — エージェントにnudgeを送る ───
 # 設計書 Section A-1 準拠
 # 引数: agent_id (必須), message (任意), type (任意), priority (任意)
 cmd_suriken() {
+    # FIX-LBUG-001: SSH再帰防止ガード（ローカル変数定義より前に配置）
+    # リモートSSH経由で呼ばれた場合、再度クロスマシン配信しない（無限ループ防止）
+    if [[ "${NJSLYR_SSH_DEPTH:-0}" -ge 1 ]]; then
+        echo "[suriken] SSH depth limit reached (depth=${NJSLYR_SSH_DEPTH}), aborting to prevent infinite loop" >&2
+        return 1
+    fi
+
     local agent_id="${1:?ERROR: suriken requires agent_id}"
+
+    # FIX-SEC-M001: agent_idバリデーション（全下流関数を保護）
+    if [[ ! "$agent_id" =~ ^[a-z0-9_]+$ ]]; then
+        echo "[suriken] ERROR: invalid agent_id: '$agent_id'" >&2
+        return 1
+    fi
+
     local message="${2:-}"
     local type="${3:-system_notice}"
     local priority="${4:-}"
@@ -55,14 +98,38 @@ cmd_suriken() {
     pane_id=$(resolve_pane_by_agent_id "$agent_id")
 
     if [[ -z "$pane_id" ]]; then
-        echo "ERROR: suriken: pane not found for $agent_id" >&2
+        # FIX-LBUG-002: message付きsurikenのリモートinbox_write（nudge前に実行）
+        if [[ -n "$message" ]]; then
+            if [[ -f "$PROJECT_ROOT/lib/ssh_fallback.sh" ]]; then
+                # shellcheck source=lib/ssh_fallback.sh
+                source "$PROJECT_ROOT/lib/ssh_fallback.sh"
+                local peer_host peer_project escaped_message
+                peer_host=$(_ssh_get_peer_host)
+                peer_project=$(_ssh_get_peer_project)
+                escaped_message=$(printf '%q' "$message")
+                if [[ -n "$peer_host" && -n "$peer_project" ]]; then
+                    # shellcheck disable=SC2086
+                    ssh $SSH_OPTS "$peer_host" \
+                        "cd '$peer_project' && bash scripts/inbox_write.sh '$agent_id' $escaped_message '$type' 'njslyr' '' '$priority'" \
+                        2>/dev/null \
+                        || echo "[suriken] WARNING: remote inbox_write failed for $agent_id" >&2
+                fi
+            fi
+        fi
+
+        echo "[suriken] pane not found for $agent_id — trying SSH tier1..." >&2
+        if _cmd_suriken_ssh_fallback "$agent_id"; then
+            return 0
+        fi
+        echo "[suriken] SSH tier1 failed. No further fallback (ntfy廃止済み)." >&2
         return 1
     fi
 
     # メッセージがある場合はinbox_write（from="njslyr"固定）
+    # inbox_write失敗でnudge送信を中断しないよう || true（nudgeが主目的）
     if [[ -n "$message" ]]; then
         bash "$SCRIPT_DIR/inbox_write.sh" \
-            "$agent_id" "$message" "$type" "njslyr" "" "$priority"
+            "$agent_id" "$message" "$type" "njslyr" "" "$priority" || true
     fi
 
     # unread数を確認してnudgeテキストを生成
@@ -102,7 +169,7 @@ cmd_chop() {
     tmux send-keys -t "$pane_id" Enter 2>/dev/null
 
     # clear_last タイムスタンプ更新（UNIFIED-MED-009: B-1 graceピリオドとの連携インターフェース）
-    echo "$(date +%s)" > "$STATE_DIR/clear_last_${agent_id}"
+    date +%s > "$STATE_DIR/clear_last_${agent_id}"
 
     echo "[chop] $agent_id: /clear 送信完了。30秒後にリカバリー確認..."
     sleep 30
@@ -111,7 +178,7 @@ cmd_chop() {
     local retry=0
     while [[ $retry -lt 3 ]]; do
         local unread_count
-        unread_count=$(grep -c 'read: false' "$PROJECT_ROOT/queue/inbox/${agent_id}.yaml" 2>/dev/null || echo "0")
+        unread_count=$(grep -c 'read: false' "$PROJECT_ROOT/queue/inbox/${agent_id}.yaml" 2>/dev/null) || unread_count=0
         if [[ "$unread_count" -gt 0 ]]; then
             cmd_suriken "$agent_id"
             break
@@ -181,11 +248,12 @@ cmd_spawn_tengu() {
 
     # 元エージェントのタスクYAML status を suspended に変更（rollback用に元statusを保存）
     local orig_task_yaml orig_task_status
+    # shellcheck disable=SC2012  # ls -t needed for mtime sort; yaml filenames have no special chars
     orig_task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${orig_agent}"*.yaml 2>/dev/null | head -1)
     orig_task_status="idle"
     if [[ -n "$orig_task_yaml" && -f "$orig_task_yaml" ]]; then
-        orig_task_status=$(grep '^ *status:' "$orig_task_yaml" | head -1 | awk '{print $2}' | tr -d "'\"" || echo "idle")
-        sed -i '' 's/^ *status: .*/  status: suspended/' "$orig_task_yaml" 2>/dev/null || true
+        orig_task_status=$(awk '/^ *status:/ {gsub(/['"'"'"]/, "", $2); print $2; exit}' "$orig_task_yaml" 2>/dev/null || echo "idle")
+        sedi 's/^ *status: .*/  status: suspended/' "$orig_task_yaml" 2>/dev/null || true
     fi
 
     # remain-on-exit設定（恒久ルール: respawn-pane前に必須）
@@ -203,12 +271,9 @@ cmd_spawn_tengu() {
     if ! tmux respawn-pane -k -t "$pane_id" \
         "claude --model claude-sonnet-4-6 --dangerously-skip-permissions" 2>/dev/null; then
         # エラーロールバック: STATEファイル削除 + bg_color復元 + タスクYAML status復元
-        local orig_bg_color
-        orig_bg_color=$(cat "$STATE_DIR/yakuzatengu_original_bg_color" 2>/dev/null || \
-            { [[ "$orig_model" =~ [Oo]pus ]] && echo "#1a002e" || echo "default"; })
         tmux select-pane -t "$pane_id" -P "bg=${orig_bg_color}" 2>/dev/null || true
         if [[ -n "${orig_task_yaml:-}" && -f "${orig_task_yaml:-}" ]]; then
-            sed -i '' "s|^ *status: suspended|  status: ${orig_task_status:-assigned}|" "$orig_task_yaml" 2>/dev/null || true
+            sedi "s|^ *status: suspended|  status: ${orig_task_status:-assigned}|" "$orig_task_yaml" 2>/dev/null || true
         fi
         rm -f "$STATE_DIR/yakuzatengu_active" \
               "$STATE_DIR/yakuzatengu_original_agent_id" \
@@ -301,9 +366,10 @@ cmd_despawn_tengu() {
     # UNIFIED-MED-002: 元エージェントのタスクYAML status を suspended → assigned に復元
     if [[ -n "$orig_agent" ]]; then
         local orig_task_yaml
+        # shellcheck disable=SC2012  # ls -t needed for mtime sort; yaml filenames have no special chars
         orig_task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${orig_agent}"*.yaml 2>/dev/null | head -1)
         if [[ -n "$orig_task_yaml" && -f "$orig_task_yaml" ]]; then
-            sed -i '' "s|^ *status: suspended|  status: assigned|" "$orig_task_yaml" 2>/dev/null || true
+            sedi "s|^ *status: suspended|  status: assigned|" "$orig_task_yaml" 2>/dev/null || true
             echo "[despawn_tengu] Restored task status: $orig_task_yaml"
         fi
     fi
@@ -319,8 +385,67 @@ cmd_despawn_tengu() {
     echo "[despawn_tengu] ◆ヤクザ天狗帰還◆ yakuzatengu → ${orig_agent}。任務完了。"
 }
 
-# ─── A-6: detox — バリキドリンク解毒（Opus→Sonnet復帰）───
+# ─── A-7: inject — バリキドリンク投与（Sonnet/DS→Opus切替）───
+# njslyr.sh inject_barikidorink() 相当のワンコマンド版
+# subtask_347b: DS→Opus直対応（Sonnet経由しない）
+# 引数: agent_id (必須)
+cmd_inject() {
+    local agent_id="${1:?ERROR: inject requires agent_id}"
+
+    local pane_id
+    pane_id=$(resolve_pane_by_agent_id "$agent_id")
+
+    [[ -z "$pane_id" ]] && { echo "ERROR: inject: pane not found for $agent_id" >&2; return 1; }
+
+    # 現在のモデル確認
+    local current_model current_bg
+    current_model=$(tmux show-options -pv -t "$pane_id" @model_name 2>/dev/null || echo "unknown")
+    current_bg=$(tmux show-options -pv -t "$pane_id" background 2>/dev/null || echo "unknown")
+
+    # 既にOpusなら skip
+    if [[ "$current_model" == "Opus" && "$current_bg" == "#1a002e" ]]; then
+        echo "[inject] $agent_id ($pane_id): already Opus + bg=#1a002e. skip."
+        return 0
+    fi
+
+    # 元モデルが未設定なら保存（初回inject時のみ）
+    # subtask_347b: DSモデルも保存対象に
+    local original_model
+    original_model=$(tmux show-options -pv -t "$pane_id" @original_model 2>/dev/null || echo "")
+    if [[ -z "$original_model" && "$current_model" != "Opus" ]]; then
+        tmux set-option -p -t "$pane_id" @original_model "$current_model" 2>/dev/null || true
+        tmux set-option -p -t "$pane_id" @original_bg "$current_bg" 2>/dev/null || true
+        # subtask_347b: DS環境変数も保存（detox時に復元用）
+        local current_extra_env
+        current_extra_env=$(tmux show-options -pv -t "$pane_id" @extra_env 2>/dev/null || echo "")
+        if [[ "$current_model" == "DS" || "$current_model" == "deepseek-chat" ]] && [[ -n "$current_extra_env" ]]; then
+            tmux set-option -p -t "$pane_id" @original_extra_env "$current_extra_env" 2>/dev/null || true
+        fi
+    fi
+
+    echo "[inject] $agent_id ($pane_id): $current_model (bg=$current_bg) → Opus (bg=#1a002e)"
+
+    # /model claude-opus-4-6 送信（オートコンプリート回避: text→Escape→Enter）
+    # subtask_347b: DS→Opus直（Sonnet経由しない）
+    if [[ "$current_model" != "Opus" ]]; then
+        tmux send-keys -t "$pane_id" "/model claude-opus-4-6" 2>/dev/null
+        sleep 0.3
+        tmux send-keys -t "$pane_id" Escape 2>/dev/null
+        sleep 0.1
+        tmux send-keys -t "$pane_id" Enter 2>/dev/null
+        sleep 0.5
+    fi
+
+    # @model_name / bg_color は常に更新
+    tmux set-option -p -t "$pane_id" @model_name "Opus" 2>/dev/null || true
+    tmux select-pane -t "$pane_id" -P "bg=#1a002e" 2>/dev/null || true
+
+    echo "[inject] $agent_id: inject complete (Opus, bg=#1a002e)"
+}
+
+# ─── A-6: detox — バリキドリンク解毒（Opus→元モデル復帰）───
 # njslyr.sh detox_barikidorink() 相当のワンコマンド版
+# subtask_347b: Opus→元モデル復帰（ハードコードSonnet禁止）
 # 引数: agent_id (必須)
 cmd_detox() {
     local agent_id="${1:?ERROR: detox requires agent_id}"
@@ -335,18 +460,89 @@ cmd_detox() {
     current_model=$(tmux show-options -pv -t "$pane_id" @model_name 2>/dev/null || echo "unknown")
     current_bg=$(tmux show-options -pv -t "$pane_id" background 2>/dev/null || echo "unknown")
 
-    # @model_nameがSonnetでもbg色がdefaultでなければ修正が必要
-    if [[ "$current_model" == "Sonnet" && "$current_bg" == "default" ]]; then
-        echo "[detox] $agent_id ($pane_id): already Sonnet + bg=default. skip."
+    # 元モデルを取得（存在すれば復帰先）
+    local original_model original_bg target_model target_bg target_extra_env
+    original_model=$(tmux show-options -pv -t "$pane_id" @original_model 2>/dev/null || echo "")
+    original_bg=$(tmux show-options -pv -t "$pane_id" @original_bg 2>/dev/null || echo "")
+    target_extra_env=$(tmux show-options -pv -t "$pane_id" @original_extra_env 2>/dev/null || echo "")
+
+    if [[ -n "$original_model" ]]; then
+        target_model="$original_model"
+        target_bg="$original_bg"
+    else
+        # 元モデル未保存時はデフォルトでsonnet
+        target_model="sonnet"
+        target_bg="default"
+    fi
+
+    # subtask_347b: 元モデルがDSの場合、環境変数を復元してclaude --modelで再起動
+    if [[ "$target_model" == "DS" || "$target_model" == "deepseek-chat" || "$target_model" == "DeepSeek" ]]; then
+        echo "[detox] $agent_id ($pane_id): $current_model (bg=$current_bg) → DS (bg=${target_bg:-default}) with env restore"
+
+        # DS環境変数を復元（保存済みの場合）
+        local ds_env=""
+        if [[ -n "$target_extra_env" ]]; then
+            ds_env="$target_extra_env"
+        elif [[ -f "$PROJECT_ROOT/config/deepseek.env" ]]; then
+            # deepseek.envから読み込み（\r除去）
+            local ds_key
+            ds_key=$(grep "DEEPSEEK_API_KEY" "$PROJECT_ROOT/config/deepseek.env" 2>/dev/null | cut -d'=' -f2 | tr -d '\r' || echo "")
+            if [[ -n "$ds_key" ]]; then
+                ds_env="ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic ANTHROPIC_AUTH_TOKEN=${ds_key} ANTHROPIC_MODEL=deepseek-chat ANTHROPIC_SMALL_FAST_MODEL=deepseek-chat"
+            fi
+        fi
+
+        # remain-on-exit設定
+        tmux set-option -p -t "$pane_id" remain-on-exit on 2>/dev/null || true
+
+        # DS環境変数付きでclaude再起動
+        if [[ -n "$ds_env" ]]; then
+            tmux respawn-pane -k -t "$pane_id" \
+                "env $ds_env claude --model kimi-k2.5 --dangerously-skip-permissions" 2>/dev/null || {
+                echo "ERROR: detox: respawn-pane failed for DS" >&2
+                return 1
+            }
+        else
+            tmux respawn-pane -k -t "$pane_id" \
+                "claude --model kimi-k2.5 --dangerously-skip-permissions" 2>/dev/null || {
+                echo "ERROR: detox: respawn-pane failed for DS" >&2
+                return 1
+            }
+        fi
+        sleep 1
+
+        # @model_name / bg_color / @extra_env 復元
+        tmux set-option -p -t "$pane_id" @model_name "DS" 2>/dev/null || true
+        tmux set-option -p -t "$pane_id" @extra_env "$ds_env" 2>/dev/null || true
+        tmux select-pane -t "$pane_id" -P "bg=${target_bg:-default}" 2>/dev/null || true
+
+        echo "[detox] $agent_id: detox complete (DS, bg=${target_bg:-default})"
         return 0
     fi
 
-    echo "[detox] $agent_id ($pane_id): $current_model (bg=$current_bg) → Sonnet (bg=default)"
+    # 既にターゲットモデルかつ背景色が一致なら skip（モデル名は小文字化して比較）
+    local current_model_lower target_model_lower
+    current_model_lower=$(echo "$current_model" | tr '[:upper:]' '[:lower:]')
+    target_model_lower=$(echo "$target_model" | tr '[:upper:]' '[:lower:]')
+    if [[ "$current_model_lower" == "$target_model_lower" && "$current_bg" == "${target_bg:-default}" ]]; then
+        echo "[detox] $agent_id ($pane_id): already $target_model + bg=${target_bg:-default}. skip."
+        return 0
+    fi
 
-    # モデルがSonnetでなければ /model sonnet 送信
-    if [[ "$current_model" != "Sonnet" ]]; then
-        # /model sonnet 送信（オートコンプリート回避: text→Escape→Enter）
-        tmux send-keys -t "$pane_id" "/model sonnet" 2>/dev/null
+    echo "[detox] $agent_id ($pane_id): $current_model (bg=$current_bg) → $target_model (bg=${target_bg:-default})"
+
+    # モデルがターゲットと異なれば /model 送信（小文字化比較）
+    if [[ "$current_model_lower" != "$target_model_lower" ]]; then
+        # モデルコマンドを決定
+        local model_cmd
+        case "$target_model" in
+            opus) model_cmd="/model claude-opus-4-6" ;;
+            sonnet) model_cmd="/model sonnet" ;;
+            haiku) model_cmd="/model claude-haiku-4-5" ;;
+            *) model_cmd="/model $target_model" ;;
+        esac
+        # モデルコマンド送信（オートコンプリート回避: text→Escape→Enter）
+        tmux send-keys -t "$pane_id" "$model_cmd" 2>/dev/null
         sleep 0.3
         tmux send-keys -t "$pane_id" Escape 2>/dev/null
         sleep 0.1
@@ -354,11 +550,19 @@ cmd_detox() {
         sleep 0.5
     fi
 
-    # @model_name / bg_color は常に更新（部分的な解毒状態を修復）
-    tmux set-option -p -t "$pane_id" @model_name "Sonnet" 2>/dev/null || true
-    tmux select-pane -t "$pane_id" -P "bg=default" 2>/dev/null || true
+    # 表示用モデル名を決定
+    local display_model="$target_model"
+    case "$target_model" in
+        sonnet) display_model="Sonnet" ;;
+        opus) display_model="Opus" ;;
+        haiku) display_model="Haiku" ;;
+    esac
 
-    echo "[detox] $agent_id: detox complete (Sonnet, bg=default)"
+    # @model_name / bg_color をターゲットに更新
+    tmux set-option -p -t "$pane_id" @model_name "$display_model" 2>/dev/null || true
+    tmux select-pane -t "$pane_id" -P "bg=${target_bg:-default}" 2>/dev/null || true
+
+    echo "[detox] $agent_id: detox complete ($display_model, bg=${target_bg:-default})"
 }
 
 # ─── usage ───
@@ -385,6 +589,10 @@ Subcommands:
   despawn_tengu [reason]
       Despawn yakuzatengu and restore original agent.
 
+  inject <agent_id>
+      Inject barikidorink (Sonnet → Opus). Sends /model claude-opus-4-6,
+      updates @model_name and bg_color. Skips if already Opus.
+
   detox <agent_id>
       Detox barikidorink (Opus → Sonnet). Sends /model sonnet,
       updates @model_name and bg_color. Skips if already Sonnet.
@@ -396,6 +604,7 @@ Examples:
   bash scripts/njslyr_cmd.sh slay yakuza2 "コンテキスト枯渇"
   bash scripts/njslyr_cmd.sh spawn_tengu yakuza7 "cmd_999 インフラ監視"
   bash scripts/njslyr_cmd.sh despawn_tengu
+  bash scripts/njslyr_cmd.sh inject yakuza5
   bash scripts/njslyr_cmd.sh detox yakuza3
 EOF
 }
@@ -423,6 +632,10 @@ main() {
         despawn_tengu)
             shift
             cmd_despawn_tengu "$@"
+            ;;
+        inject)
+            shift
+            cmd_inject "$@"
             ;;
         detox)
             shift

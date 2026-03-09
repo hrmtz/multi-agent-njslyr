@@ -1,0 +1,83 @@
+task_id: subtask_325c
+parent_cmd: cmd_325
+analyst: yakuza7
+machine: neosaitama
+timestamp: "2026-03-01T00:15:00"
+status: completed
+
+summary: |
+  cmd_325 subtask_325c: thumbnail v1-v5テンプレート改善 + ずんだもん立ち絵配置
+  全5テンプレートのキャッチコピー・ずんだもん・装飾要素実装完了。
+  wiggle動画v1-v5全生成SUCCESS。QC CONDITIONAL PASS。
+
+changes:
+  files_modified:
+    - path: "output/2026-02-12_nasal_silicone_removal/reel/thumbnail_v1_fire.html"
+      description: "キャッチコピー改善 + ずんだもん立ち絵(shocked)追加"
+    - path: "output/2026-02-12_nasal_silicone_removal/reel/thumbnail_v2_data.html"
+      description: "キャッチコピー改善 + ずんだもん立ち絵(surprise)追加"
+    - path: "output/2026-02-12_nasal_silicone_removal/reel/thumbnail_v3_danger.html"
+      description: "キャッチコピー改善 + ずんだもん立ち絵(cry)追加"
+    - path: "output/2026-02-12_nasal_silicone_removal/reel/thumbnail_v4_bright.html"
+      description: "キャッチコピー改善 + ずんだもん立ち絵(happy)追加"
+    - path: "output/2026-02-12_nasal_silicone_removal/reel/thumbnail_v5_minimal.html"
+      description: "キャッチコピー改善 + ずんだもん立ち絵(doya)追加"
+    - path: "output/2026-02-02_strut_vs_seg/reel/variations.json"
+      description: "strut_vs_seg variations設定更新"
+    - path: "output/2026-02-12_nasal_silicone_removal/reel/capture_layers_config.json"
+      description: "レイヤーキャプチャ設定更新"
+    - path: "reel/capture_layers_batch.js"
+      description: "レイヤーキャプチャスクリプト更新"
+    - path: "reel/capture_9x16.js"
+      description: "9x16キャプチャスクリプト更新"
+    - path: "reel/convert_to_9x16.py"
+      description: "9x16変換スクリプト更新"
+    - path: "reel/generate_thumbnail.py"
+      description: "ずんだもん立ち絵対応"
+    - path: "templates/base.html"
+      description: "ベーステンプレート更新"
+    - path: "CLAUDE.md"
+      description: "L452キャラ合成方式をPSD→HTML直接埋め込みに更新"
+    - path: "reel/CLAUDE_REEL.md"
+      description: "新規作成 — reel設計ドキュメント追加"
+
+  catchcopy:
+    v1_fire: "鼻先の形 / こんなに違う！ 【衝撃】"
+    v2_data: "軟骨移植 / どっちが向いてる？ 【解説】"
+    v3_danger: "間違えた移植で / 鼻が変形した件 【悲報】"
+    v4_bright: "正しい術式で / 鼻先が激変した件 【朗報】"
+    v5_minimal: "術式を知らずに / 選んでた件 【真実】"
+
+  zundamon_placement:
+    v1: "zundamon_shocked.png — 右下配置"
+    v2: "zundamon_surprise.png — 右下配置"
+    v3: "zundamon_cry.png — 右下配置"
+    v4: "zundamon_happy.png — 右下配置"
+    v5: "zundamon_doya.png — 右下配置"
+    asset_base: "reel/sozai/zundamon_thumbnail/"
+
+  colorscheme:
+    v1_fire: "赤系 (#e60012/#FFE500)"
+    v2_data: "青系 (#0066cc/#00e5ff)"
+    v3_danger: "赤黒系 (#cc0000/#FFE500)"
+    v4_bright: "緑系 (#00a63e/#00e676)"
+    v5_minimal: "紫系 (#7c00cc/#d946ef)"
+
+test_results:
+  wiggle_videos:
+    v1_fire: "1080x1920 30fps h264+aac 2.2s 1.1MB — SUCCESS"
+    v2_data: "1080x1920 30fps h264+aac 2.3s 1.1MB — SUCCESS"
+    v3_danger: "1080x1920 30fps h264+aac 2.3s 1.2MB — SUCCESS"
+    v4_bright: "1080x1920 30fps h264+aac 2.5s 1.1MB — SUCCESS"
+    v5_minimal: "1080x1920 30fps h264+aac 1.9s 0.8MB — SUCCESS"
+  focus_line_rotation: "20s cycle (0.6°/frame@30fps準拠)"
+  qc_decision: "CONDITIONAL PASS"
+  qc_report: "queue/reports/soukaiya_report_subtask_325c_qc.yaml"
+  remaining_issue: "ISSUE-001 CLAUDE.md L452矛盾解消 → 本commitで対応済み"
+
+git_commits:
+  - hash: "5875b29"
+    message: "feat: cmd_325 subtask_325c — thumbnail v1-v5 + ずんだもん立ち絵配置 + CLAUDE.md L452更新"
+    repo: "instagram-slides"
+
+git_push_status: "completed — origin/main up to date"

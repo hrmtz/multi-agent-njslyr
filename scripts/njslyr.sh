@@ -14,9 +14,18 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
     export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
 fi
 
+# Cross-platform sed -i (BSD vs GNU)
+sedi() {
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
 # ─── Configuration ───
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
-PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$SCRIPT_DIR")}"
+PROJECT_ROOT="${PROJECT_ROOT:-${SCRIPT_DIR%/*}}"
 DASHBOARD="$PROJECT_ROOT/dashboard.md"
 LOG_DIR="$PROJECT_ROOT/queue/logs"
 METRICS_DIR="$PROJECT_ROOT/queue/metrics"
@@ -46,6 +55,32 @@ REFRESH_INTERVAL=14400     # 4 hours: long-running refresh interval (B-4)
     exit 1
 }
 
+# ─── Dynamic tmux window/pane resolution (FIX-002/FIX-003) ───
+SETTINGS_YAML="$PROJECT_ROOT/config/settings.yaml"
+
+# get_agents_window: neosaitamaリネーム対応 — agents/neosaitama/kyotoを動的検出
+get_agents_window() {
+    tmux list-windows -t multiagent -F '#{window_name}' 2>/dev/null \
+        | grep -E '^(agents|neosaitama|kyoto)$' | head -1 || true
+}
+
+# get_monitor_window: machine roleに応じてmonitorウィンドウを返す
+# kyoto → main:tortoise / neosaitama → main:crane
+get_monitor_window() {
+    local role
+    role=$(awk '/^  role:/ {print $2; exit}' "$SETTINGS_YAML" 2>/dev/null)
+    role="${role:-kyoto}"
+    # Legacy role normalization
+    case "$role" in
+        mbp)   role="neosaitama" ;;
+        ryzen) role="kyoto" ;;
+    esac
+    case "$role" in
+        neosaitama) echo "main:crane" ;;
+        *)          echo "main:tortoise" ;;
+    esac
+}
+
 # ─── Session mode (default: once) ───
 # "once" = single execution (for cron/tmux timer)
 # "continuous" = infinite loop with 15-minute sleep (for daemon mode)
@@ -61,19 +96,19 @@ show_startup_banner() {
     echo -e "\033[1;31m◆◆◆ SHUTDOWN ◆◆◆\033[0m  \033[1;33m電脳空間切断開始\033[0m  \033[1;31m◆◆◆ SHUTDOWN ◆◆◆\033[0m"
     echo ""
     echo -e "\033[1;35m卍\033[0m \033[0;37mネオサイタマ電脳IRCコトダマ空間から切断中...\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[1;33m  ✗\033[0m \033[0;37m[1/5] #マッポーの世 チャネル離脱\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[1;33m  ✗\033[0m \033[0;37m[2/5] コトダマ空間ソケット解放中\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[0;31m  ✗\033[0m \033[0;37m[3/5] サイバーパンクプロトコル解除\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[0;31m  ✗\033[0m \033[0;37m[4/5] UNIXニューロン認証解除\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[1;31m  ✗\033[0m \033[0;37m[5/5] ニンジャソウル・リンク切断\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[1;31m  サヨナラ！\033[0m \033[1;37m切断処理を開始する。\033[0m"
-    sleep 0.5
+    sleep 0.2
     echo ""
 
     # タイトルバナー（yokubari.shと同一のASCIIアート、赤枠＋終了テーマ）
@@ -145,15 +180,15 @@ show_completion_banner() {
     # コトダマ空間切断完了シーケンス（yokubari.sh接続完了の対）
     # ═══════════════════════════════════════════════════════════════════════════
     echo -e "\033[1;35m卍\033[0m \033[0;37mコトダマ空間切断シーケンス実行中...\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[1;33m  ✗\033[0m \033[0;37m[1/4] ニンジャソウル・リンク解放完了\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[0;31m  ✗\033[0m \033[0;37m[2/4] エージェント監視ループ終了\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[0;31m  ✗\033[0m \033[0;37m[3/4] 電脳IRCソケット完全切断\033[0m"
-    sleep 0.3
+    sleep 0.1
     echo -e "\033[1;31m  ✗\033[0m \033[0;37m[4/4] コトダマ空間からのログアウト完了\033[0m"
-    sleep 0.5
+    sleep 0.2
 
     echo ""
     echo -e "\033[1;31m  ╔═══════════════════════════════════════════════════════════════════════╗\033[0m"
@@ -231,7 +266,7 @@ update_dashboard() {
         if grep -q "^## 🚨ヨウタイオウ" "$DASHBOARD"; then
             local temp_file
             temp_file=$(TMPDIR="$CACHE_DIR" mktemp)
-            awk -v msg="$message" '
+            if awk -v msg="$message" '
                 /^## 🚨ヨウタイオウ/ {
                     print
                     print ""
@@ -244,7 +279,11 @@ update_dashboard() {
                     next
                 }
                 {print}
-            ' "$DASHBOARD" > "$temp_file" && mv "$temp_file" "$DASHBOARD"
+            ' "$DASHBOARD" > "$temp_file"; then
+                mv "$temp_file" "$DASHBOARD" || rm -f "$temp_file"
+            else
+                rm -f "$temp_file"
+            fi
         else
             {
                 echo ""
@@ -282,12 +321,20 @@ inject_barikidorink() {
     if [ "$current_model" = "Opus" ]; then
         echo "[barikidorink] ${agent_id:-$pane} already Opus, skipping model switch" >&2
     else
-        tmux send-keys -t "$pane" "/model opus" Enter
+        tmux send-keys -t "$pane" "/model opus"
+        sleep 0.3
+        tmux send-keys -t "$pane" Escape
+        sleep 0.1
+        tmux send-keys -t "$pane" Enter
         sleep 0.5
         tmux set-option -p -t "$pane" @model_name "Opus"
         tmux select-pane -t "$pane" -P 'bg=#1a002e'
         sleep 0.3
-        tmux send-keys -t "$pane" "/clear" Enter
+        tmux send-keys -t "$pane" "/clear"
+        sleep 0.3
+        tmux send-keys -t "$pane" Escape
+        sleep 0.1
+        tmux send-keys -t "$pane" Enter
         sleep 5
     fi
 
@@ -298,21 +345,33 @@ inject_barikidorink() {
     elif [ "$current_model" != "Opus" ] && [ -n "$agent_id" ]; then
         # Re-nudge: no task_yaml given, manually check inbox unread and send nudge
         local unread_count
-        unread_count=$(grep -c 'read: false' "$_project_root/queue/inbox/${agent_id}.yaml" 2>/dev/null || echo "0")
+        unread_count=$(grep -c 'read: false' "$_project_root/queue/inbox/${agent_id}.yaml" 2>/dev/null) || unread_count=0
         if [ "$unread_count" -gt 0 ]; then
-            tmux send-keys -t "$pane" "inbox${unread_count}" Enter
+            tmux send-keys -t "$pane" "inbox${unread_count}"
+            sleep 0.3
+            tmux send-keys -t "$pane" Escape
+            sleep 0.1
+            tmux send-keys -t "$pane" Enter
         fi
     fi
 }
 
 detox_barikidorink() {
     local pane=$1
-    tmux send-keys -t "$pane" "/model sonnet" Enter
+    tmux send-keys -t "$pane" "/model sonnet"
+    sleep 0.3
+    tmux send-keys -t "$pane" Escape
+    sleep 0.1
+    tmux send-keys -t "$pane" Enter
     sleep 0.5
     tmux set-option -p -t "$pane" @model_name "Sonnet"
     tmux select-pane -t "$pane" -P 'bg=default'
     sleep 0.3
-    tmux send-keys -t "$pane" "/clear" Enter
+    tmux send-keys -t "$pane" "/clear"
+    sleep 0.3
+    tmux send-keys -t "$pane" Escape
+    sleep 0.1
+    tmux send-keys -t "$pane" Enter
 }
 
 # ─── Validate @agent_id assignments (2026-02-18 恒久対策) ───
@@ -320,8 +379,15 @@ detox_barikidorink() {
 # 検知した場合はダッシュボードへ警告を記録してダークニンジャに通知する。
 validate_agent_ids() {
     local suspicious_panes
-    suspicious_panes=$(tmux list-panes -t multiagent:agents -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
-        awk '$2 == "darkninja" {print $1}' || true)
+    local agents_win monitor_win
+    agents_win=$(get_agents_window)
+    monitor_win=$(get_monitor_window)
+    suspicious_panes=$(
+        {
+            [[ -n "$agents_win" ]] && tmux list-panes -t "multiagent:${agents_win}" -F '#{pane_index} #{@agent_id}' 2>/dev/null
+            [[ -n "$monitor_win" ]] && tmux list-panes -t "${monitor_win}" -F 'monitor:#{pane_index} #{@agent_id}' 2>/dev/null
+        } | awk '$2 == "darkninja" {print $1}' || true
+    )
 
     if [[ -n "$suspicious_panes" ]]; then
         local msg="🚨 @agent_id誤設定検知！multiagentペイン(${suspicious_panes})にdarkninja IDが設定されている。yokubari.shで再起動が必要。"
@@ -335,10 +401,16 @@ validate_agent_ids() {
 
 # ─── Get all monitored agents ───
 get_monitored_agents() {
-    # Dynamically detect agents from yokubari.sh process list
+    # Dynamically detect agents from tmux pane @agent_id
     # Exclude darkninja (human agent)
-    tmux list-panes -t multiagent:agents -F '#{@agent_id}' 2>/dev/null | \
-        grep -v '^$' | \
+    # Check agents window (dynamic name) + monitor window (machine-role-dependent)
+    local agents_win monitor_win
+    agents_win=$(get_agents_window)
+    monitor_win=$(get_monitor_window)
+    {
+        [[ -n "$agents_win" ]] && tmux list-panes -t "multiagent:${agents_win}" -F '#{@agent_id}' 2>/dev/null
+        [[ -n "$monitor_win" ]] && tmux list-panes -t "${monitor_win}" -F '#{@agent_id}' 2>/dev/null
+    } | grep -v '^$' | \
         grep -v '^darkninja$' | \
         sort -u || true
 }
@@ -360,30 +432,51 @@ get_inbox_unread_count() {
     grep -c '^ *read: false$' "$inbox" 2>/dev/null || true
 }
 
+# ─── Get latest task YAML for agent (dedup: replaces 5x ls -t|head -1) ───
+get_latest_task_yaml() {
+    local agent_id="$1"
+    # shellcheck disable=SC2012
+    ls -t "$PROJECT_ROOT/queue/tasks/${agent_id}"*.yaml 2>/dev/null | head -1
+}
+
 # ─── Check task YAML status ───
 get_task_status() {
     local agent_id="$1"
     # M1 fix: Use glob pattern to match _subtask_xxx.yaml files
     local task_yaml
-    task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${agent_id}"*.yaml 2>/dev/null | head -1)
+    task_yaml=$(get_latest_task_yaml "$agent_id")
 
     if [[ -z "$task_yaml" || ! -f "$task_yaml" ]]; then
         echo "idle"
         return 0
     fi
 
-    # Extract status field from YAML (simple grep approach)
+    # Extract status field from YAML (single awk — replaces grep|head|sed 3-process pipe)
     local status
-    status=$(grep '^ *status: ' "$task_yaml" | head -1 | sed 's/.*status: *//;s/ *$//' || echo "idle")
-    echo "$status"
+    status=$(awk '/^ *status: /{sub(/.*status: */,""); sub(/ *$/,""); print; exit}' "$task_yaml" 2>/dev/null || true)
+    echo "${status:-idle}"
 }
 
 # ─── Get pane target for agent ───
 get_pane_target() {
     local agent_id="$1"
-    # Find pane with matching @agent_id (BUG-2 fix: use named window "agents")
-    tmux list-panes -t multiagent:agents -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
-        awk -v id="$agent_id" '$2 == id {print "multiagent:agents." $1; exit}'
+    local result agents_win monitor_win
+    agents_win=$(get_agents_window)
+    monitor_win=$(get_monitor_window)
+    # Find pane with matching @agent_id in agents window first (dynamic name)
+    if [[ -n "$agents_win" ]]; then
+        result=$(tmux list-panes -t "multiagent:${agents_win}" -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
+            awk -v id="$agent_id" -v win="$agents_win" '$2 == id {print "multiagent:" win "." $1; exit}')
+        if [[ -n "$result" ]]; then
+            echo "$result"
+            return 0
+        fi
+    fi
+    # Fallback: check monitor window (main:tortoise or main:crane)
+    if [[ -n "$monitor_win" ]]; then
+        tmux list-panes -t "${monitor_win}" -F '#{pane_index} #{@agent_id}' 2>/dev/null | \
+            awk -v id="$agent_id" -v win="$monitor_win" '$2 == id {print win "." $1; exit}'
+    fi
 }
 
 # ─── Agent busy detection (from inbox_watcher.sh pattern) ───
@@ -394,7 +487,7 @@ agent_is_busy() {
     pane_tail=$(timeout 1 tmux capture-pane -t "$pane_target" -p 2>/dev/null | tail -5 || echo "")
 
     # Check for busy markers (BUG-3 fix: expanded patterns — confirmed Claude Code outputs only)
-    if echo "$pane_tail" | grep -qiE '(Working|Thinking|Planning|Sending|Generating|\(thinking\)|thought for|Cogitated|思考中|考え中|計画中|送信中|処理中|実行中|生成中|esc to interrupt)'; then
+    if grep -qiE '(Working|Thinking|Planning|Sending|Generating|\(thinking\)|thought for|Cogitated|思考中|考え中|計画中|送信中|処理中|実行中|生成中|esc to interrupt)' <<< "$pane_tail"; then
         return 0  # busy
     fi
 
@@ -409,7 +502,7 @@ agent_is_thinking() {
     pane_content=$(timeout 1 tmux capture-pane -t "$pane_target" -p 2>/dev/null | tail -10 || echo "")
 
     # Check for thinking markers (BUG-3 fix: add bracketed (thinking) pattern)
-    if echo "$pane_content" | grep -qiE '(Thinking|\(thinking\)|思考中|Planning|考え中|計画中)'; then
+    if grep -qiE '(Thinking|\(thinking\)|思考中|Planning|考え中|計画中)' <<< "$pane_content"; then
         return 0  # thinking
     fi
 
@@ -420,7 +513,7 @@ agent_is_thinking() {
 is_long_running_task() {
     local agent_id="$1"
     local task_yaml
-    task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${agent_id}"*.yaml 2>/dev/null | head -1)
+    task_yaml=$(get_latest_task_yaml "$agent_id")
 
     [[ -n "$task_yaml" && -f "$task_yaml" ]] && grep -q '^ *long_running: *true' "$task_yaml"
 }
@@ -435,7 +528,7 @@ inbox_watcher_recently_cleared() {
     [[ ! -f "$clear_lock" ]] && return 1
 
     local last_clear_ts
-    last_clear_ts=$(cat "$clear_lock" 2>/dev/null || echo "0")
+    read -r last_clear_ts < "$clear_lock" 2>/dev/null || last_clear_ts=0
 
     local now
     now=$(date +%s)
@@ -452,7 +545,7 @@ get_restart_count() {
     [[ ! -f "$restart_file" ]] && echo "0" && return 0
 
     local count
-    count=$(grep 'count:' "$restart_file" 2>/dev/null | sed 's/.*: *//' || echo "0")
+    count=$(awk '/count:/{sub(/.*: */,""); print; exit}' "$restart_file" 2>/dev/null); count="${count:-0}"
     echo "$count"
 }
 
@@ -486,10 +579,10 @@ check_restart_loop() {
 
     [[ ! -f "$restart_file" ]] && return 1  # no loop
 
-    local count
-    local last_restart
-    count=$(grep 'count:' "$restart_file" 2>/dev/null | sed 's/.*: *//' || echo "0")
-    last_restart=$(grep 'last_restart:' "$restart_file" 2>/dev/null | sed 's/.*: *"//;s/".*//' || echo "1970-01-01T00:00:00")
+    local count last_restart
+    # Single awk per field (replaces grep|sed 2-process pipe with 1 awk each)
+    count=$(awk '/count:/{sub(/.*: */,""); print; exit}' "$restart_file" 2>/dev/null); count="${count:-0}"
+    last_restart=$(awk '/last_restart:/{sub(/.*: *"/,""); sub(/".*/,""); print; exit}' "$restart_file" 2>/dev/null); last_restart="${last_restart:-1970-01-01T00:00:00}"
 
     # Convert timestamp to epoch (macOS native date: -j flag; GNU date: -d flag)
     local last_restart_epoch
@@ -608,12 +701,12 @@ stage3_slay() {
 
     # Data preservation Step 3: タスクYAML状態更新
     local pre_slay_task_yaml
-    pre_slay_task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${agent_id}"*.yaml 2>/dev/null | head -1)
+    pre_slay_task_yaml=$(get_latest_task_yaml "$agent_id")
     local current_task_id="unknown"
     if [[ -n "$pre_slay_task_yaml" && -f "$pre_slay_task_yaml" ]]; then
-        current_task_id=$(grep '^ *task_id: ' "$pre_slay_task_yaml" | head -1 | sed 's/.*task_id: *//;s/^"//;s/"$//' || echo "unknown")
+        current_task_id=$(awk '/^ *task_id: /{sub(/.*task_id: */,""); gsub(/"/,""); print; exit}' "$pre_slay_task_yaml" 2>/dev/null); current_task_id="${current_task_id:-unknown}"
         log "Data preservation: タスクYAML状態更新 (${pre_slay_task_yaml})..."
-        sed -i '' 's/^ *status: .*/  status: slayed_by_njslyr/' "$pre_slay_task_yaml" 2>/dev/null || true
+        sedi 's/^ *status: .*/  status: slayed_by_njslyr/' "$pre_slay_task_yaml" 2>/dev/null || true
     fi
 
     # Data preservation Step 4: 粛清ログ記録
@@ -724,7 +817,7 @@ check_cooldown() {
     [[ ! -f "$cooldown_file" ]] && return 0  # No cooldown active
 
     local last_ts
-    last_ts=$(cat "$cooldown_file")
+    read -r last_ts < "$cooldown_file" 2>/dev/null || last_ts=0
 
     local now
     now=$(date +%s)
@@ -800,7 +893,7 @@ should_spawn_yakuzatengu() {
         [[ ! "$yid" =~ ^yakuza[0-9]+$ ]] && continue
         local idle_file="$STATE_DIR/njslyr_${yid}_idle_start"
         [[ ! -f "$idle_file" ]] && continue
-        local idle_start; idle_start=$(cat "$idle_file")
+        local idle_start; read -r idle_start < "$idle_file" 2>/dev/null || idle_start=0
         local idle_elapsed=$((now - idle_start))
         [[ $idle_elapsed -ge 300 ]] && idle_count=$(( idle_count + 1 ))
     done < <(get_monitored_agents)
@@ -830,7 +923,7 @@ spawn_yakuzatengu() {
         [[ ! "$yid" =~ ^yakuza[0-9]+$ ]] && continue
         local idle_file="$STATE_DIR/njslyr_${yid}_idle_start"
         if [[ -f "$idle_file" ]]; then
-            local idle_start; idle_start=$(cat "$idle_file")
+            local idle_start; read -r idle_start < "$idle_file" 2>/dev/null || idle_start=0
             local idle_elapsed=$((now - idle_start))
             if [[ $idle_elapsed -gt $max_idle ]]; then
                 max_idle=$idle_elapsed
@@ -869,8 +962,9 @@ spawn_yakuzatengu() {
     touch "$STATE_DIR/yakuzatengu_active"
     echo "$orig_agent" > "$STATE_DIR/yakuzatengu_original_agent_id"
     # BUG-T5 fix: pane_id（%N形式）を保存（pane_indexはペイン追加削除でズレる可能性あり）
-    local orig_pane_id
-    orig_pane_id=$(tmux list-panes -t multiagent:agents -F '#{pane_index} #{pane_id} #{@agent_id}' 2>/dev/null | \
+    local orig_pane_id agents_win_spawn
+    agents_win_spawn=$(get_agents_window)
+    orig_pane_id=$([[ -n "$agents_win_spawn" ]] && tmux list-panes -t "multiagent:${agents_win_spawn}" -F '#{pane_index} #{pane_id} #{@agent_id}' 2>/dev/null | \
         awk -v id="$orig_agent" '$3 == id {print $2; exit}')
     echo "${orig_pane_id:-$pane_target}" > "$STATE_DIR/yakuzatengu_original_pane"
     echo "$orig_model" > "$STATE_DIR/yakuzatengu_original_model"
@@ -882,11 +976,11 @@ spawn_yakuzatengu() {
 
     # S-3: 元yakuzaNタスクYAML statusをsuspendedに変更
     local task_yaml orig_task_status
-    task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${orig_agent}"*.yaml 2>/dev/null | head -1)
+    task_yaml=$(get_latest_task_yaml "$orig_agent")
     if [[ -n "$task_yaml" && -f "$task_yaml" ]]; then
         # BUG-T3 fix: 変更前のstatusを保存（rollback時に復元する）
-        orig_task_status=$(grep '^ *status:' "$task_yaml" | head -1 | awk '{print $2}' | tr -d "'\"")
-        sed -i '' 's/^ *status: .*/  status: suspended/' "$task_yaml" 2>/dev/null || true
+        orig_task_status=$(awk '/^ *status:/{gsub(/['\''"]/, "", $2); print $2; exit}' "$task_yaml" 2>/dev/null); orig_task_status="${orig_task_status:-assigned}"
+        sedi 's/^ *status: .*/  status: suspended/' "$task_yaml" 2>/dev/null || true
         log "spawn_yakuzatengu: ${orig_agent} タスクYAML statusをsuspendedに変更（元: ${orig_task_status}）"
     fi
 
@@ -924,7 +1018,7 @@ spawn_yakuzatengu() {
         tmux select-pane -t "$pane_target" -P "bg=${orig_bg_color}" 2>/dev/null || true
         # BUG-T3 fix: task YAML status復元（suspendedから元のstatusに戻す）
         if [[ -n "${task_yaml:-}" && -f "${task_yaml:-}" ]]; then
-            sed -i '' "s/^ *status: suspended/  status: ${orig_task_status:-assigned}/" "$task_yaml" 2>/dev/null || true
+            sedi "s/^ *status: suspended/  status: ${orig_task_status:-assigned}/" "$task_yaml" 2>/dev/null || true
         fi
         rm -f "$STATE_DIR/yakuzatengu_active" \
               "$STATE_DIR/yakuzatengu_original_agent_id" \
@@ -954,7 +1048,7 @@ spawn_yakuzatengu() {
 should_despawn_yakuzatengu() {
     # Guard時間チェック: spawn後300秒未満はdespawn禁止（M-2）
     local spawn_time now elapsed
-    spawn_time=$(cat "$STATE_DIR/yakuzatengu_spawn_time" 2>/dev/null || echo 0)
+    read -r spawn_time < "$STATE_DIR/yakuzatengu_spawn_time" 2>/dev/null || spawn_time=0
     now=$(date +%s)
     elapsed=$((now - spawn_time))
     if [[ $elapsed -lt 300 ]]; then
@@ -1008,9 +1102,9 @@ despawn_yakuzatengu() {
 
     # STATEファイル読み込み
     local orig_agent orig_pane orig_model
-    orig_agent=$(cat "$STATE_DIR/yakuzatengu_original_agent_id" 2>/dev/null || echo "")
-    orig_pane=$(cat "$STATE_DIR/yakuzatengu_original_pane" 2>/dev/null || echo "")
-    orig_model=$(cat "$STATE_DIR/yakuzatengu_original_model" 2>/dev/null || echo "Sonnet")
+    read -r orig_agent < "$STATE_DIR/yakuzatengu_original_agent_id" 2>/dev/null || orig_agent=""
+    read -r orig_pane < "$STATE_DIR/yakuzatengu_original_pane" 2>/dev/null || orig_pane=""
+    read -r orig_model < "$STATE_DIR/yakuzatengu_original_model" 2>/dev/null || orig_model="Sonnet"
 
     if [[ -z "$orig_agent" || -z "$orig_pane" ]]; then
         log "ERROR: despawn_yakuzatengu: STATEファイル不完全。cleanup実行。"
@@ -1075,7 +1169,7 @@ despawn_yakuzatengu() {
 check_long_running_refresh() {
     local now last_refresh elapsed
     now=$(date +%s)
-    last_refresh=$(cat "$STATE_DIR/njslyr_last_refresh" 2>/dev/null); last_refresh="${last_refresh:-0}"
+    read -r last_refresh < "$STATE_DIR/njslyr_last_refresh" 2>/dev/null || last_refresh=0
     elapsed=$(( now - last_refresh ))
 
     if [[ $elapsed -ge $REFRESH_INTERVAL ]]; then
@@ -1101,7 +1195,7 @@ check_stale_state() {
                       "$STATE_DIR/njslyr_${agent_id}_stage2_last" \
                       "$STATE_DIR/njslyr_${agent_id}_stage3_last"; do
         [[ ! -f "$state_file" ]] && continue
-        ts=$(cat "$state_file" 2>/dev/null); ts="${ts:-0}"
+        read -r ts < "$state_file" 2>/dev/null || ts=0
         age=$(( now - ts ))
         if [[ $age -gt $STALE_THRESHOLD ]]; then
             log "WARN: stale state file detected: $state_file (age: ${age}s). Removing."
@@ -1120,7 +1214,7 @@ check_agent_idle_v2() {
     # Step0: graceピリオドチェック（/clear直後180秒間はidle扱いしない）
     # clear_last_${agent_id} は A-2 chop() が echo "$(date +%s)" で更新する
     local clear_last grace_elapsed
-    clear_last=$(cat "$STATE_DIR/clear_last_${agent_id}" 2>/dev/null); clear_last="${clear_last:-0}"
+    read -r clear_last < "$STATE_DIR/clear_last_${agent_id}" 2>/dev/null || clear_last=0
     grace_elapsed=$(( $(date +%s) - clear_last ))
     if [[ $grace_elapsed -lt 180 ]]; then
         return 1  # grace period: /clear直後はidle扱いしない
@@ -1128,12 +1222,12 @@ check_agent_idle_v2() {
 
     # Step1: タスクYAMLでstatus確認
     local task_yaml task_status
-    task_yaml=$(ls -t "$PROJECT_ROOT/queue/tasks/${agent_id}"*.yaml 2>/dev/null | head -1)
+    task_yaml=$(get_latest_task_yaml "$agent_id")
     if [[ -z "$task_yaml" ]]; then
         task_status="idle"
     else
-        task_status=$(grep '^ *status: ' "$task_yaml" | head -1 | \
-            sed 's/.*status: *//;s/ *$//' || echo "idle")
+        task_status=$(awk '/^ *status: /{sub(/.*status: */,""); sub(/ *$/,""); print; exit}' "$task_yaml" 2>/dev/null || true)
+        task_status="${task_status:-idle}"
     fi
 
     # Step2: inbox unread確認（unreadがある場合はidle扱いしない）
@@ -1151,6 +1245,23 @@ check_agent_idle_v2() {
     [[ "$task_status" == "idle" ]]
 }
 
+# ─── Check inbox_watcher process health ───
+check_inbox_watcher() {
+    local agent_id="$1"
+    # pgrep で watcher プロセスを確認
+    if ! pgrep -f "inbox_watcher.sh.*${agent_id}" >/dev/null 2>&1; then
+        log "WARN: inbox_watcher for ${agent_id} not found. Attempting restart..."
+        # watcher_supervisor.sh が存在すれば、それ経由で再起動
+        local supervisor="${SCRIPT_DIR}/watcher_supervisor.sh"
+        if [[ -f "$supervisor" ]]; then
+            bash "$supervisor" "$agent_id" &
+            log "INFO: watcher_supervisor started for ${agent_id}"
+        else
+            log "ERROR: watcher_supervisor.sh not found. Manual restart required."
+        fi
+    fi
+}
+
 check_agent() {
     local agent_id="$1"
 
@@ -1162,6 +1273,9 @@ check_agent() {
 
     # B-2: 健全性チェック（staleなタイムスタンプファイルを削除）
     check_stale_state "$agent_id"
+
+    # Watcher health check
+    check_inbox_watcher "$agent_id"
 
     # Get pane target
     local pane_target
@@ -1225,7 +1339,7 @@ check_agent() {
 
         # Calculate elapsed thinking time
         local thinking_start
-        thinking_start=$(cat "$thinking_state_file" 2>/dev/null || echo "0")
+        read -r thinking_start < "$thinking_state_file" 2>/dev/null || thinking_start=0
         local now
         now=$(date +%s)
         local thinking_elapsed=$((now - thinking_start))
@@ -1280,7 +1394,7 @@ check_agent() {
     local stage1_ts_file="$STATE_DIR/njslyr_${agent_id}_stage1_last"
     if [[ -f "$stage1_ts_file" ]]; then
         local stage1_ts
-        stage1_ts=$(cat "$stage1_ts_file")
+        read -r stage1_ts < "$stage1_ts_file" 2>/dev/null || stage1_ts=0
         local now
         now=$(date +%s)
         local elapsed=$((now - stage1_ts))
@@ -1316,7 +1430,7 @@ check_agent() {
     local stage2_ts_file="$STATE_DIR/njslyr_${agent_id}_stage2_last"
     if [[ -f "$stage2_ts_file" ]]; then
         local stage2_ts
-        stage2_ts=$(cat "$stage2_ts_file")
+        read -r stage2_ts < "$stage2_ts_file" 2>/dev/null || stage2_ts=0
         local now
         now=$(date +%s)
         local elapsed=$((now - stage2_ts))
@@ -1362,7 +1476,7 @@ check_agent() {
         fi
 
         local idle_start
-        idle_start=$(cat "$idle_state_file" 2>/dev/null || echo "0")
+        read -r idle_start < "$idle_state_file" 2>/dev/null || idle_start=0
         local idle_elapsed=$((now - idle_start))
 
         if [[ $idle_elapsed -ge $IDLE_TIMEOUT ]]; then
@@ -1437,26 +1551,10 @@ main() {
 
     # Check each agent
     local agent_num=0
-    local agent_total
-    agent_total=$(echo "$agents" | grep -v '^$' | wc -l | tr -d ' ')
 
     while IFS= read -r agent_id; do
         [[ -z "$agent_id" ]] && continue
         agent_num=$((agent_num + 1))
-
-        # Special handling: darkninja is excluded
-        if [[ "$agent_id" == "darkninja" ]]; then
-            log "SKIP: darkninja（ラオモトのホンジン、粛清対象外）"
-            echo -e "  \033[1;35m  卍\033[0m \033[1;37m${agent_id}\033[0m \033[0;37m─────────\033[0m \033[1;35mラオモトのホンジン。粛清対象外。\033[0m"
-            continue
-        fi
-
-        # Special handling: gryakuza is limited to Stage 1 only
-        if [[ "$agent_id" == "gryakuza" ]]; then
-            log "INFO: ${agent_id} (monitor_context.sh priority, njslyr=Stage 1 only)"
-            # TODO: Implement gryakuza-specific logic (Stage 1 only)
-            # For Phase 2, we apply same logic but Stage 2/3 are skipped in check_agent
-        fi
 
         echo -ne "  \033[1;36m  ⚔\033[0m \033[1;37m${agent_id}\033[0m \033[0;37m─────────\033[0m "
         if check_agent "$agent_id"; then

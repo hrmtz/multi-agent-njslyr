@@ -5,7 +5,13 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# macOS (Darwin): util-linux (flock) via Homebrew
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    _HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+    export PATH="${_HOMEBREW_PREFIX}/opt/util-linux/bin:$PATH"
+fi
+
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)"
 
 # Parse arguments
 AGENT_ID=""
@@ -14,6 +20,10 @@ KEEP=5
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --keep)
+            if [ -z "${2:-}" ]; then
+                echo "ERROR: --keep requires a value" >&2
+                exit 1
+            fi
             KEEP="$2"
             shift 2
             ;;
@@ -69,6 +79,7 @@ mkdir -p "$ARCHIVE_DIR"
 attempt=0
 max_attempts=5
 
+_backoff_delays=("" "0.2" "0.4" "0.8" "1.6")
 while [ $attempt -lt $max_attempts ]; do
     if (
         flock -w 5 200 || exit 1
@@ -96,7 +107,8 @@ try:
 
     # Determine messages to archive (read:true older than keep N)
     to_keep_read = read[-keep:] if keep > 0 else []
-    to_archive = read[:-keep] if keep > 0 and len(read) > keep else ([] if keep > 0 else read)
+    # read[:-keep] returns [] when len(read) <= keep (Python negative-index edge case)
+    to_archive = read[:-keep] if keep > 0 else read
 
     if not to_archive:
         print(f'[inbox_archive] Nothing to archive (read={len(read)}, keep={keep}).', file=sys.stderr)
@@ -137,7 +149,8 @@ except Exception as e:
     else
         attempt=$((attempt + 1))
         if [ $attempt -lt $max_attempts ]; then
-            backoff_delay=$(awk "BEGIN {print 0.1 * (2 ^ $attempt)}")
+            # Exponential backoff (precomputed): 0.1s * 2^attempt
+            backoff_delay="${_backoff_delays[$attempt]}"
             echo "[inbox_archive] Lock timeout for $INBOX (attempt $((attempt + 1))/$max_attempts), retrying in ${backoff_delay}s..." >&2
             sleep "$backoff_delay"
         else

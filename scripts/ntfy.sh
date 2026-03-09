@@ -9,7 +9,12 @@ SETTINGS="$SCRIPT_DIR/config/settings.yaml"
 # shellcheck source=../lib/ntfy_auth.sh
 source "$SCRIPT_DIR/lib/ntfy_auth.sh"
 
-TOPIC=$(grep 'ntfy_topic:' "$SETTINGS" | awk '{print $2}' | tr -d '"')
+# 第2引数でトピック上書き可能（デフォルトはsettings.yamlのntfy_topic）
+if [ -n "$2" ]; then
+  TOPIC="$2"
+else
+  TOPIC=$(grep 'ntfy_topic:' "$SETTINGS" | head -1 | awk '{print $2}' | tr -d '"')
+fi
 if [ -z "$TOPIC" ]; then
   echo "ntfy_topic not configured in settings.yaml" >&2
   exit 1
@@ -19,7 +24,7 @@ fi
 AUTH_ARGS=()
 while IFS= read -r line; do
     [ -n "$line" ] && AUTH_ARGS+=("$line")
-done < <(ntfy_get_auth_args "$SCRIPT_DIR/config/ntfy_auth.env")
+done < <(ntfy_get_auth_args "$SCRIPT_DIR/config/api_keys.env")
 
 # shellcheck disable=SC2086
 curl -s "${AUTH_ARGS[@]}" -H "Tags: outbound" -d "$1" "https://ntfy.sh/$TOPIC" > /dev/null

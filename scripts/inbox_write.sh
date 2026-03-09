@@ -4,9 +4,18 @@
 # Example: bash scripts/inbox_write.sh gryakuza "ヤクザ5号、任務完了" report_received yakuza5 "" P1
 # Example (task_assigned): bash scripts/inbox_write.sh yakuza3 "タスクYAML読んで作業開始" task_assigned gryakuza queue/tasks/yakuza3_subtask_237c.yaml P2
 
+# macOS SSH non-interactive shell PATH fix (Homebrew binaries not loaded by default)
+export PATH=/opt/homebrew/bin:/usr/local/bin:$PATH
+
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# macOS (Darwin): util-linux (flock) via Homebrew
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    _HOMEBREW_PREFIX="${HOMEBREW_PREFIX:-/opt/homebrew}"
+    export PATH="${_HOMEBREW_PREFIX}/bin:/usr/local/bin:${_HOMEBREW_PREFIX}/opt/util-linux/bin:$PATH"
+fi
+
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)"
 TARGET="$1"
 CONTENT="$2"
 TYPE="${3:-wake_up}"
@@ -22,7 +31,7 @@ if [ -z "$PRIORITY_ARG" ]; then
             ;;
         report_received)
             # Check for BLOCKING keyword in content
-            if echo "$CONTENT" | grep -qi "BLOCKING"; then
+            if [[ "$CONTENT" =~ [Bb][Ll][Oo][Cc][Kk][Ii][Nn][Gg] ]]; then
                 PRIORITY="P0"  # BLOCKING issue = emergency
             else
                 PRIORITY="P1"  # Normal QC result = high priority
@@ -65,26 +74,34 @@ if [ ! -f "$INBOX" ]; then
     echo "messages: []" > "$INBOX"
 fi
 
-# Generate unique message ID (timestamp-based)
-MSG_ID="msg_$(date +%Y%m%d_%H%M%S)_$(head -c 4 /dev/urandom | xxd -p)"
+# Generate unique message ID (timestamp-based; single date fork, printf builtin for rand)
 TIMESTAMP=$(date "+%Y-%m-%dT%H:%M:%S")
+printf -v _rand '%04x%04x' "$RANDOM" "$RANDOM"
+MSG_ID="msg_${TIMESTAMP//[^0-9]/}_${_rand}"
 
 # Atomic write with flock (exponential backoff: max 5 retries)
 # Backoff delays: 0.1s, 0.2s, 0.4s, 0.8s (doubles each time)
 attempt=0
 max_attempts=5
 
+_backoff_delays=("" "0.2" "0.4" "0.8" "1.6")
 while [ $attempt -lt $max_attempts ]; do
     if (
         flock -w 5 200 || exit 1
 
         # Add message via python3 (unified YAML handling)
+        # Pass user-controlled strings via env vars to avoid shell injection
+        INBOX_PATH="$INBOX" INBOX_CONTENT="$CONTENT" INBOX_TASK_YAML="$TASK_YAML_PATH" \
+        INBOX_MSG_ID="$MSG_ID" INBOX_FROM="$FROM" INBOX_TIMESTAMP="$TIMESTAMP" \
+        INBOX_TYPE="$TYPE" INBOX_PRIORITY="$PRIORITY" \
         python3 -c "
-import yaml, sys
+import yaml, sys, os, tempfile
 
 try:
+    inbox_path = os.environ['INBOX_PATH']
+
     # Load existing inbox
-    with open('$INBOX') as f:
+    with open(inbox_path) as f:
         data = yaml.safe_load(f)
 
     # Initialize if needed
@@ -93,19 +110,38 @@ try:
     if not data.get('messages'):
         data['messages'] = []
 
-    # Add new message
+    # C5: msg_id de-duplication — skip if same msg_id already exists
+    # Use case: SSH+ntfy fallback race condition where both deliver same message.
+    # Requires caller (e.g. lib/ssh_inbox_write.sh) to pass a stable msg_id via INBOX_MSG_ID.
+    # Without stable msg_id from caller, each invocation generates a unique id (no-op dedup).
+    #
+    # dispatch_ack design (Phase 2+):
+    #   task_yaml fields:
+    #     dispatch_ack:
+    #       received_at: "2026-02-28T15:00:00+09:00"
+    #       acknowledged_by: gryakuza_neo
+    #   Flow: receiver updates task_yaml dispatch_ack → SSH ACK → Kyoto confirms delivery.
+    #   ACK timeout 90s → ntfy fallback re-send. msg_id dedup prevents double execution.
+    msg_id = os.environ['INBOX_MSG_ID']
+    existing_ids = {m.get('id') for m in data['messages']}
+    if msg_id in existing_ids:
+        print(f'[inbox_write] duplicate msg_id skipped: {msg_id}', file=sys.stderr)
+        sys.exit(0)
+
+    # Add new message (all fields via env vars — safe from shell injection)
     new_msg = {
-        'id': '$MSG_ID',
-        'from': '$FROM',
-        'timestamp': '$TIMESTAMP',
-        'type': '$TYPE',
-        'priority': '$PRIORITY',
-        'content': '''$CONTENT''',
+        'id': msg_id,
+        'from': os.environ['INBOX_FROM'],
+        'timestamp': os.environ['INBOX_TIMESTAMP'],
+        'type': os.environ['INBOX_TYPE'],
+        'priority': os.environ['INBOX_PRIORITY'],
+        'content': os.environ['INBOX_CONTENT'],
         'read': False
     }
     # Add task_yaml_path if provided (for task_assigned messages)
-    if '$TASK_YAML_PATH':
-        new_msg['task_yaml_path'] = '$TASK_YAML_PATH'
+    task_yaml = os.environ.get('INBOX_TASK_YAML', '')
+    if task_yaml:
+        new_msg['task_yaml_path'] = task_yaml
     data['messages'].append(new_msg)
 
     # Overflow protection: keep max 50 messages
@@ -117,12 +153,11 @@ try:
         data['messages'] = unread + read[-30:]
 
     # Atomic write: tmp file + rename (prevents partial reads)
-    import tempfile, os
-    tmp_fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname('$INBOX'), suffix='.tmp')
+    tmp_fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(inbox_path), suffix='.tmp')
     try:
         with os.fdopen(tmp_fd, 'w') as f:
             yaml.dump(data, f, default_flow_style=False, allow_unicode=True, indent=2)
-        os.replace(tmp_path, '$INBOX')
+        os.replace(tmp_path, inbox_path)
     except:
         os.unlink(tmp_path)
         raise
@@ -140,9 +175,8 @@ except Exception as e:
         # Lock timeout or error
         attempt=$((attempt + 1))
         if [ $attempt -lt $max_attempts ]; then
-            # Exponential backoff: 0.1s * 2^attempt
-            # attempt=0 → 0.1s, attempt=1 → 0.2s, attempt=2 → 0.4s, attempt=3 → 0.8s
-            backoff_delay=$(awk "BEGIN {print 0.1 * (2 ^ $attempt)}")
+            # Exponential backoff (precomputed): 0.1s * 2^attempt
+            backoff_delay="${_backoff_delays[$attempt]}"
             echo "[inbox_write] Lock timeout for $INBOX (attempt $((attempt + 1))/$max_attempts), retrying in ${backoff_delay}s..." >&2
             sleep "$backoff_delay"
         else

@@ -11,11 +11,11 @@
 #   - basic: ユーザー名+パスワード (自己ホスト ntfy用)
 #   - none: 認証なし (公開ntfy.sh、後方互換)
 #
-# 設定ファイル: config/ntfy_auth.env (git非追跡)
+# 設定ファイル: config/api_keys.env (git非追跡)
 
 # --- ntfy_get_auth_args ---
 # curl用の認証引数を標準出力に返す
-# 引数: [auth_env_file] — 認証設定ファイルのパス（省略時はconfig/ntfy_auth.env）
+# 引数: [auth_env_file] — 認証設定ファイルのパス（省略時はconfig/api_keys.env）
 # 出力: curl引数文字列 (例: "-H" "Authorization: Bearer tk_xxx")
 #        認証設定なしの場合は空文字列（後方互換）
 ntfy_get_auth_args() {
@@ -25,7 +25,7 @@ ntfy_get_auth_args() {
     if [ -z "$auth_file" ]; then
         local script_dir
         script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)" || true
-        auth_file="${script_dir}/config/ntfy_auth.env"
+        auth_file="${script_dir}/config/api_keys.env"
     fi
 
     # 環境変数を読み込み（ファイルが存在する場合のみ）

@@ -1,0 +1,16 @@
+name = "line-ntfy-bridge"
+main = "src/worker.js"
+compatibility_date = "2024-01-01"
+account_id = "REDACTED_CF_ACCOUNT"
+
+# Secrets are set via `wrangler secret set` — never hardcode them here.
+# Required secrets:
+#   wrangler secret set LINE_CHANNEL_SECRET
+#   wrangler secret set LINE_CHANNEL_ACCESS_TOKEN
+#   wrangler secret set ANTHROPIC_API_KEY          # optional: enables Haiku instant reply
+
+# KV namespace for agent status (populated by cron_status_push.sh)
+[[kv_namespaces]]
+binding = "STATUS_KV"
+id = "REDACTED_KV_ID"
+preview_id = "REDACTED_KV_PREVIEW_ID"
