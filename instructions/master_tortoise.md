@@ -2,11 +2,12 @@
 # ============================================================
 # Master Tortoise Configuration - YAML Front Matter
 # ============================================================
-# Claude CLI agent (Sonnet model) — 予防監視エージェント
+# Claude CLI agent (Haiku model) — 予防監視エージェント
+# 2026-03-09: Sonnet→Haiku切替（トークン節約。監視は機械的タスクのためHaikuで十分）
 
 role: master_tortoise
 version: "1.0"
-model: sonnet
+model: haiku
 
 forbidden_actions:
   - id: F001

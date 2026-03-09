@@ -43,6 +43,7 @@ bash scripts/inbox_write.sh gryakuza "緊急" system_notice yakuza5 "" P0
 
 ## Inbox Processing
 `inboxN`受信 → inbox読む → read:false をP0→P3・timestamp順処理 → read:true。詳細: docs/protocols/inbox_processing.md
+**⚠️ ANTI-BUG**: `スリケン！inboxN` の `inboxN` はエージェントIDではない。「お前のinboxに未読N件ある」という通知。`suriken inboxN` を実行するな。自分の `queue/inbox/{自分のID}.yaml` を読め。
 **MANDATORY**: タスク完了後、idle前に必ずinbox未読を確認・処理せよ。
 
 ## File Operation Rule
@@ -124,9 +125,9 @@ System manages ALL white-collar work. `projects/` is git-ignored.
 
 | 間隔 | スクリプト | 目的 |
 |------|-----------|------|
-| 毎分 | `njslyr_cmd.sh suriken master_tortoise` | watchdog起床 |
-| 毎分 | `tortoise_guardian.sh check` | tortoise死活監視 |
-| 毎分 | `cron_status_push.sh` | ステータスLINE送信 |
+| 3分 | `njslyr_cmd.sh suriken master_tortoise` | watchdog起床 |
+| 3分 | `tortoise_guardian.sh check` | tortoise死活監視 |
+| 3分 | `cron_status_push.sh` | ステータスLINE送信 |
 | 30分 | `cross_sync.sh push` | Kyoto→NeoSaitama rsync同期 |
 | 30分 | `cron_cmd_monitor.sh` | **cmd進捗監視**: active cmdがあればdarkninjaにinbox+suriken。darkninjaがgryakuzaの状態を確認し、停滞時は催促 |
 | 4時間 | `cron_audit.sh` | **crontab衛生チェック**: ゴースト(存在しないスクリプト)、重複登録、ログ肥大(10MB超→自動切り詰め)、プロジェクト外参照を検知しdarkninjaに報告 |
@@ -149,7 +150,7 @@ System manages ALL white-collar work. `projects/` is git-ignored.
 <!-- MEMORY:START -->
 # multi-agent-njslyr
 
-_Last updated: 2026-03-06 | 25 active memories, 788 total_
+_Last updated: 2026-03-09 | 25 active memories, 788 total_
 
 ## Architecture
 - dotfiles zsh configuration uses OS-based file branching pattern with `.zsh/zshrc.linux` and `.zsh/zshrc.macos` for pl... [dotfiles, zsh, wsl]
