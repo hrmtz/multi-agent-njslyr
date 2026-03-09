@@ -64,7 +64,7 @@ fi
 # Triple-check: agent_id, session from TMUX_PANE, and actual current session.
 # Handles TMUX_PANE inheritance bug where darkninja session inherits TMUX_PANE
 # pointing to another agent's pane (e.g. yakuza4 → SESSION_NAME="multiagent").
-if [ "$AGENT_ID" = "darkninja" ] || [ "$SESSION_NAME" = "darkninja" ] || [ "$ACTUAL_SESSION" = "darkninja" ]; then
+if [ "$AGENT_ID" = "darkninja" ] || [ "$SESSION_NAME" = "darkninja" ] || [ "$ACTUAL_SESSION" = "darkninja" ] || [ "$ACTUAL_SESSION" = "main" ]; then
     exit 0
 fi
 

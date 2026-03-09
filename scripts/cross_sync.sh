@@ -101,6 +101,7 @@ RSYNC_EXCLUDES=(
     "queue/archive/"       # archived old data
     "queue/metrics/"       # local metrics
     "queue/logs/"          # queue logs
+    ".cocoindex_code/"     # cocoindex MCP server artifacts
 )
 
 # Build rsync exclude args
@@ -355,10 +356,15 @@ main() {
     mkdir -p "$(dirname "$LOCKFILE")"
     mkdir -p "$LOG_DIR"
 
-    # Tailscale connectivity check
+    # Connectivity check: try tailscale first, fall back to SSH ping
     if ! check_tailscale; then
-        ntfy_notify_failure "$SUBCMD failed: Tailscale unreachable ($PEER_HOST)"
-        exit 1
+        log_warn "Tailscale check failed, trying SSH connectivity..."
+        if ssh -o ConnectTimeout=5 -o BatchMode=yes "$PEER_HOST" true 2>/dev/null; then
+            log_info "SSH connectivity to $PEER_HOST OK (tailscale check bypassed)"
+        else
+            ntfy_notify_failure "$SUBCMD failed: peer unreachable ($PEER_HOST)"
+            exit 1
+        fi
     fi
 
     local sync_failed=0
@@ -382,6 +388,19 @@ main() {
     if ! sync_secrets "$SUBCMD"; then
         log_error "Secrets sync failed"
         sync_failed=1
+    fi
+
+    # Pull remote heartbeat (crane HB lives on NeoSaitama, tortoise reads on Kyoto)
+    if [[ "$SUBCMD" == "push" && ("$MACHINE_ROLE" == "kyoto" || "$MACHINE_ROLE" == "ryzen") ]]; then
+        log_info "=== Pulling remote heartbeat (crane → kyoto) ==="
+        local hb_remote="$PEER_HOST:$PEER_PROJECT_ROOT/queue/heartbeat/"
+        local hb_local="$SCRIPT_DIR/queue/heartbeat/"
+        mkdir -p "$hb_local"
+        rsync -avz --timeout=30 \
+            -e "ssh -o ConnectTimeout=10 -o BatchMode=yes" \
+            "$hb_remote" "$hb_local" 2>>"$LOG_FILE" || {
+            log_warn "Heartbeat pull failed (non-fatal)"
+        }
     fi
 
     if (( sync_failed )); then

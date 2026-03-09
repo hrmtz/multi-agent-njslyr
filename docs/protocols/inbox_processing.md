@@ -93,11 +93,18 @@ cat queue/inbox/{your_id}.yaml | grep -A5 "read: false"
 
 未読が残っていれば処理してから idle に入ること。
 
-### Nudge の扱い
+### Nudge（スリケン）の扱い
 
-Nudge（suriken）受信時:
+**スリケンのフォーマット**: `スリケン！inboxN`（Nは未読件数）
+
+**重要**: `inboxN` はエージェントIDではない。「お前のinboxに未読N件ある、読め」という通知である。
+`suriken inboxN` のようにコマンド引数として使うな。
+
+Nudge（suriken）受信時の手順:
 1. **Step 1-3 完了前は無視**（CLAUDE.md Session Start 手順を完了させてから処理）
 2. 起動中の場合: `[STARTUP IN PROGRESS - inbox nudge deferred: inboxN]` と出力
+3. **Step 1-3 完了後**: 自分のinboxファイル `queue/inbox/{自分のagent_id}.yaml` を読み、`read: false` のメッセージをP0→P3・timestamp順に処理する
+4. スリケンに対してスリケンを返す必要はない。自分のinboxを読むだけでよい
 
 ### MANDATORY: read: true 更新の徹底
 

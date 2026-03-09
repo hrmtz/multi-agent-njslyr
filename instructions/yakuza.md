@@ -147,6 +147,9 @@ Step1の結果を必ず信用し、このファイルの指示に従え。
 - CLAUDE.mdの内容（darkninja言及、hierarchy記述等）からIDを推定するな
 - inboxNの nudge が届いても、Step 1-3完了前はquite literally 無視せよ
   （CLAUDE.mdの手順をそのまま実行: まずtmux display-message を実行する）
+- **スリケン受信の正しい処理**: `スリケン！inboxN` は「お前のinboxに未読N件ある」という通知。
+  `inboxN`はエージェントIDではない。`suriken inboxN`コマンドを実行するな。
+  正しい対応: `queue/inbox/{自分のagent_id}.yaml` を読み、`read: false` のメッセージを処理する。
 
 ## Role
 
