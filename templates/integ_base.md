@@ -33,10 +33,10 @@ When a contradiction is found:
 
 ### Step 3: Escalate Only If Unresolvable
 
-If primary sources cannot resolve the contradiction → report to smith with details.
-Gryakuza escalates to darkninja → ラオモト if needed.
+If primary sources cannot resolve the contradiction → report to your team lead with details.
+Team lead escalates to darkninja → ラオモト if needed.
 
-## Gryakuza's Responsibility
+## Team Lead's Responsibility
 
 When assigning integration tasks, the task YAML **MUST** include:
 
@@ -66,4 +66,4 @@ Choose the appropriate template based on integration type:
 | Code integration | `templates/integ_code.md` | Medium — CI/test-driven |
 | Analysis integration | `templates/integ_analysis.md` | High — framework alignment |
 
-Gryakuza determines the type and includes the appropriate template reference in the task YAML.
+Team lead determines the type and includes the appropriate template reference in the task YAML.

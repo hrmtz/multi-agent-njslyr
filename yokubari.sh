@@ -125,7 +125,7 @@ else
     CLI_ADAPTER_LOADED=false
 fi
 
-# 暗黒メガコーポ名リスト（グレーターヤクザの所属企業をランダム選出）
+# 暗黒メガコーポ名リスト（チームリードの所属企業をランダム選出）
 MEGACORPS=(
     "オムラ・インダストリ"
     "ヨロシサン製薬"
@@ -147,7 +147,7 @@ MEGACORPS=(
     "モーモーバイオジェネティクス社"
     "チャノマ・コンフォーツ社"
 )
-GRYAKUZA_CORP="${MEGACORPS[$((RANDOM % ${#MEGACORPS[@]}))]}"
+LEAD_CORP="${MEGACORPS[$((RANDOM % ${#MEGACORPS[@]}))]}"
 
 # 色付きログ関数（忍殺風）
 log_info() {
@@ -271,7 +271,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "モデル構成:"
             echo "  ダークニンジャ:      Opus（デフォルト。--darkninja-no-thinkingで無効化）"
-            echo "  グレーターヤクザ:      Sonnet（高速タスク管理）"
+            echo "  チームリード:      Sonnet（高速タスク管理）"
             echo "  ソウカイヤ:      Opus（戦略立案・設計判断）"
             echo "  ヤクザ1-7:   Sonnet（ジッコウ部隊）"
             echo ""
@@ -387,7 +387,7 @@ show_battle_cry() {
     echo -e "\033[1;33m  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\033[0m"
     echo -e "\033[1;33m  ┃\033[0m  \033[1;37mmulti-agent-njslyr\033[0m 〜 \033[1;36mネオサイタマ・マルチエージェント統率\033[0m 〜  \033[1;33m┃\033[0m"
     echo -e "\033[1;33m  ┃\033[0m                                                                 \033[1;33m┃\033[0m"
-    echo -e "\033[1;33m  ┃\033[0m  \033[1;35mダークニンジャ\033[0m: 統括  \033[1;31mグレーターヤクザ\033[0m: カンリ  \033[1;33mソウカイヤ\033[0m: 戦略  \033[1;34mヤクザ\033[0m: ×7  \033[1;33m┃\033[0m"
+    echo -e "\033[1;33m  ┃\033[0m  \033[1;35mダークニンジャ\033[0m: 統括  \033[1;31mチームリード\033[0m: カンリ  \033[1;33mソウカイヤ\033[0m: 戦略  \033[1;34mヤクザ\033[0m: ×7  \033[1;33m┃\033[0m"
     echo -e "\033[1;33m  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\033[0m"
     echo ""
 }
@@ -694,7 +694,7 @@ EOF
     echo "inbox:" > ./queue/ntfy_inbox.yaml
 
     # agent inbox リセット
-    for agent in darkninja smith soukaiya "$MONITOR_AGENT"; do
+    for agent in darkninja smith tajiba soukaiya "$MONITOR_AGENT"; do
         echo "messages:" > "./queue/inbox/${agent}.yaml"
     done
     for ((i=1; i<=YAKUZA_MAX; i++)); do
@@ -856,9 +856,9 @@ PANE_BASE=$(tmux show-options -gv pane-base-index 2>/dev/null || echo 0)
 # STEP 5.1: multiagent セッション作成（9ペイン：smith + yakuza1-8）
 # ═══════════════════════════════════════════════════════════════════════════════
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-    log_war "⚔️ グレーターヤクザ・ヤクザ・ソウカイヤをジェネレート中…9名配備！（neosaitama）"
+    log_war "⚔️ チームリード・ヤクザ・ソウカイヤをジェネレート中…9名配備！（neosaitama）"
 else
-    log_war "⚔️ グレーターヤクザ・ヤクザ・ソウカイヤをジェネレート中…9名配備！"
+    log_war "⚔️ チームリード・ヤクザ・ソウカイヤをジェネレート中…9名配備！"
 fi
 
 # 最初のペイン作成
@@ -1051,7 +1051,7 @@ tmux select-layout -t multiagent:agents tiled
 # ウィンドウリサイズ時にペインを自動再配置（WezTerm等のリサイズ追従）
 tmux set-hook -t multiagent client-resized 'resize-window -A -t multiagent:agents ; select-layout -t multiagent:agents tiled'
 
-log_success "  └─ グレーターヤクザ・ヤクザ・ソウカイヤのジン、コンストラクト完了！ワザマエ！"
+log_success "  └─ チームリード・ヤクザ・ソウカイヤのジン、コンストラクト完了！ワザマエ！"
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1108,9 +1108,9 @@ if [ "$SETUP_ONLY" = false ]; then
         log_info "  ◆召喚◆ ダークニンジャ…ニンジャソウル覚醒！イヤーッ！"
     fi
 
-    # グレーターヤクザ起動（バックグラウンド）
+    # チームリード起動（バックグラウンド）
     ( launch_agent "multiagent:agents.$((PANE_BASE + 0))" "smith" "sonnet" ) &
-    log_info "  ◆召喚◆ グレーターヤクザ（所属: ${GRYAKUZA_CORP}）…ニンジャソウル覚醒！イヤーッ！"
+    log_info "  ◆召喚◆ チームリード（所属: ${LEAD_CORP}）…ニンジャソウル覚醒！イヤーッ！"
 
     # クローンヤクザ起動（バックグラウンド、YAKUZA_MAX体）
     # subtask_347b: yakuza1-7をDeepSeek V3（deepseek-chat）に統一
@@ -1255,7 +1255,7 @@ NINJA_EOF
 
     # inbox ディレクトリ初期化（シンボリックリンク先のLinux FSに作成）
     mkdir -p "$SCRIPT_DIR/logs"
-    for agent in darkninja smith soukaiya "$MONITOR_AGENT"; do
+    for agent in darkninja smith tajiba soukaiya "$MONITOR_AGENT"; do
         [ -f "$SCRIPT_DIR/queue/inbox/${agent}.yaml" ] || echo "messages:" > "$SCRIPT_DIR/queue/inbox/${agent}.yaml"
     done
     for ((i=1; i<=YAKUZA_MAX; i++)); do
@@ -1281,7 +1281,7 @@ NINJA_EOF
         awk -v id="$1" '$1==id{print $2;exit}' <<< "$_watcher_pane_map"
     }
 
-    # グレーターヤクザ・ヤクザ・ソウカイヤのwatcher
+    # チームリード・ヤクザ・ソウカイヤのwatcher
     _pid=$(  _get_watcher_pane_id "smith");   [[ -n "$_pid" ]] && launch_watcher "smith" "$_pid"
     for ((i=1; i<=YAKUZA_MAX; i++)); do
         _pid=$(_get_watcher_pane_id "yakuza${i}"); [[ -n "$_pid" ]] && launch_watcher "yakuza${i}" "$_pid"
@@ -1510,7 +1510,7 @@ if [ "$SETUP_ONLY" = true ]; then
     echo "  │  tmux send-keys -t main:darkninja \\                      │"
     echo "  │    'claude --dangerously-skip-permissions' Enter         │"
     echo "  │                                                          │"
-    echo "  │  # グレーターヤクザ・ヤクザを一斉ショウカン                                  │"
+    echo "  │  # チームリード・ヤクザを一斉ショウカン                                  │"
     echo "  │  for p in \$(seq $PANE_BASE $((PANE_BASE+8))); do                                 │"
     echo "  │      tmux send-keys -t multiagent:${_agents_new_name:-agents}.\$p \\            │"
     echo "  │      'claude --dangerously-skip-permissions' Enter       │"
@@ -1529,7 +1529,7 @@ echo "  │  ラオモトのホンジンにアタッチしてメイレイを開�
 echo "  │     tmux attach-session -t main        (または: css)     │"
 fi
 echo "  │                                                          │"
-echo "  │  グレーターヤクザ・ヤクザのジンを確認する:                            │"
+echo "  │  チームリード・ヤクザのジンを確認する:                            │"
 echo "  │     tmux attach-session -t multiagent   (または: csm)    │"
 echo "  │                                                          │"
 echo "  │  ※ 各ニンジャはオキテを読み込み済み。                    │"

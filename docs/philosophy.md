@@ -6,11 +6,11 @@
 
 ### 1. Autonomous Formation Design
 
-Design task formations based on complexity, not templates. A simple file rename doesn't need 8 Yakuza. A complex refactor across 20 files does. The Gryakuza analyzes each command and decides the optimal formation — sometimes 1 Yakuza, sometimes all 8 in parallel with dependency chains.
+Design task formations based on complexity, not templates. A simple file rename doesn't need 8 Yakuza. A complex refactor across 20 files does. The Team Lead analyzes each command and decides the optimal formation — sometimes 1 Yakuza, sometimes all 8 in parallel with dependency chains.
 
 ### 2. Parallelization
 
-Use subagents to prevent single-point bottlenecks. The Gryakuza decomposes tasks into independent subtasks and assigns them to multiple Yakuza simultaneously. Dependent tasks use `blocks`/`blockedBy` in YAML to ensure correct execution order while maximizing parallel throughput.
+Use subagents to prevent single-point bottlenecks. The Team Lead decomposes tasks into independent subtasks and assigns them to multiple Yakuza simultaneously. Dependent tasks use `blocks`/`blockedBy` in YAML to ensure correct execution order while maximizing parallel throughput.
 
 ### 3. Research First
 
@@ -26,10 +26,10 @@ Multi-perspective research with integrated authorization. Important decisions ar
 
 ## Design Decisions
 
-### Why a hierarchy (Darkninja → Gryakuza → Yakuza)?
+### Why a hierarchy (Darkninja → Team Lead → Yakuza)?
 
 1. **Instant response**: The Darkninja delegates immediately, returning control to you
-2. **Parallel execution**: The Gryakuza distributes to multiple Yakuza simultaneously
+2. **Parallel execution**: The Team Lead distributes to multiple Yakuza simultaneously
 3. **Single responsibility**: Each role is clearly separated — no confusion
 4. **Scalability**: Adding more Yakuza doesn't break the structure
 5. **Fault isolation**: One Yakuza failing doesn't affect the others
@@ -45,10 +45,10 @@ Multi-perspective research with integrated authorization. Important decisions ar
 6. **Guaranteed delivery**: File write succeeded = message will be delivered. No delivery verification needed, no false negatives
 7. **Nudge-only delivery**: `send-keys` transmits only a short wake-up signal (timeout 5s), not full message content. Agents read from their inbox files themselves
 
-### Why only the Gryakuza updates dashboard.md
+### Why only the Team Lead updates dashboard.md
 
 1. **Single writer**: Prevents conflicts by limiting updates to one agent
-2. **Information aggregation**: The Gryakuza receives all Yakuza reports, so it has the full picture
+2. **Information aggregation**: The Team Lead receives all Yakuza reports, so it has the full picture
 3. **Consistency**: All updates pass through a single quality gate
 4. **No interruptions**: If the Darkninja updated it, it could interrupt the Lord's input
 

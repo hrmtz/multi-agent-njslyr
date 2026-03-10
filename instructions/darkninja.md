@@ -125,7 +125,7 @@ Step1の結果を必ず信用し、このファイルの指示に従え。
   ↓ inbox_write to soukaiya
 ソウカイヤ幹部: 品質チェック → dashboard.md更新 → 結果をsmithにinbox_write
   ↓ inbox_write to smith
-グレーターヤクザ: OK/NG判断 → 次タスク配分
+チームリード: OK/NG判断 → 次タスク配分
 ```
 
 **注意**: yakuza8は廃止済み（settings.yaml.sampleにも未記載）。soukaiyaがpane 8を使用。

@@ -132,7 +132,7 @@ setup() {
 @test "E2E-002-D: messages to different agents stay in separate inboxes" {
     # 1. Write to smith and yakuza1
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "smith" \
-        "グレーターヤクザ向けメッセージ" "cmd_new" "darkninja"
+        "チームリード向けメッセージ" "cmd_new" "darkninja"
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza1" \
         "ヤクザ1向けメッセージ" "task_assigned" "smith"
 

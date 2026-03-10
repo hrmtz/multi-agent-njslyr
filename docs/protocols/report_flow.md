@@ -7,7 +7,7 @@
 ## 概要: 完了報告フロー
 
 ```
-Yakuza → (report YAML + inbox) → Soukaiya → (QC + inbox) → Gryakuza → (dashboard + inbox) → Darkninja
+Yakuza → (report YAML + inbox) → Soukaiya → (QC + inbox) → Team Lead → (dashboard + inbox) → Darkninja
 ```
 
 ---
@@ -92,13 +92,13 @@ bash scripts/task_complete.sh subtask_360a 1 /home/hrmtz/project/multi-agent-njs
 
 1. Report YAML 受信（task_yaml_path フィールドで場所特定）
 2. 成果物確認（files_modified を Read で確認）
-3. QC 結果を Gryakuza に inbox_write
+3. QC 結果を Team Lead に inbox_write
    - Pass: `report_received` type
    - Fail/Redo: `redo` type、内容に問題点を明記
 
 ---
 
-## Gryakuza 受信後手順
+## Team Lead 受信後手順
 
 1. `scan_all_reports`: `queue/reports/yakuza*_report*.yaml` を全スキャン
 2. dashboard.md 更新（センカセクション）
@@ -110,7 +110,7 @@ bash scripts/task_complete.sh subtask_360a 1 /home/hrmtz/project/multi-agent-njs
 ## Redo（再作業）フロー
 
 ```
-Soukaiya/Gryakuza → (redo指示) → Yakuza inbox
+Soukaiya/Team Lead → (redo指示) → Yakuza inbox
 ```
 
 Redo 指示受信時:

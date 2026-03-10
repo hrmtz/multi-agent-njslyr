@@ -1349,8 +1349,8 @@ check_agent() {
             log "[KARATE] ${agent_id} がThinking${thinking_elapsed}秒！THINKING_TIMEOUT(${THINKING_TIMEOUT}秒)超過！"
             rm -f "$thinking_state_file"
 
-            # smith / yakuzatengu are limited to Stage 1 only (m2 fix + S-5)
-            if [[ "$agent_id" == "smith" ]] || [[ "$agent_id" == "yakuzatengu" ]]; then
+            # team leads / yakuzatengu are limited to Stage 1 only (m2 fix + S-5)
+            if [[ "$agent_id" == "smith" ]] || [[ "$agent_id" == "tajiba" ]] || [[ "$agent_id" == "yakuzatengu" ]]; then
                 stage1_suriken "$agent_id" "thinking超過（${thinking_elapsed}秒）"
                 update_cooldown "$agent_id" "stage1"
                 return 0
@@ -1383,10 +1383,10 @@ check_agent() {
         return 0
     fi
 
-    # m2 fix: smith is limited to Stage 1 only (monitor_context.sh has priority)
-    local smith_stage1_only=false
-    if [[ "$agent_id" == "smith" ]]; then
-        smith_stage1_only=true
+    # m2 fix: team leads are limited to Stage 1 only (monitor_context.sh has priority)
+    local lead_stage1_only=false
+    if [[ "$agent_id" == "smith" ]] || [[ "$agent_id" == "tajiba" ]]; then
+        lead_stage1_only=true
         # NOTE: spawn判定は(0)に移動済み（BUG-SPAWN-1 fix）。ここでは不要。
     fi
 
@@ -1403,7 +1403,7 @@ check_agent() {
         # Check if inbox is still unread after 2 minutes
         if [[ $elapsed -ge $NUDGE_NO_RESPONSE ]] && [[ "$has_unread" == "true" ]]; then
             # m2 fix: Skip Stage 2 for smith (spawn already handled above)
-            if [[ "$smith_stage1_only" == "true" ]]; then
+            if [[ "$lead_stage1_only" == "true" ]]; then
                 log "SKIP: ${agent_id} is limited to Stage 1 (monitor_context.sh priority)"
                 return 0
             fi
@@ -1439,7 +1439,7 @@ check_agent() {
         # Check if inbox is still unread after 2 minutes AND /clear had no effect
         if [[ $elapsed -ge $NUDGE_NO_RESPONSE ]] && [[ "$has_unread" == "true" ]]; then
             # m2 fix: Skip Stage 3 for smith / S-5: yakuzatengu Stage 1 only
-            if [[ "$smith_stage1_only" == "true" ]] || [[ "$agent_id" == "yakuzatengu" ]]; then
+            if [[ "$lead_stage1_only" == "true" ]] || [[ "$agent_id" == "yakuzatengu" ]]; then
                 log "SKIP: ${agent_id} is limited to Stage 1 (monitor_context.sh priority)"
                 return 0
             fi

@@ -1,4 +1,4 @@
-# Gryakuza FAQ & Troubleshooting
+# Team Lead FAQ & Troubleshooting
 
 このファイルには、トラブル発生時に参照する手順・リカバリ方法を記載。
 

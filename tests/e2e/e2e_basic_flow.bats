@@ -82,7 +82,7 @@ setup() {
 }
 
 # ═══════════════════════════════════════════════════════════════
-# E2E-001-B: Gryakuza decomposes cmd into subtask for yakuza
+# E2E-001-B: smith decomposes cmd into subtask for yakuza
 # ═══════════════════════════════════════════════════════════════
 
 @test "E2E-001-B: smith receives cmd, decomposes into yakuza subtask" {

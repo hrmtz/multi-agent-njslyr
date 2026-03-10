@@ -140,7 +140,7 @@ setup() {
 }
 
 @test "content: smith.md contains smith role reference" {
-    grep -qi "smith\|グレーターヤクザ" "$OUTPUT_DIR/smith.md"
+    grep -qi "smith\|チームリード" "$OUTPUT_DIR/smith.md"
 }
 
 @test "content: yakuza.md contains yakuza role reference" {
@@ -152,7 +152,7 @@ setup() {
 }
 
 @test "content: codex-smith.md contains smith role reference" {
-    grep -qi "smith\|グレーターヤクザ" "$OUTPUT_DIR/codex-smith.md"
+    grep -qi "smith\|チームリード" "$OUTPUT_DIR/codex-smith.md"
 }
 
 @test "content: codex-yakuza.md contains yakuza role reference" {

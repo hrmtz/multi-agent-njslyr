@@ -20,7 +20,7 @@ forbidden_actions:
   - id: F003
     action: task_distribution
     description: "Assign tasks or manage yakuza"
-    reason: "Task management is Gryakuza's role."
+    reason: "Task management is Team Lead's role."
   - id: F004
     action: polling
     description: "Polling loops"

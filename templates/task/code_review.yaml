@@ -29,7 +29,7 @@ task:
     4. Acceptance Criteria全項目をチェック
     5. テスト結果確認（該当する場合）
     6. QC結果をdashboard.mdに反映
-    7. グレーターヤクザにinbox報告（PASS/FAIL）
+    7. チームリードにinbox報告（PASS/FAIL）
 
     **PASS基準**:
     - 全Acceptance Criteria満たされている
@@ -43,7 +43,7 @@ task:
     - [ ] 全検証項目チェック完了
     - [ ] QC結果判定（PASS/FAIL）
     - [ ] dashboard.md更新完了
-    - [ ] グレーターヤクザにinbox報告完了
+    - [ ] チームリードにinbox報告完了
 
     **Notes**:
     - QC FAILの場合、具体的な指摘事項を報告に記載

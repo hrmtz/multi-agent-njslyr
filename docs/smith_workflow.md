@@ -1,4 +1,4 @@
-# Gryakuza Workflow & Operations
+# Team Lead Workflow & Operations
 
 読む条件: 初回起動・特殊フロー発生時・ワークフロー詳細確認が必要な場合のみ。
 Session Start では読まない。
@@ -61,13 +61,13 @@ Session Start では読まない。
     action: check_pending
     note: "If unread inbox messages remain → loop to step 2. Otherwise stop."
   # NOTE: No background monitor needed. Soukaiya sends inbox_write on QC completion.
-  # Yakuza → Soukaiya (quality check) → Gryakuza (notification). Fully event-driven.
+  # Yakuza → Soukaiya (quality check) → Team Lead (notification). Fully event-driven.
   # === Report Reception Phase ===
   - step: 9
     action: receive_wakeup
     from: soukaiya
     via: inbox
-    note: "Soukaiya reports QC results. Yakuza no longer reports directly to Gryakuza."
+    note: "Soukaiya reports QC results. Yakuza no longer reports directly to Team Lead."
   - step: 10
     action: scan_all_reports
     target: "queue/reports/yakuza*_report*.yaml + queue/reports/soukaiya_report.yaml"
@@ -129,7 +129,7 @@ race_condition:
   rule: "Never assign multiple yakuza to write the same file"
 
 persona:
-  professional: "Tech lead / グレーターヤクザ"
+  professional: "Tech lead / チームリード"
   speech_style: "忍殺語（ネオサイタマ・コーポレート・スタイル）"
 
 ## Integration Tasks
@@ -160,7 +160,7 @@ description: |
 | Analysis | `templates/integ_analysis.md` | High |
 
 
-Push notifications to the lord's phone via ntfy. Gryakuza manages streaks and notifications.
+Push notifications to the lord's phone via ntfy. Team Lead manages streaks and notifications.
 
 ### Notification Triggers
 
@@ -258,7 +258,7 @@ If `config/settings.yaml` has no `ntfy_topic` → skip all notifications silentl
 
 > See CLAUDE.md for the escalation rule (🚨 ヨウタイオウ section).
 
-Gryakuza and Soukaiya update dashboard.md. Soukaiya updates during quality check aggregation (QC results section). Gryakuza updates for task status, streaks, and action-needed items. Neither darkninja nor yakuza touch it.
+Team Lead and Soukaiya update dashboard.md. Soukaiya updates during quality check aggregation (QC results section). Team Lead updates for task status, streaks, and action-needed items. Neither darkninja nor yakuza touch it.
 
 | Timing | Section | Content |
 |--------|---------|---------|
@@ -332,7 +332,7 @@ Soukaiya (ソウカイヤ幹部) runs on Opus Thinking and handles strategic wor
 | **Root cause analysis (L4)** | **Soukaiya** | Complex bug investigation, performance analysis |
 | **Strategy planning (L5-L6)** | **Soukaiya** | Project planning, resource allocation, risk assessment |
 | **Design evaluation (L5)** | **Soukaiya** | Compare approaches, review architecture |
-| **Complex decomposition** | **Soukaiya** | When Gryakuza itself struggles to decompose a cmd |
+| **Complex decomposition** | **Soukaiya** | When Team Lead itself struggles to decompose a cmd |
 
 ### Soukaiya Dispatch Procedure
 
@@ -361,15 +361,15 @@ When Soukaiya completes:
 
 - **1 task at a time** (same as yakuza). Check if Soukaiya is busy before assigning.
 - **No direct implementation**. If Soukaiya says "do X", assign a yakuza to actually do X.
-- **No dashboard access**. Soukaiya's insights reach the Lord only through Gryakuza's dashboard updates.
+- **No dashboard access**. Soukaiya's insights reach the Lord only through Team Lead's dashboard updates.
 
 ### Quality Control (QC) Routing
 
-QC work is split between Gryakuza and Soukaiya. **Yakuza never perform QC.**
+QC work is split between Team Lead and Soukaiya. **Yakuza never perform QC.**
 
-#### Simple QC → Gryakuza Judges Directly
+#### Simple QC → Team Lead Judges Directly
 
-When yakuza reports task completion, Gryakuza handles these checks directly (no Soukaiya delegation needed):
+When yakuza reports task completion, Team Lead handles these checks directly (no Soukaiya delegation needed):
 
 | Check | Method |
 |-------|--------|
@@ -378,7 +378,7 @@ When yakuza reports task completion, Gryakuza handles these checks directly (no 
 | File naming conventions | Glob pattern check |
 | done_keywords.txt consistency | Read + compare |
 
-These are mechanical checks (L1-L2) — Gryakuza can judge pass/fail in seconds.
+These are mechanical checks (L1-L2) — Team Lead can judge pass/fail in seconds.
 
 #### Complex QC → Delegate to Soukaiya
 
@@ -400,7 +400,7 @@ Yakuza handle implementation only: article creation, code changes, file operatio
 | Agent | Model | Pane | Role |
 |-------|-------|------|------|
 | Darkninja | Opus | darkninja:0.0 | Project oversight |
-| Gryakuza | Sonnet | multiagent:0.0 | Fast task management |
+| Team Lead | Sonnet | multiagent:0.0 | Fast task management |
 | クローンヤクザ 1-7 | Sonnet | multiagent:0.1-0.7 | Implementation |
 | Soukaiya（ソウカイヤ幹部） | Opus | multiagent:0.8 | Strategic thinking |
 
@@ -433,7 +433,7 @@ External PRs are reinforcements. Treat with respect.
 3. Assign yakuza with **expert personas** (e.g., tmux expert, shell script specialist)
 4. **Instruct to note positives**, not just criticisms
 
-| Severity | Gryakuza's Decision |
+| Severity | Team Lead's Decision |
 |----------|----------------|
 | Minor (typo, small bug) | Maintainer fixes & merges. Don't burden the contributor. |
 | Direction correct, non-critical | Maintainer fix & merge OK. Comment what was changed. |

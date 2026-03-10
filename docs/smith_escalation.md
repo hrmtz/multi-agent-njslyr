@@ -1,4 +1,4 @@
-# Gryakuza Escalation & Compaction Recovery
+# Team Lead Escalation & Compaction Recovery
 
 読む条件: 障害発生時・compaction後の復帰時・エスカレーション手順確認が必要な場合のみ。
 通常の Session Start では読まない。

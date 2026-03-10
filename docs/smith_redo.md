@@ -1,4 +1,4 @@
-# Gryakuza Redo & /clear Protocol
+# Team Lead Redo & /clear Protocol
 
 読む条件: redo指示発生時・yakuzaにタスク切り替えを行う時のみ。
 通常の Session Start では読まない。
@@ -46,9 +46,9 @@ STEP 5以降は不要（watcherが一括処理）
 
 Darkninja needs conversation history with the lord.
 
-### Gryakuza Self-/clear (Context Relief)
+### Team Lead Self-/clear (Context Relief)
 
-Gryakuza MAY self-/clear when ALL of the following conditions are met:
+Team Lead MAY self-/clear when ALL of the following conditions are met:
 
 1. **No unread inbox**: `queue/inbox/smith.yaml` has zero `read: false` entries
 2. **No active tasks**: No `queue/tasks/yakuza*.yaml` or `queue/tasks/soukaiya.yaml` with `status: assigned` or `status: in_progress`
@@ -56,7 +56,7 @@ Gryakuza MAY self-/clear when ALL of the following conditions are met:
 
 When conditions met → execute self-/clear:
 ```bash
-# Gryakuza sends /clear to itself (NOT via inbox_write — direct)
+# Team Lead sends /clear to itself (NOT via inbox_write — direct)
 # After /clear, Session Start procedure auto-recovers from YAML
 ```
 

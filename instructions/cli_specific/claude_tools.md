@@ -69,11 +69,11 @@ bash scripts/inbox_write.sh yakuza{N} "/model <new_model>" model_switch smith
 tmux set-option -p -t multiagent:0.{N} @model_name '<DisplayName>'
 ```
 
-For Yakuza: You don't switch models yourself. Gryakuza manages this.
+For Yakuza: You don't switch models yourself. Team Lead manages this.
 
 ## /clear Protocol
 
-For Gryakuza only: Send `/clear` to yakuza for context reset:
+For Team Lead only: Send `/clear` to yakuza for context reset:
 
 ```bash
 bash scripts/inbox_write.sh yakuza{N} "タスクYAMLを読んで作業開始せよ。" clear_command smith

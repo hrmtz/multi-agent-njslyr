@@ -785,7 +785,7 @@ mcp__memory__read_graph()
 ### v3.5 — Yakuza Tengu (retired in v5.1)
 
 - Yakuza Tengu emergency supervisor (auto-spawn on manager overload) — replaced by Agent Tool in v5.1
-- Named agents (Gryakuza → Yamahiro)
+- Named agents (Team Lead → Smith/Tajiba/Yamahiro/Kusuba)
 - Yakuza persona enforcement after `/clear`
 
 ### v3.4 — Bloom Routing, E2E Tests

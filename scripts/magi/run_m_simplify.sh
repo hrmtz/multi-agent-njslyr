@@ -120,14 +120,15 @@ if [[ "$AUTO_CMD" == "true" ]]; then
     echo "Running MAGI with --json (auto-cmd mode)..."
     echo ""
 
-    echo "$INPUT" | python3 "$SCRIPT_DIR/cli.py" \
+    MAGI_OUTPUT=$(echo "$INPUT" | python3 "$SCRIPT_DIR/cli.py" \
         --mode deliberate \
         --session simplify \
         --stdin \
         --json \
-        "${EXTRA_ARGS[@]}" | tee >(
-            # Extract JSON block (last {...} in output) and save to file
-            python3 -c "
+        "${EXTRA_ARGS[@]}" | tee /dev/stderr)
+
+    # Extract JSON block sequentially (no race condition)
+    echo "$MAGI_OUTPUT" | python3 -c "
 import sys, json, re
 out_path = sys.argv[1]
 content = sys.stdin.read()
@@ -144,9 +145,8 @@ for m in reversed(matches):
     except (json.JSONDecodeError, ValueError):
         continue
 " "$RESULT_JSON"
-        )
 
-    if [[ -f "$RESULT_JSON" ]]; then
+    if [[ -f "$RESULT_JSON" ]] && python3 -c "import json; json.load(open('$RESULT_JSON'))" 2>/dev/null; then
         echo ""
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "Generating cmd YAML tasks via monju_adapter..."

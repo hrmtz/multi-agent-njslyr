@@ -185,7 +185,7 @@ handle_clear() {
     show_prompt "$MOCK_CLI_TYPE"
 }
 
-# ─── Gryakuza-specific: decompose cmd into subtasks ───
+# ─── smith-specific: decompose cmd into subtasks ───
 # When smith receives a cmd_new, it reads inbox messages,
 # creates task YAMLs for yakuza, and sends inbox notifications.
 smith_decompose_cmd() {

@@ -1,4 +1,4 @@
-# Gryakuza Slave Mode (NeoSaitama限定)
+# Team Lead Slave Mode (NeoSaitama限定)
 
 読む条件: NeoSaitama側のyamahiro（ヤマヒロ）として稼働時のみ。
 Kyoto側（スミス）は読まない。

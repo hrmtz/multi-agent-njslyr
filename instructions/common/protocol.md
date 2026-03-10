@@ -10,13 +10,13 @@ bash scripts/inbox_write.sh <target_agent> "<message>" <type> <from>
 
 Examples:
 ```bash
-# Darkninja → Gryakuza
+# Darkninja → Team Lead
 bash scripts/inbox_write.sh smith "cmd_048を書いた。実行せよ。" cmd_new darkninja
 
-# Yakuza → Gryakuza
+# Yakuza → Team Lead
 bash scripts/inbox_write.sh smith "クローンヤクザ5号、ニンム完了。報告YAML確認されたし。" report_received yakuza5
 
-# Gryakuza → Yakuza
+# Team Lead → Yakuza
 bash scripts/inbox_write.sh yakuza3 "タスクYAMLを読んで作業開始せよ。" task_assigned smith
 ```
 
@@ -85,10 +85,10 @@ you will be stuck idle until the escalation sends `/clear` (~4 min).
 
 ## Redo Protocol
 
-When Gryakuza determines a task needs to be redone:
+When Team Lead determines a task needs to be redone:
 
-1. Gryakuza writes new task YAML with new task_id (e.g., `subtask_097d` → `subtask_097d2`), adds `redo_of` field
-2. Gryakuza sends `clear_command` type inbox message (NOT `task_assigned`)
+1. Team Lead writes new task YAML with new task_id (e.g., `subtask_097d` → `subtask_097d2`), adds `redo_of` field
+2. Team Lead sends `clear_command` type inbox message (NOT `task_assigned`)
 3. inbox_watcher delivers `/clear` to the agent → session reset
 4. Agent recovers via Session Start procedure, reads new task YAML, starts fresh
 
@@ -98,9 +98,9 @@ Race condition is eliminated: `/clear` wipes old context. Agent re-reads YAML wi
 
 | Direction | Method | Reason |
 |-----------|--------|--------|
-| Yakuza/Soukaiya → Gryakuza | Report YAML + inbox_write | File-based notification |
-| Gryakuza → Darkninja/ラオモト | dashboard.md update + inbox_write **mandatory** | Dashboard update + ダークニンジャへのinbox報告は**全cmd完了時に必須**。報告なき完了はセプク案件。 |
-| Gryakuza → Soukaiya | YAML + inbox_write | Strategic task delegation |
+| Yakuza/Soukaiya → Team Lead | Report YAML + inbox_write | File-based notification |
+| Team Lead → Darkninja/ラオモト | dashboard.md update + inbox_write **mandatory** | Dashboard update + ダークニンジャへのinbox報告は**全cmd完了時に必須**。報告なき完了はセプク案件。 |
+| Team Lead → Soukaiya | YAML + inbox_write | Strategic task delegation |
 | Top → Down | YAML + inbox_write | Standard wake-up |
 
 ## File Operation Rule

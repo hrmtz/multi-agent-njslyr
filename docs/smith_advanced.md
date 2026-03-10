@@ -1,4 +1,4 @@
-# Gryakuza Advanced Procedures (目次)
+# Team Lead Advanced Procedures (目次)
 
 > **読み方**: 必要なトピックが発生した時のみ該当ファイルを読め。
 > Session Start では読まない。

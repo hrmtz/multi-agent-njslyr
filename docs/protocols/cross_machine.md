@@ -6,7 +6,7 @@
 
 ## マシン構成
 
-| マシン | 役割 | Gryakuza | アクセス |
+| マシン | 役割 | Team Lead | アクセス |
 |--------|------|----------|---------|
 | **Kyoto / Ryzen** | Primary (Master) | スミス | ローカル |
 | **NeoSaitama / MBP** | Secondary (Slave) | ヤマヒロ | `ssh <peer-hostname>` (Tailscale) |
