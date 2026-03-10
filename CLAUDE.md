@@ -162,14 +162,11 @@ _Last updated: 2026-03-10 | 25 active memories, 788 total_
 
 ## Architecture
 - dotfiles zsh configuration uses OS-based file branching pattern with `.zsh/zshrc.linux` and `.zsh/zshrc.macos` for pl... [dotfiles, zsh, wsl]
-- instagram-slides/CLAUDE.md serves as operational reference document with structured sections including Kyoto Quick St... [instagram-slides, documentation, runbook]
-- surgery-log-app is a Flask application running on NeoSaitama (peer-hostname host) in Docker on port 18080 (internal 8000)... [architecture, surgery-log-app, flask, data-persistence]
 - Agent inbox architecture uses mixed directory structure: yakuza7 and soukaiya use /home/hrmtz/project/multi-agent-njs... [agent-architecture, inbox-structure, authentication]
 
 ## Key Decisions
-- Role separation and identity verification enforcement: darkninja refrains from direct NAS deployment, surgery-log-app... [role-separation, identity-verification, escalation-hierarchy]
+- Role separation and identity verification enforcement: darkninja refrains from direct NAS deployment... [role-separation, identity-verification, escalation-hierarchy]
 - NLM MCP tool unavailability recovery: use ToolSearch rediscovery pattern ('select:mcp__notebooklm__source_add') inste... [nlm, mcp-recovery, authentication, resilience]
-- surgery-log-app backup mechanism implemented: pre-save logic now copies source .md file to .md.bak before write_text(... [surgery-log-app, backup, deployment]
 - Agent environment management and credential distribution: after identifying and removing tmux global ANTHROPIC_API_KE... [agent-management, tmux, credentials, authentication]
 
 ## Patterns & Conventions
@@ -188,14 +185,10 @@ _Last updated: 2026-03-10 | 25 active memories, 788 total_
 ## Current Progress
 - NLM Wave 2 batch completion status finalized: yakuza1 B0 (50/50 upload, 50 query), yakuza2 B1 (49/50 upload with 1 de... [progress, nlm-batch, yakuza-fleet]
 - Kyoto yakuza authentication and infrastructure cleanup completed: darkninja restored `/login` command and Claude Max ... [authentication, infrastructure, deployment]
-- subtask_324a (instagram-slides CLAUDE.md improvement) completed with QC PASS verdict by soukaiya agent: all 8 accepta... [qc_pass, instagram_slides, soukaiya]
-- surgery-log-app edit and PDF download features completed and deployed to example-nas NAS: opnote_edit.html template wit... [surgery-log-app, deployment, feature-complete]
 
 ## Context
 - master_tortoise heartbeat failure sustained at 7900+ seconds (131+ minutes) at 21:59:15 JST, critically exceeding cra... [monitoring, crane, critical]
 - NotebookLM source_add (batch upload) operations do not trigger rate-limiting even at scale (50 PDFs uploaded successf... [nlm, rate-limiting, batch-processing]
-- surgery-log-app web interface accessible at http://REDACTED_IP:18080 (example-nas NAS Tailscale IP + port 18080 mapp... [deployment, surgery_log_app, network]
-- Zotero User ID is REDACTED_ID, displayed on https://www.zotero.org/settings/keys page as 'Your userID for use in API cal... [zotero, api, configuration]
 
 _For deeper context, use memory_search, memory_related, or memory_ask tools._
 <!-- MEMORY:END -->

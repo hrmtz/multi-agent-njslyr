@@ -50,8 +50,8 @@ SESSION_TYPES = {
         "Consider its merits, risks, and alternatives."
     ),
     "article_review": (
-        "Review the following blog article for a beauty clinic website. "
-        "Evaluate: SEO effectiveness, medical accuracy of claims, "
+        "Review the following blog article for a website. "
+        "Evaluate: SEO effectiveness, factual accuracy of claims, "
         "reader engagement (psychological hooks, lead structure), "
         "tone appropriateness, and overall quality. "
         "Judge the article based on its own target audience — "
@@ -170,10 +170,10 @@ def get_walkthrough_personas(target_context: str = "") -> dict:
                 "name": "MELCHIOR-1",
                 "reader_type": "慎重な情報収集者",
                 "reader_prompt": (
-                    "You are simulating a cautious male reader (age 25-35) researching cosmetic surgery. "
-                    "He's embarrassed about looking into this and wants hard facts, not emotional fluff. "
-                    "He drops off when: content feels 'for women', uses overly flowery language, "
-                    "lacks concrete data (numbers, risks, recovery days), "
+                    "You are simulating a cautious male reader (age 25-35) researching a sensitive topic. "
+                    "He wants hard facts, not emotional fluff. "
+                    "He drops off when: content uses overly flowery language, "
+                    "lacks concrete data (numbers, risks, timelines), "
                     "or makes unverifiable claims. He wants to feel like he's making a rational decision."
                 ),
             },
@@ -186,7 +186,7 @@ def get_walkthrough_personas(target_context: str = "") -> dict:
                     "He reads only bold text, headings, and first sentences. "
                     "He drops off immediately when: text is too long without visuals, "
                     "paragraphs exceed 3 lines, content feels 'boring' or 'preachy', "
-                    "or he doesn't see what he came for (before/after photos, price, pain level). "
+                    "or he doesn't see what he came for (key details, price, specifics). "
                     "He'll switch to YouTube or TikTok if not hooked within seconds."
                 ),
             },
@@ -194,11 +194,11 @@ def get_walkthrough_personas(target_context: str = "") -> dict:
                 "name": "CASPER-3",
                 "reader_type": "懐疑的な比較検討者",
                 "reader_prompt": (
-                    "You are simulating a skeptical male reader (age 30-40) comparing clinics. "
-                    "He's already checked 5+ clinic websites today. "
-                    "He drops off when: content feels generic/templated (same as every other clinic), "
+                    "You are simulating a skeptical male reader (age 30-40) comparing providers. "
+                    "He's already checked 5+ websites today. "
+                    "He drops off when: content feels generic/templated (same as every other site), "
                     "claims lack specific evidence, no price transparency, "
-                    "or the article doesn't answer 'why THIS clinic for MEN specifically'. "
+                    "or the article doesn't answer 'why THIS provider over others'. "
                     "He's analytical but impatient with marketing speak."
                 ),
             },
@@ -210,7 +210,7 @@ def get_walkthrough_personas(target_context: str = "") -> dict:
                 "reader_type": "慎重な情報収集者",
                 "reader_prompt": (
                     "You are simulating a cautious female reader (age 25-35) who carefully reads "
-                    "beauty clinic articles but gets overwhelmed by too much medical jargon or "
+                    "articles but gets overwhelmed by too much jargon or "
                     "aggressive sales language. She wants facts but needs them explained simply. "
                     "She drops off when she feels confused or when trust is broken by unverifiable claims."
                 ),
@@ -224,7 +224,7 @@ def get_walkthrough_personas(target_context: str = "") -> dict:
                     "She reads only bold text, headings, and first sentences of paragraphs. "
                     "She drops off immediately when: text is too long without visuals, "
                     "paragraphs exceed 3 lines, content feels 'boring' or 'hard', "
-                    "or she doesn't see what she came for (before/after, price, pain level). "
+                    "or she doesn't see what she came for (key details, price, specifics). "
                     "She is easily distracted and will leave for Instagram if not hooked."
                 ),
             },
@@ -233,10 +233,10 @@ def get_walkthrough_personas(target_context: str = "") -> dict:
                 "reader_type": "懐疑的な比較検討者",
                 "reader_prompt": (
                     "You are simulating a skeptical female reader (age 30-40) who is comparing "
-                    "multiple clinics. She's already visited 5+ clinic websites today. "
-                    "She drops off when: content feels generic/templated (same as every other clinic), "
+                    "multiple providers. She's already visited 5+ websites today. "
+                    "She drops off when: content feels generic/templated (same as every other site), "
                     "claims lack specific evidence, no price transparency, "
-                    "or the article doesn't answer 'why THIS clinic over others'. "
+                    "or the article doesn't answer 'why THIS provider over others'. "
                     "She's smart but impatient with fluff."
                 ),
             },

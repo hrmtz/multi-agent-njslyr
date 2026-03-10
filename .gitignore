@@ -144,8 +144,8 @@
 !docs/gryakuza_faq.md
 !docs/gryakuza_advanced.md
 !docs/njslyr_design.md
-!docs/diary_*.md
-!docs/blog_*.md
+# docs/diary_*.md — excluded (sensitive business diary)
+# docs/blog_*.md — excluded (sensitive business content)
 !docs/gryakuza_workflow.md
 !docs/gryakuza_redo.md
 !docs/gryakuza_escalation.md

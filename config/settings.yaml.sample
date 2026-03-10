@@ -16,7 +16,7 @@ skill:
 machine:
   role: kyoto              # kyoto (server/primary) | neosaitama (client/secondary)
                            # Legacy values also accepted: ryzen (=kyoto) | mbp (=neosaitama)
-  peer_host: <your-tailscale-hostname>  # Tailscale hostname of peer machine (e.g., "peer-hostname" or "peer-hostname")
+  peer_host: <your-tailscale-hostname>  # Tailscale hostname of peer machine
   peer_project_root: /Users/yourname/project/multi-agent-njslyr
 
 # ntfy notification topic (required for cross-machine heartbeat)

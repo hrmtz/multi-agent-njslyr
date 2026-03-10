@@ -1,6 +1,6 @@
 """
 Infographic Generator — Pure HTML/CSS, self-contained
-Reusable across content-forge articles and instagram-slides.
+Reusable across content-pipeline articles and social-content slides.
 
 All components output self-contained HTML with inline styles.
 Scale control: wrap in <div style="font-size: 16px"> and adjust.
@@ -55,8 +55,8 @@ PALETTES = {
         "warning": "#ea580c",
         "danger": "#dc2626",
     },
-    # example-clinic.com brand colors
-    "example": {
+    # clinic brand colors
+    "clinic": {
         "primary": "#b08d57",
         "primary_light": "#f5f0e8",
         "primary_dark": "#8b6f3a",
@@ -75,9 +75,9 @@ PALETTES = {
 
 
 def load_instagram_theme(yaml_path: str) -> dict:
-    """Load an instagram-slides theme YAML and map to infographic palette.
+    """Load a social-content theme YAML and map to infographic palette.
 
-    Maps instagram-slides theme keys to infographic palette keys:
+    Maps social-content theme keys to infographic palette keys:
         colors.primary → primary
         colors.primary_light → primary_light
         colors.primary_dark → primary_dark
@@ -116,9 +116,9 @@ def load_instagram_theme(yaml_path: str) -> dict:
 
 def _p(palette="clinical") -> dict:
     """Resolve palette. Accepts:
-    - str: built-in palette name ("clinical", "warm", "example")
+    - str: built-in palette name ("clinical", "warm", "clinic")
     - dict: custom color dict (passed through, merged with clinical defaults)
-    - str path ending in .yaml: instagram-slides theme file
+    - str path ending in .yaml: social-content theme file
     """
     if isinstance(palette, dict):
         # Custom dict — merge with defaults for any missing keys

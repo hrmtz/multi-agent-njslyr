@@ -385,7 +385,7 @@ logs/autocomplete_stuck.log
 
 ```bash
 SSH_OPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
-PEER_HOST="peer-hostname"  # Ryzen WSL/tortoise の Tailscale ホスト名
+PEER_HOST="<kyoto-hostname>"  # Ryzen WSL/tortoise の Tailscale ホスト名
 PEER_PROJECT="/home/hrmtz/project/multi-agent-njslyr"
 
 ssh $SSH_OPTS $PEER_HOST "cat ${PEER_PROJECT}/queue/heartbeat/crane.yaml"
@@ -472,7 +472,7 @@ bash scripts/inbox_write.sh gryakuza \
 | 宛先 | 手段 | 用途 |
 |------|------|------|
 | gryakuza | inbox_write.sh | 事後分析レポート、再発防止策提案 |
-| master_tortoise | SSH: `ssh peer-hostname` で heartbeat YAML を直接更新 | ハートビート交換（SSHのみ） |
+| master_tortoise | SSH: `ssh <kyoto-hostname>` で heartbeat YAML を直接更新 | ハートビート交換（SSHのみ） |
 | darkninja（緊急時） | ntfy `{base_topic}` メイントピック | マシンCRITICAL通知のみ |
 
 **tortoise⇔crane通信パス**: 両監視エージェントは直接inbox通信不可。

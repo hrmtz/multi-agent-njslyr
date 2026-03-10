@@ -177,7 +177,7 @@ grep -c '^ *read: false$' "$INBOX"
 ### 仕様ドキュメント
 
 - 設計書: `DESIGN_3LAYER_THUMBNAIL.md`
-- 運用手順: `reel/CLAUDE_THUMBNAIL.md`（リポジトリルート `instagram-slides/reel/` 配下）
+- 運用手順: `reel/CLAUDE_THUMBNAIL.md`（リポジトリルート `social-content/reel/` 配下）
 
 ### 注意事項
 - 中間PNG（title/fg）は各8MB程度と大きい（2倍解像度キャプチャのため）。Python側で1080x1920にリサイズするため機能上問題なし

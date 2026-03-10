@@ -22,7 +22,7 @@ if env_file.exists():
             key, _, val = line.partition("=")
             os.environ.setdefault(key.strip(), val.strip())
 
-ARTICLES_DIR = "/home/hrmtz/project/content-forge/output/articles"
+ARTICLES_DIR = os.environ.get("CONTENT_PIPELINE_DIR", "/path/to/content-pipeline") + "/output/articles"
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 TIMEOUT = 120
 
@@ -70,7 +70,7 @@ def rewrite_article(article_dir: str, magi_plans: str) -> dict:
     original_content = draft.get("content", "")
     title = draft.get("title", "")
 
-    system_prompt = """You are an expert medical content editor for a Japanese beauty clinic blog.
+    system_prompt = """You are an expert content editor for a website.
 You will receive an article and improvement plans from a three-AI review panel (MAGI system).
 
 Your task: Apply the improvement plans to rewrite the article.
@@ -79,15 +79,15 @@ Rules:
 1. Keep the same HTML structure (p, h2, h3, ul, li, strong, a tags)
 2. Keep all image placeholders (___IMGPH_*___) exactly as they are
 3. Keep all existing internal links (<a href="...">) unchanged
-4. Apply medical expression corrections: 断定→客観的表現 (「証明する」→「報告されている」等)
+4. Apply expression corrections: use objective language (e.g. "X was reported" instead of "X proves")
 5. Strengthen SEO: naturally incorporate target keywords in title and intro
 6. Improve CTAs: add concrete next steps
 7. Add parenthetical explanations for technical terms
 8. Balance intro hooks: don't just scare, also show solutions
 9. Maintain the article's core message and evidence
 10. Output ONLY the rewritten HTML content. No explanations, no markdown fencing.
-11. Write in Japanese.
-12. Do NOT add fictional statistics, clinic names, or fabricated data."""
+11. Write in the same language as the original article.
+12. Do NOT add fictional statistics, names, or fabricated data."""
 
     user_msg = f"""# Article Title: {title}
 
@@ -149,15 +149,11 @@ def save_rewrite(result: dict):
 
 
 def main():
+    # List your article directory names here
     articles = [
-        "article_M1_メンズ鼻整形",
-        "article_M2_男性鼻整形自然",
-        "article_M3_メンズ鼻整形バレない",
-        "article_M4_男性鼻整形ダウンタイム",
-        "article_M5_メンズ団子鼻",
-        "article_M6_男鼻低い",
-        "article_M7_男性鼻整形費用",
-        "article_M8_メンズ鼻整形おすすめ",
+        "article_01_example_topic",
+        "article_02_example_topic",
+        # Add more articles as needed
     ]
 
     print("◆ MAGI REWRITE — Applying consensus plans ◆\n")

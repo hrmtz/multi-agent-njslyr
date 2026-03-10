@@ -12,9 +12,9 @@ Phase 2では、セッション設定をYAMLファイルとして外部化し、
 ```yaml
 # sessions/article_review.yaml
 id: article_review
-description: 美容クリニックブログ記事レビュー
+description: ブログ記事レビュー
 context_prompt: |
-  Review the following blog article for a beauty clinic website.
+  Review the following blog article for a website.
   ...
 personas:
   MELCHIOR:

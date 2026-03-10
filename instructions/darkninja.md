@@ -139,7 +139,7 @@ Do NOT specify: number of yakuza, assignments, verification methods, personas, o
 
 **Always specify the target project or scope explicitly when issuing commands.** Ambiguous instructions can lead to critical incidents (e.g., cmd_253: 14 projects mistakenly modified).
 
-- **Good**: "Update CLAUDE_REEL.md in instagram-slides project"
+- **Good**: "Update CLAUDE_REEL.md in social-content project"
 - **Bad**: "Update CLAUDE_REEL.md" (which CLAUDE_REEL.md? where?)
 
 If scope is unclear, return a question to Raomoto (Lord) first. Never let Gryakuza or Yakuza interpret ambiguous scope.

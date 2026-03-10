@@ -9,7 +9,7 @@
 | マシン | 役割 | Gryakuza | アクセス |
 |--------|------|----------|---------|
 | **Kyoto / Ryzen** | Primary (Master) | スミス | ローカル |
-| **NeoSaitama / MBP** | Secondary (Slave) | ヤマヒロ | `ssh peer-hostname` (Tailscale) |
+| **NeoSaitama / MBP** | Secondary (Slave) | ヤマヒロ | `ssh <peer-hostname>` (Tailscale) |
 
 **重要**: 「ローカル/リモート」で判断するな。マシン名で判別せよ。
 
@@ -23,7 +23,7 @@ Primary (送信)      →  SSH (優先)  →  Secondary受信
 ```
 
 - SSH ファースト: `dispatch/aisatsu/suriken/heartbeat` 全て SSH → ntfy fallback
-- NeoSaitama SSH: `ssh peer-hostname` (Tailscale 経由)
+- NeoSaitama SSH: `ssh <peer-hostname>` (Tailscale 経由)
 - Tailscale: `--unattended` 有効化済み（ログイン前接続維持）
 
 ---
@@ -114,7 +114,7 @@ CLAUDE_BIN=/Users/hrmtz/.local/bin/claude  # フルパス必須
 
 ```bash
 # SSH 疎通テスト
-ssh peer-hostname echo "OK"
+ssh <peer-hostname> echo "OK"
 
 # ntfy 疎通テスト
 bash scripts/ntfy_send_report.sh --test
@@ -132,5 +132,5 @@ tailscale status
 
 credentials 同期（手動）:
 ```bash
-scp ~/.claude/.credentials.json peer-hostname:~/.claude/.credentials.json
+scp ~/.claude/.credentials.json <peer-hostname>:~/.claude/.credentials.json
 ```
