@@ -18,7 +18,10 @@ log() {
 # Load Cloudflare credentials (env vars from op run, or fallback to file)
 ENV_FILE="$PROJECT_ROOT/config/api_keys.env"
 if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]] && [[ -f "$ENV_FILE" ]]; then
-    eval "$(grep -E '^(CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|CLOUDFLARE_KV_NAMESPACE_ID)=' "$ENV_FILE" | tr -d '\r')"
+    while IFS='=' read -r key val; do
+        val="${val//$'\r'/}"
+        export "$key=$val"
+    done < <(grep -E '^(CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|CLOUDFLARE_KV_NAMESPACE_ID)=' "$ENV_FILE")
 fi
 
 if [[ -z "${CLOUDFLARE_API_TOKEN:-}" || -z "${CLOUDFLARE_ACCOUNT_ID:-}" || -z "${CLOUDFLARE_KV_NAMESPACE_ID:-}" ]]; then
