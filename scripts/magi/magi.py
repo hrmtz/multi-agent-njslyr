@@ -407,8 +407,13 @@ def run_deliberate(question: str, session: str, skip: list[str], output_json: bo
     print_consensus_summary(phase2_results)
 
     if output_json:
+        # Aggregate scores and consensus
+        scores = {n: r.get("score") for n, r in phase2_results.items() if isinstance(r.get("score"), (int, float))}
+        avg_score = sum(scores.values()) / len(scores) if scores else None
         output = {
             "mode": "deliberate",
+            "avg_score": round(avg_score, 1) if avg_score else None,
+            "scores": scores,
             "phase1": phase1_results, "phase2": phase2_results,
             "elapsed_seconds": round(t3 - t0, 1),
         }
@@ -438,11 +443,14 @@ def split_into_sections(html: str) -> list[dict]:
             if current_content.strip():
                 # Strip HTML tags for preview
                 plain = _re.sub(r'<[^>]+>', '', current_content).strip()
+                char_count = len(plain)
                 sections.append({
                     "id": len(sections) + 1,
                     "title": current_title,
                     "content": current_content.strip(),
                     "plain_preview": plain[:80],
+                    "char_count": char_count,
+                    "read_time_sec": max(1, char_count // 10),  # ~600 chars/min
                 })
             current_title = _re.sub(r'<[^>]+>', '', h_match.group(1)).strip()
             current_content = ""
@@ -452,11 +460,14 @@ def split_into_sections(html: str) -> list[dict]:
     # Last section
     if current_content.strip():
         plain = _re.sub(r'<[^>]+>', '', current_content).strip()
+        char_count = len(plain)
         sections.append({
             "id": len(sections) + 1,
             "title": current_title,
             "content": current_content.strip(),
             "plain_preview": plain[:80],
+            "char_count": char_count,
+            "read_time_sec": max(1, char_count // 10),
         })
 
     return sections
@@ -571,9 +582,11 @@ def run_walkthrough(question: str, session: str, skip: list[str], output_json: b
         print(f"{C.RED}Error: Could not split article into sections{C.RESET}")
         return {}
 
-    print(f"{C.BOLD}── 記事構成: {len(sections)}セクション ──{C.RESET}\n")
+    total_chars = sum(s.get("char_count", 0) for s in sections)
+    total_time = sum(s.get("read_time_sec", 0) for s in sections)
+    print(f"{C.BOLD}── 記事構成: {len(sections)}セクション / {total_chars}文字 / 読了{total_time // 60}分{total_time % 60}秒 ──{C.RESET}\n")
     for s in sections:
-        print(f"  S{s['id']}: {s['title']} ({len(s['content'])}文字)")
+        print(f"  S{s['id']}: {s['title']} ({s.get('char_count', '?')}字 / {s.get('read_time_sec', '?')}秒)")
     print()
 
     # Format sections for the prompt
@@ -648,9 +661,18 @@ def run_walkthrough(question: str, session: str, skip: list[str], output_json: b
     print_walkthrough_consensus(phase2_results, w_personas)
 
     if output_json:
+        # Aggregate retention and dropout
+        retentions = {n: r.get("retention_score") for n, r in phase2_results.items() if isinstance(r.get("retention_score"), (int, float))}
+        dropouts = {n: r.get("consensus_dropout_point") for n, r in phase2_results.items() if isinstance(r.get("consensus_dropout_point"), int)}
+        avg_retention = sum(retentions.values()) / len(retentions) if retentions else None
         output = {
             "mode": "walkthrough",
-            "sections": [{"id": s["id"], "title": s["title"]} for s in sections],
+            "avg_retention": round(avg_retention, 1) if avg_retention else None,
+            "retentions": retentions,
+            "dropouts": dropouts,
+            "total_chars": sum(s.get("char_count", 0) for s in sections),
+            "total_read_time_sec": sum(s.get("read_time_sec", 0) for s in sections),
+            "sections": [{"id": s["id"], "title": s["title"], "char_count": s.get("char_count", 0)} for s in sections],
             "phase1": phase1_results, "phase2": phase2_results,
             "elapsed_seconds": round(t3 - t0, 1),
         }

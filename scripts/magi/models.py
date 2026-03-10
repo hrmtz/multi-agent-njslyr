@@ -155,8 +155,8 @@ def call_gemini(system_prompt: str, user_message: str) -> dict:
 
     def _do():
         resp = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}",
-            headers={"Content-Type": "application/json"},
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+            headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
             json={
                 "systemInstruction": {"parts": [{"text": system_prompt}]},
                 "contents": [{"parts": [{"text": user_message}]}],
@@ -232,9 +232,23 @@ def call_all_parallel(prompts: dict[str, tuple[str, str]], skip: list[str] | Non
             name = futures[future]
             try:
                 results[name] = future.result()
+            except requests.exceptions.HTTPError as e:
+                status = e.response.status_code if e.response is not None else "?"
+                body = ""
+                if e.response is not None:
+                    try:
+                        body = e.response.json().get("error", {}).get("message", "")[:200]
+                    except Exception:
+                        body = e.response.text[:200]
+                results[name] = {
+                    "opinion": f"API Error {status}: {body or str(e)}",
+                    "reasoning": "",
+                    "vote": "abstain",
+                    "conditions": "",
+                }
             except Exception as e:
                 results[name] = {
-                    "opinion": f"API Error: {e}",
+                    "opinion": f"Error: {type(e).__name__}: {e}",
                     "reasoning": "",
                     "vote": "abstain",
                     "conditions": "",

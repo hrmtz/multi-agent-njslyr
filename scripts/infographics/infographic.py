@@ -18,6 +18,7 @@ Usage:
     )
 """
 
+from html import escape as _esc
 from typing import Optional
 
 
@@ -88,7 +89,8 @@ def load_instagram_theme(yaml_path: str) -> dict:
     """
     try:
         import yaml
-        theme = yaml.safe_load(open(yaml_path))
+        with open(yaml_path) as f:
+            theme = yaml.safe_load(f)
     except Exception:
         return PALETTES["clinical"]
 
@@ -160,7 +162,7 @@ def comparison_table(
         header_cells += (
             f'<div style="padding:0.6em 0.4em;background:{bg};color:#fff;'
             f'font-weight:{fw};text-align:center;font-size:0.85em;'
-            f'border-right:1px solid rgba(255,255,255,0.2)">{col}</div>'
+            f'border-right:1px solid rgba(255,255,255,0.2)">{_esc(str(col))}</div>'
         )
 
     # Data rows
@@ -185,7 +187,7 @@ def comparison_table(
                 f'<div style="padding:0.5em 0.4em;background:{cell_bg};'
                 f'color:{cell_color};font-weight:{fw};font-size:0.8em;'
                 f'border-right:1px solid {c["border"]};border-bottom:1px solid {c["border"]};'
-                f'text-align:center;line-height:1.4">{val_str}</div>'
+                f'text-align:center;line-height:1.4">{_esc(val_str)}</div>'
             )
         data_rows += cells
 
@@ -193,7 +195,7 @@ def comparison_table(
     if note:
         note_html = (
             f'<div style="padding:0.4em 0.6em;font-size:0.7em;color:{c["text_dim"]};'
-            f'text-align:right">※ {note}</div>'
+            f'text-align:right">※ {_esc(str(note))}</div>'
         )
 
     return (
@@ -201,7 +203,7 @@ def comparison_table(
         f'border-radius:0.6em;overflow:hidden;border:1px solid {c["border"]};'
         f'box-shadow:0 2px 8px rgba(0,0,0,0.06)">'
         f'<div style="background:{c["primary_dark"]};color:#fff;padding:0.6em 1em;'
-        f'font-weight:700;font-size:1em;text-align:center">{title}</div>'
+        f'font-weight:700;font-size:1em;text-align:center">{_esc(str(title))}</div>'
         f'<div style="display:grid;grid-template-columns:repeat({col_count},1fr)">'
         f'{header_cells}{data_rows}'
         f'</div>'
@@ -235,12 +237,12 @@ def stat_cards(
     for stat in stats:
         fg, bg = color_map.get(stat.get("color", "primary"), color_map["primary"])
         detail = stat.get("detail", "")
-        detail_html = f'<div style="font-size:0.55em;color:{c["text_dim"]};margin-top:0.2em">{detail}</div>' if detail else ""
+        detail_html = f'<div style="font-size:0.55em;color:{c["text_dim"]};margin-top:0.2em">{_esc(str(detail))}</div>' if detail else ""
         cards += (
             f'<div style="background:{bg};border-radius:0.5em;padding:0.8em 0.5em;'
             f'text-align:center;border:1px solid {c["border"]}">'
-            f'<div style="font-size:1.8em;font-weight:800;color:{fg};line-height:1">{stat["value"]}</div>'
-            f'<div style="font-size:0.7em;color:{c["text"]};margin-top:0.3em;font-weight:600">{stat["label"]}</div>'
+            f'<div style="font-size:1.8em;font-weight:800;color:{fg};line-height:1">{_esc(str(stat.get("value", "")))}</div>'
+            f'<div style="font-size:0.7em;color:{c["text"]};margin-top:0.3em;font-weight:600">{_esc(str(stat.get("label", "")))}</div>'
             f'{detail_html}'
             f'</div>'
         )
@@ -248,7 +250,7 @@ def stat_cards(
     col_count = min(len(stats), 4)
     return (
         f'<div style="font-family:\'Noto Sans JP\',sans-serif;max-width:100%">'
-        f'<div style="font-weight:700;font-size:0.9em;color:{c["text"]};margin-bottom:0.5em">{title}</div>'
+        f'<div style="font-weight:700;font-size:0.9em;color:{c["text"]};margin-bottom:0.5em">{_esc(str(title))}</div>'
         f'<div style="display:grid;grid-template-columns:repeat({col_count},1fr);gap:0.5em">'
         f'{cards}'
         f'</div></div>'
@@ -282,15 +284,15 @@ def timeline_bar(
             f'<div style="flex:1;text-align:center;position:relative">'
             f'<div style="width:0.8em;height:0.8em;border-radius:50%;background:{color};'
             f'margin:0 auto 0.3em;border:2px solid #fff;box-shadow:0 0 0 2px {color}"></div>'
-            f'<div style="font-size:0.7em;font-weight:700;color:{color}">{ev["time"]}</div>'
-            f'<div style="font-size:0.65em;color:{c["text"]};margin-top:0.15em">{ev["label"]}</div>'
+            f'<div style="font-size:0.7em;font-weight:700;color:{color}">{_esc(str(ev.get("time", "")))}</div>'
+            f'<div style="font-size:0.65em;color:{c["text"]};margin-top:0.15em">{_esc(str(ev.get("label", "")))}</div>'
             f'</div>'
         )
 
     # Connecting line
     return (
         f'<div style="font-family:\'Noto Sans JP\',sans-serif;max-width:100%">'
-        f'<div style="font-weight:700;font-size:0.9em;color:{c["text"]};margin-bottom:0.6em">{title}</div>'
+        f'<div style="font-weight:700;font-size:0.9em;color:{c["text"]};margin-bottom:0.6em">{_esc(str(title))}</div>'
         f'<div style="position:relative;padding:0.5em 0">'
         f'<div style="position:absolute;top:0.9em;left:5%;right:5%;height:3px;'
         f'background:linear-gradient(to right,{c["danger"]},{c["warning"]},{c["success"]});'
@@ -317,24 +319,28 @@ def range_bar(
         unit: Unit label (e.g. "万円", "日")
     """
     c = _p(palette)
+    if not items:
+        return ""
 
     # Find global min/max
-    all_vals = [v for item in items for v in [item["min"], item["max"]]]
+    all_vals = [v for item in items for v in [item.get("min", 0), item.get("max", 0)]]
     global_min = min(all_vals)
     global_max = max(all_vals)
     span = global_max - global_min or 1
 
     bars = ""
     for item in items:
-        left_pct = (item["min"] - global_min) / span * 80 + 5
-        width_pct = (item["max"] - item["min"]) / span * 80
-        typical_pct = (item.get("typical", item["min"]) - global_min) / span * 80 + 5
+        item_min = item.get("min", 0)
+        item_max = item.get("max", 0)
+        left_pct = (item_min - global_min) / span * 80 + 5
+        width_pct = (item_max - item_min) / span * 80
+        typical_pct = (item.get("typical", item_min) - global_min) / span * 80 + 5
 
         bars += (
             f'<div style="margin-bottom:0.6em">'
             f'<div style="display:flex;justify-content:space-between;margin-bottom:0.2em">'
-            f'<span style="font-size:0.75em;font-weight:600;color:{c["text"]}">{item["label"]}</span>'
-            f'<span style="font-size:0.7em;color:{c["text_dim"]}">{item["min"]}〜{item["max"]}{unit}</span>'
+            f'<span style="font-size:0.75em;font-weight:600;color:{c["text"]}">{_esc(str(item.get("label", "")))}</span>'
+            f'<span style="font-size:0.7em;color:{c["text_dim"]}">{item_min}〜{item_max}{_esc(str(unit))}</span>'
             f'</div>'
             f'<div style="position:relative;height:1.2em;background:{c["border"]};border-radius:0.6em">'
             f'<div style="position:absolute;left:{left_pct:.1f}%;width:{width_pct:.1f}%;height:100%;'
@@ -344,7 +350,7 @@ def range_bar(
 
     return (
         f'<div style="font-family:\'Noto Sans JP\',sans-serif;max-width:100%">'
-        f'<div style="font-weight:700;font-size:0.9em;color:{c["text"]};margin-bottom:0.5em">{title}</div>'
+        f'<div style="font-weight:700;font-size:0.9em;color:{c["text"]};margin-bottom:0.5em">{_esc(str(title))}</div>'
         f'{bars}</div>'
     )
 

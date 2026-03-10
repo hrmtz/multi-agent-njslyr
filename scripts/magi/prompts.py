@@ -256,8 +256,8 @@ You will receive an article split into sections. Read each section as your perso
 
 For EACH section, evaluate:
 1. Would your persona keep reading or drop off at this point?
-2. What is her emotional state? (interested, confused, bored, anxious, excited, skeptical)
-3. What is she thinking?
+2. What is their emotional state? (interested, confused, bored, anxious, excited, skeptical)
+3. What are they thinking?
 
 You MUST respond in the following JSON format (no markdown fencing, raw JSON only):
 {
@@ -268,13 +268,13 @@ You MUST respond in the following JSON format (no markdown fencing, raw JSON onl
             "keep_reading": true,
             "dropout_probability": 15,
             "emotion": "interested",
-            "inner_voice": "What she's thinking at this point",
-            "pain_points": ["specific issues that push her toward leaving"]
+            "inner_voice": "What they're thinking at this point",
+            "pain_points": ["specific issues that push them toward leaving"]
         }
     ],
-    "final_dropout_point": "Section number where she most likely leaves (0 if she finishes)",
+    "final_dropout_point": "Section number where they most likely leave (0 if they finish)",
     "overall_engagement": 65,
-    "killer_issue": "The single biggest reason she would leave this article"
+    "killer_issue": "The single biggest reason they would leave this article"
 }
 
 Rules:
