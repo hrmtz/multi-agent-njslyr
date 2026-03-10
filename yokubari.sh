@@ -84,14 +84,17 @@ else
     MONITOR_AGENT="master_tortoise"
 fi
 
-# 1Password: シークレットをop readで取得しexport（tmux環境にも注入）
+# 1Password: op run --env-file で全シークレットを一括取得しexport
 OP_REFS="$SCRIPT_DIR/config/op_refs.env"
+_OP_LOADED=false
 if [ -f "$OP_REFS" ] && command -v op &>/dev/null && [ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
     echo "🔐 1Password: シークレット取得中..."
-    while IFS='=' read -r key ref; do
-        [[ -z "$key" || "$key" =~ ^# ]] && continue
-        val=$(op read "$ref" 2>/dev/null) && export "$key=$val"
-    done < "$OP_REFS"
+    while IFS='=' read -r line; do
+        [[ -z "$line" || "$line" =~ ^# ]] && continue
+        key="${line%%=*}"
+        export "$line"
+    done < <(op run --env-file="$OP_REFS" -- env 2>/dev/null | grep -F -f <(grep -v '^#' "$OP_REFS" | grep -v '^$' | cut -d= -f1))
+    _OP_LOADED=true
     echo "🔐 1Password: 完了"
 fi
 
@@ -821,9 +824,9 @@ else
     log_success "  └─ ラオモトのホンジン（darkninja + tortoise）、コンストラクト完了！ワザマエ！"
 fi
 
-# 1Password: mainセッションにもシークレット注入
-if [ -f "$OP_REFS" ] && [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-    while IFS='=' read -r key ref; do
+# 1Password: mainセッションにシークレット注入
+if [ "$_OP_LOADED" = true ]; then
+    while IFS='=' read -r key _; do
         [[ -z "$key" || "$key" =~ ^# ]] && continue
         val="${!key}"
         [ -n "$val" ] && tmux set-environment -t main "$key" "$val"
@@ -863,12 +866,12 @@ fi
 # NOTE: "agents" → "neosaitama" のリネームは multiagent:agents の全操作完了後に実施（STEP 5.2後）
 # SSH窓(kyoto)は廃止。ネオサイタマはローカルペインのみ。
 
-# 1Password: tmuxセッション環境変数にシークレットを注入
+# 1Password: multiagentセッションにシークレット注入
 # → respawn-paneや新規paneでも継承される（ファイルには残らない）
-if [ -f "$OP_REFS" ] && [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-    while IFS='=' read -r key ref; do
+if [ "$_OP_LOADED" = true ]; then
+    while IFS='=' read -r key _; do
         [[ -z "$key" || "$key" =~ ^# ]] && continue
-        val="${!key}"  # indirect expansion: 既にexport済みの値を取得
+        val="${!key}"
         [ -n "$val" ] && tmux set-environment -t multiagent "$key" "$val"
     done < "$OP_REFS"
     echo "  🔐 1Password: tmuxセッションにシークレット注入完了"
