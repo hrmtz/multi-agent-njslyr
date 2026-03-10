@@ -123,7 +123,7 @@ def call_openai(system_prompt: str, user_message: str) -> dict:
                 "Content-Type": "application/json",
             },
             json={
-                "model": "gpt-5.2-chat-latest",
+                "model": "gpt-5.2",
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
