@@ -123,7 +123,7 @@ def call_openai(system_prompt: str, user_message: str) -> dict:
                 "Content-Type": "application/json",
             },
             json={
-                "model": "gpt-4o",
+                "model": "gpt-5.2-chat-latest",
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
@@ -145,9 +145,8 @@ def call_openai(system_prompt: str, user_message: str) -> dict:
 def call_gemini(system_prompt: str, user_message: str) -> dict:
     """Call Gemini API via REST.
 
-    Disables thinking mode to avoid conflict with responseMimeType=application/json.
-    Gemini 2.5-flash thinking parts corrupt JSON concatenation — root cause of 7/8
-    walkthrough parse failures.
+    Gemini 3 Flash (upgraded from 2.5-flash which had thinking mode JSON corruption).
+    thinkingConfig kept at 0 as precaution for JSON mode compatibility.
     """
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
@@ -155,7 +154,7 @@ def call_gemini(system_prompt: str, user_message: str) -> dict:
 
     def _do():
         resp = requests.post(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent",
             headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
             json={
                 "systemInstruction": {"parts": [{"text": system_prompt}]},
