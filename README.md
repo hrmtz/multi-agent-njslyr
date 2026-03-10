@@ -9,7 +9,7 @@ Kyoto (Ryzen/WSL) + NeoSaitama (MBP) + TOKYO-3 (MAGI). Separated by Tailscale. U
 
 [![GitHub Stars](https://img.shields.io/github/stars/hrmtz/multi-agent-njslyr?style=social)](https://github.com/hrmtz/multi-agent-njslyr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![v5.0 Cross-Machine](https://img.shields.io/badge/v5.0-Cross--Machine-ff6600?style=flat-square)](https://github.com/hrmtz/multi-agent-njslyr)
+[![v6.0 TOKYO-3](https://img.shields.io/badge/v6.0-TOKYO--3-ff6600?style=flat-square)](https://github.com/hrmtz/multi-agent-njslyr)
 [![BATS 123/123](https://img.shields.io/badge/BATS-123%2F123_PASS-brightgreen?style=flat-square)]()
 
 [English](README.md) | [Japanese](README_ja.md)
@@ -673,6 +673,17 @@ mcp__memory__read_graph()
 ---
 
 ## Changelog
+
+### v6.0 — TOKYO-3 (MAGI System)
+
+- **MAGI three-way AI deliberation** — Claude (MELCHIOR) + GPT (BALTHASAR) + Gemini (CASPER) に同一議題を並列分析させ、クロスレビューで合意形成。コードレビュー、戦略判断、設計決定、コンテンツ評価に対応する汎用審議システム。
+- **Three cities network** — Kyoto (operations) + NeoSaitama (content pipeline) + TOKYO-3 (MAGI deliberation). Darkninja がMAGIに諮問し、合議結果をYAMLタスクに変換してヤクザ群団に投入。
+- **Three deliberation modes** — `judge` (approve/reject voting), `deliberate` (improvement proposals + consensus plan), `walkthrough` (persona-based experience simulation with dropout tracking).
+- **Monju Adapter** — MAGI合意結果をYAMLタスク形式に自動変換。審議→実行のフルループを実現。
+- **magi_core packaging** (cmd_384) — Monolithic `magi.py` を `core/` パッケージに分離。orchestrator / models / prompts / schemas / utils の5モジュール構成。
+- **MAGI hygiene fixes** — MODEL_CONFIG single source of truth, fail-fast on missing API keys, exponential backoff (429/502/503), Phase 2 cross-review compression, Jaccard similarity deduplication (threshold 0.7), per-mode schema validation.
+- **SDK-free architecture** — All API calls via raw REST (`requests`). No anthropic/openai/google SDK dependencies. `--skip` で部分稼働可能（2体以上で合議成立）。
+- **Model upgrades** — MELCHIOR: Claude Sonnet 5, BALTHASAR: GPT-5.2, CASPER: Gemini 3 Pro.
 
 ### v5.1 — Infrastructure Optimization & Yakuza Tengu Retirement
 

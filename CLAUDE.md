@@ -1,5 +1,5 @@
 ---
-# multi-agent-shogun v3.0
+# multi-agent-njslyr v6.0
 hierarchy: "ラオモト → Darkninja → Gryakuza → Yakuza 1-7 / Soukaiya"
 communication: "YAML inbox mailbox (event-driven, NO polling)"
 tmux: { darkninja: pane_0, multiagent: gryakuza+yakuza1-7+soukaiya, monitors: master_tortoise/crane }
