@@ -1,6 +1,6 @@
 # MAGI System — Three-way AI Deliberation
 
-3つの異なるAI（Claude / GPT / Gemini）に同一の議題を並列で分析させ、クロスレビューで合意形成する審議システム。
+3つの異なるAI（Claude / GPT / Gemini）に同一の議題を並列で分析させ、クロスレビューで合意形成する汎用審議システム。戦略判断、コードレビュー、コンテンツ評価、設計決定など、あらゆる意思決定に使える。
 
 ## Architecture
 
@@ -46,32 +46,39 @@ python3 scripts/magi/magi.py --mode judge "Should we deploy feature X?"
 
 ### deliberate — 改善提案（デフォルト）
 ```bash
-python3 scripts/magi/magi.py --mode deliberate --session article_review --file article.html
+python3 scripts/magi/magi.py --mode deliberate --session code_review --file main.py
+python3 scripts/magi/magi.py --mode deliberate --session strategy --file proposal.md
 ```
-スコアリング + 具体的改善提案 + リライト例を生成。Phase 2で合意形成し `consensus_plan` を出力。
+スコアリング + 具体的改善提案 + リライト例を生成。Phase 2で合意形成し `consensus_plan` を出力。コードレビュー、戦略提案、記事改善など対象を問わない。
 
-### walkthrough — 読者離脱シミュレーション
+### walkthrough — ペルソナベース体験シミュレーション
 ```bash
 python3 scripts/magi/magi.py --mode walkthrough --file article.html --context "メンズ鼻整形"
 ```
-3つの読者ペルソナ（慎重型/衝動型/懐疑型）が記事を読み進め、セクションごとの離脱確率・感情・内心の声を出力。`--context` に男性系キーワードがあれば男性ペルソナに自動切替。
+3つのペルソナ（慎重型/衝動型/懐疑型）がコンテンツを通読し、セクションごとの離脱確率・感情・内心の声を出力。`--context` で対象読者を指定可能。
 
 ## Session Types
 
 | Session | Use Case |
 |---------|----------|
-| `general` | 汎用的な質問・戦略判断 |
-| `article_review` | ブログ記事のSEO・医療正確性・読者エンゲージメント評価 |
-| `strategy` | 経営・技術戦略の意思決定 |
-| `code_review` | コードの正確性・セキュリティ・保守性レビュー |
+| `general` | 汎用的な質問・意思決定・設計判断 |
+| `code_review` | コードの正確性・セキュリティ・パフォーマンス・保守性 |
+| `strategy` | 経営・技術戦略・アーキテクチャ決定 |
+| `article_review` | コンテンツのSEO・正確性・読者エンゲージメント |
 
 ## Usage
 
 ```bash
-# Basic question
-python3 scripts/magi/magi.py "Is this architecture decision sound?"
+# Strategic decision
+python3 scripts/magi/magi.py "Should we migrate from monolith to microservices?"
 
-# Article review with file input
+# Code review
+python3 scripts/magi/magi.py --mode deliberate --session code_review --file auth_module.py
+
+# Architecture approval vote
+python3 scripts/magi/magi.py --mode judge --session strategy --file rfc_proposal.md
+
+# Content review
 python3 scripts/magi/magi.py --mode deliberate --session article_review --file article.html
 
 # Skip a unit (e.g. API key unavailable)
@@ -81,10 +88,10 @@ python3 scripts/magi/magi.py --skip MELCHIOR "Evaluate this strategy"
 python3 scripts/magi/magi.py --json --mode deliberate --file content.html
 
 # Stdin input
-cat article.html | python3 scripts/magi/magi.py --stdin --mode walkthrough
+cat design_doc.md | python3 scripts/magi/magi.py --stdin --mode judge
 
 # Custom output directory
-python3 scripts/magi/magi.py --output-dir results/sprint42/ --file review_target.html
+python3 scripts/magi/magi.py --output-dir results/sprint42/ --file review_target.py
 ```
 
 ### Options
