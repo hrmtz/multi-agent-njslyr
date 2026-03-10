@@ -158,3 +158,21 @@ from adapters.monju_adapter import magi_to_tasks
 
 tasks = magi_to_tasks(result, article_id="article_45")
 ```
+
+## Changelog
+
+### v1.0 (njslyr v6.0)
+
+- Initial release as standalone package
+- `core/` package: orchestrator, models, prompts, schemas, utils
+- MODEL_CONFIG single source of truth (models.py)
+- Fail-fast on missing API keys (no silent abstain)
+- 2-body minimum enforcement in `call_all_parallel`
+- Exponential backoff on 429/502/503/ConnectionError
+- Phase 2 cross-review compression (summary, not full JSON)
+- Jaccard similarity deduplication (threshold 0.7)
+- Per-mode schema validation (judge/deliberate/walkthrough)
+- Monju Adapter for YAML task conversion
+- `--profile` and `--output-dir` CLI options (profile is stub for Phase 2)
+- Backward-compatible `magi.py` wrapper
+- Models: Claude Sonnet 5 / GPT-5.2 / Gemini 3 Pro
