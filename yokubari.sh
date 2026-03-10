@@ -73,7 +73,7 @@ MACHINE_ROLE="${MACHINE_ROLE:-kyoto}"
 
 # neosaitama: Kyoto SSH接続設定（cmd_287）
 KYOTO_SSH_PORT="${KYOTO_SSH_PORT:-2200}"
-KYOTO_HOST="${KYOTO_HOST:-peer-hostname}"
+KYOTO_HOST="${KYOTO_HOST:-kyoto-host}"
 
 # マシンロール依存の早期定義（CLEAN_MODEブロックで使用されるため、STEP 5より前に必要）
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then

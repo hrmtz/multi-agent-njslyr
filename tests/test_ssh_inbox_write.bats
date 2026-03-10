@@ -51,7 +51,7 @@ EOF
     cat > "$TEST_TMPDIR/config/settings.yaml" << EOF
 machine:
   role: kyoto
-  peer_host: peer-hostname
+  peer_host: test-peer-host
   peer_project_root: /Users/hrmtz/project/multi-agent-njslyr
 EOF
 
@@ -263,7 +263,7 @@ EOF
     cat > "$TEST_TMPDIR/config/settings.yaml" << 'EOF'
 machine:
   role: kyoto
-  peer_host: peer-hostname
+  peer_host: test-peer-host
   peer_project_root: /Users/../etc/passwd
 EOF
     run bash "$TEST_SCRIPT" "gryakuza" "test" "task_assigned" "yakuza3"

@@ -6,19 +6,15 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 export $(grep -v '^#' config/api_keys.env | grep -v '^$' | xargs)
 
-ARTICLES_DIR="/home/hrmtz/project/content-forge/output/articles"
+ARTICLES_DIR="${CONTENT_PIPELINE_DIR:-/path/to/content-pipeline}/output/articles"
 RESULTS_DIR="scripts/magi/results"
 mkdir -p "$RESULTS_DIR"
 
+# List your article directory names here
 articles=(
-    "article_M1_メンズ鼻整形"
-    "article_M2_男性鼻整形自然"
-    "article_M3_メンズ鼻整形バレない"
-    "article_M4_男性鼻整形ダウンタイム"
-    "article_M5_メンズ団子鼻"
-    "article_M6_男鼻低い"
-    "article_M7_男性鼻整形費用"
-    "article_M8_メンズ鼻整形おすすめ"
+    "article_01_example_topic"
+    "article_02_example_topic"
+    # Add more articles as needed
 )
 
 run_one() {
@@ -45,7 +41,7 @@ print(f'Title: {title}\n\n{content}')
         --mode deliberate \
         --session article_review \
         --json \
-        --context "メンズ美容クリニック記事。ターゲット: 鼻整形に興味がある20-40代男性" \
+        --context "Website article. Target: your target audience description here" \
         "$content" \
         > "../../$out_file" 2>&1
     cd ../..

@@ -97,7 +97,7 @@ branch: feat/cmd_303-neo
     ├─── inbox_write → yakuza1-3 [machine=neosaitama]
     └─── inbox_write → soukaiya_neo
          │
-         │ SSH: ssh peer-hostname "inbox_write gryakuza_kyo"
+         │ SSH: ssh <kyoto-hostname> "inbox_write gryakuza_kyo"
          │ (fallback: ntfy_send_report.sh → {TOPIC})
          ▼
       スミス（gryakuza_kyo）受信・ダッシュボード更新
@@ -265,7 +265,7 @@ queue/inbox/gryakuza.yaml @ NeoSaitama ← Neo gryakuza専用
 
 ```bash
 # Neo gryakuza → Kyoto gryakuza (SSH direct)
-ssh peer-hostname "cd ~/project/multi-agent-njslyr && \
+ssh <kyoto-hostname> "cd ~/project/multi-agent-njslyr && \
   bash scripts/inbox_write.sh gryakuza '完了報告' report_received gryakuza@neo"
 
 # Kyoto gryakuza → Neo gryakuza (SSH direct)
@@ -301,7 +301,7 @@ SSH失敗時（NeoSaitamaスリープ等）のフォールバック → ntfy dis
 
 ```bash
 # NeoSaitama → Kyoto (Neo gryakuza → Kyoto gryakuza)
-ssh peer-hostname "cd ~/project/multi-agent-njslyr && \
+ssh <kyoto-hostname> "cd ~/project/multi-agent-njslyr && \
   bash scripts/inbox_write.sh gryakuza '完了報告内容' report_received gryakuza@neo \
   queue/reports/neo_report_xxx.yaml P1"
 
@@ -316,7 +316,7 @@ ssh {neo_tailscale_host} "cd ~/project/multi-agent-njslyr && \
 ```bash
 # Neo → Kyoto (rsync via SSH) — cross_sync.sh を利用
 rsync -avz --rsh=ssh queue/reports/neo_report_xxx.yaml \
-  peer-hostname:~/project/multi-agent-njslyr/queue/reports/
+  <kyoto-hostname>:~/project/multi-agent-njslyr/queue/reports/
 
 # Kyoto → Neo (rsync via SSH)
 rsync -avz --rsh=ssh queue/tasks/neo_task_xxx.yaml \
@@ -328,7 +328,7 @@ rsync -avz --rsh=ssh queue/tasks/neo_task_xxx.yaml \
 ```bash
 # NeoSaitama → GitHub（現行維持） → Kyoto pullのサイクル
 # SSH加速オプション: Kyotoをgitリモートとして追加（今後検討）
-# git remote add kyoto-direct peer-hostname:~/project/multi-agent-njslyr
+# git remote add kyoto-direct <kyoto-hostname>:~/project/multi-agent-njslyr
 # git push kyoto-direct feat/cmd_XXX-neo
 ```
 
@@ -352,7 +352,7 @@ ssh_inbox_write.sh <peer_host> <target_agent> <message> <type> <from> [yaml_path
 
 ```bash
 # SSH疎通確認
-if ! ssh -o ConnectTimeout=5 peer-hostname true 2>/dev/null; then
+if ! ssh -o ConnectTimeout=5 <kyoto-hostname> true 2>/dev/null; then
     # SSH失敗 → ntfy_send_report.sh / ntfy_send_dispatch.sh にフォールバック
     bash scripts/ntfy_send_report.sh "$REPORT_PATH"
 fi

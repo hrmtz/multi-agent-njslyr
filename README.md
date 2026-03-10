@@ -495,7 +495,7 @@ language: en          # + English translation in parens
 machine:
   role: kyoto                   # kyoto (Ryzen WSL) or neosaitama (MBP)
   operation_mode: kyoto_master  # kyoto_master | standalone | slave
-  peer_host: peer-hostname          # Tailscale hostname of peer machine
+  peer_host: <peer-hostname>    # Tailscale hostname of peer machine
   peer_project_root: /Users/hrmtz/project/multi-agent-njslyr
 
 ntfy_topic: "your-secret-topic"
@@ -637,7 +637,7 @@ tmux respawn-pane -t multiagent:0.X -k 'claude --dangerously-skip-permissions'
 
 ```bash
 # Check Tailscale connection
-tailscale ping --timeout=5s peer-hostname
+tailscale ping --timeout=5s <peer-hostname>
 
 # Manual sync
 bash scripts/cross_sync.sh

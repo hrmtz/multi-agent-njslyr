@@ -49,7 +49,7 @@ EOF
     cat > "$TEST_TMPDIR/config/settings.yaml" << EOF
 machine:
   role: neosaitama
-  peer_host: peer-hostname
+  peer_host: test-peer-host
   peer_project_root: /Users/hrmtz/project/multi-agent-njslyr
 EOF
 

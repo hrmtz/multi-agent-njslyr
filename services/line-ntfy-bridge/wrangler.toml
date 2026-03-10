@@ -1,7 +1,7 @@
 name = "line-ntfy-bridge"
 main = "src/worker.js"
 compatibility_date = "2024-01-01"
-account_id = "REDACTED_CF_ACCOUNT"
+# account_id = "set via CLOUDFLARE_ACCOUNT_ID env var or wrangler login"
 
 # Secrets are set via `wrangler secret set` — never hardcode them here.
 # Required secrets:

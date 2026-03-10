@@ -294,12 +294,9 @@ _build_secrets_list() {
     echo "$SCRIPT_DIR/config/ftp.env|$PEER_HOST:$PEER_PROJECT_ROOT/config/ftp.env"
     echo "$SCRIPT_DIR/config/line.env|$PEER_HOST:$PEER_PROJECT_ROOT/config/line.env"
 
-    # content-forge (旧 wp-publisher)
-    echo "$local_home/project/content-forge/.env|$PEER_HOST:$remote_home/project/content-forge/.env"
-
-    # seo-research
-    echo "$local_home/project/seo-research/.env|$PEER_HOST:$remote_home/project/seo-research/.env"
-    echo "$local_home/project/seo-research/secrets/service_account.json|$PEER_HOST:$remote_home/project/seo-research/secrets/service_account.json"
+    # Add additional project secrets here as needed:
+    # echo "$local_home/project/<project>/.env|$PEER_HOST:$remote_home/project/<project>/.env"
+    # echo "$local_home/project/<project>/secrets/<file>|$PEER_HOST:$remote_home/project/<project>/secrets/<file>"
 }
 
 sync_secrets() {

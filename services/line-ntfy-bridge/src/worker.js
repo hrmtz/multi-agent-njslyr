@@ -8,11 +8,10 @@
  *   LINE_CHANNEL_ACCESS_TOKEN — for LINE reply API
  *   ANTHROPIC_API_KEY          — for Haiku instant reply (optional; falls back to fixed text)
  *
- * ntfy topic: https://ntfy.sh/REDACTED_NTFY_TOPIC
+ * ntfy topic: set via env.NTFY_URL (wrangler secret or [vars])
+ *   NTFY_URL                   — ntfy topic endpoint
+ *   NTFY_TOKEN                 — ntfy auth token
  */
-
-const NTFY_URL = "https://ntfy.sh/REDACTED_NTFY_TOPIC";
-const NTFY_TOKEN = "REDACTED_TOKEN";
 const LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
@@ -52,9 +51,9 @@ export default {
     // Debug: test ntfy connectivity
     if (url.pathname === "/test-ntfy") {
       try {
-        const resp = await fetch(NTFY_URL, {
+        const resp = await fetch(env.NTFY_URL, {
           method: "POST",
-          headers: { "Content-Type": "text/plain; charset=utf-8", "Title": "Worker test", "Authorization": `Bearer ${NTFY_TOKEN}` },
+          headers: { "Content-Type": "text/plain; charset=utf-8", "Title": "Worker test", "Authorization": `Bearer ${env.NTFY_TOKEN}` },
           body: "ntfy test from worker " + new Date().toISOString(),
         });
         return new Response(`ntfy response: ${resp.status} ${await resp.text()}`, { status: 200 });
@@ -148,7 +147,7 @@ async function handleEvent(event, env, ctx) {
     } else if (msgType === "image" || msgType === "video" || msgType === "file") {
       const messageId = event.message.id;
       const fileName = event.message.fileName || null;
-      await postToNtfy(`lineimg:${messageId}:${msgType}:${fileName || ""}`, userId);
+      await postToNtfy(`lineimg:${messageId}:${msgType}:${fileName || ""}`, userId, env);
     }
   } catch (e) {
     console.error(`handleEvent FATAL: ${e.message}\n${e.stack}`);
@@ -174,7 +173,7 @@ async function getStatusText(env) {
  * Format KV JSON into a compact LINE-friendly status message
  *
  * Output example:
- *   🖥️ peer-hostname 07:35 (load:0.8)
+ *   🖥️ <hostname> 07:35 (load:0.8)
  *   dn:ON gry:ON souk:ON
  *   y1:cmd_347a y5:cmd_347b
  *   idle: y2,y3,y4,y6,y7
@@ -244,13 +243,13 @@ function formatStatusMessage(data) {
 /**
  * POST message to ntfy
  */
-async function postToNtfy(text, userId) {
-  const resp = await fetch(NTFY_URL, {
+async function postToNtfy(text, userId, env) {
+  const resp = await fetch(env.NTFY_URL, {
     method: "POST",
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
       "Title": `LINE: ${userId}`,
-      "Authorization": `Bearer ${NTFY_TOKEN}`,
+      "Authorization": `Bearer ${env.NTFY_TOKEN}`,
     },
     body: text,
   });
@@ -294,7 +293,7 @@ async function handleTextWithHaiku(text, userId, replyToken, env, ctx) {
   const ntfyBody = haikuReply
     ? `${text}\n[Haiku応答]: ${haikuReply}`
     : text;
-  ctx.waitUntil(postToNtfy(ntfyBody, userId));
+  ctx.waitUntil(postToNtfy(ntfyBody, userId, env));
 }
 
 /**

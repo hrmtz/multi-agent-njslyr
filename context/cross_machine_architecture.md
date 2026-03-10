@@ -17,7 +17,7 @@
 - **コードベース共有**: git（`hrmtz/multi-agent-njslyr`）
 - **状態YAML共有**: rsync over Tailscale（`cross_sync.sh`）
 - **リアルタイム通信**: ntfy.sh（プレフィックスルーティング）
-- **ネットワーク**: Tailscaleメッシュ。KyotoのTailscaleホスト名 = `peer-hostname`
+- **ネットワーク**: Tailscaleメッシュ。KyotoのTailscaleホスト名 = `<kyoto-hostname>`
 
 ---
 
@@ -253,10 +253,10 @@ projects/         # シークレット（git-ignored）
 
 ### 前提条件
 
-- Tailscale接続済み（`tailscale ping --timeout=5s peer-hostname` が成功すること）
+- Tailscale接続済み（`tailscale ping --timeout=5s <kyoto-hostname>` が成功すること）
 - 両マシンにrsyncインストール済み
 - `config/settings.yaml` の `machine.role`, `peer_host`, `peer_project_root` が正確に設定済み
-- KyotoへのSSHアクセス（NeoSaitamaから `peer-hostname` へ）
+- KyotoへのSSHアクセス（NeoSaitamaから `<kyoto-hostname>` へ）
 
 ---
 

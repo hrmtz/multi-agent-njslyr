@@ -33,7 +33,7 @@ setup() {
 ntfy_topic: bjk-test-topic-12345
 machine:
   role: kyoto
-  peer_host: peer-hostname
+  peer_host: test-peer-host
 EOF
 
     # lib/ntfy_auth.sh + lib/ssh_fallback.sh（本物をコピー）

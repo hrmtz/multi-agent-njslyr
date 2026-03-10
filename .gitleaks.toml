@@ -82,10 +82,10 @@ tags = ["x-api", "twitter", "pii"]
 # ============================================
 
 [[rules]]
-id = "zenn-personal-id"
-description = "Personal Zenn/X identifier"
-regex = '''redacted_handle'''
-tags = ["zenn", "personal", "pii"]
+id = "personal-username"
+description = "Personal username / handle (replace with your own pattern)"
+regex = '''your_personal_handle_here'''
+tags = ["personal", "pii"]
 
 [[rules]]
 id = "zenn-writer-skill"
