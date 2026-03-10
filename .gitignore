@@ -77,6 +77,7 @@
 !config/line.env.sample
 !config/api_keys.env.sample
 !config/sensitive_local.env.sample
+!config/op_refs.env
 # Actual .env files are excluded by default (contain secrets)
 
 # Templates

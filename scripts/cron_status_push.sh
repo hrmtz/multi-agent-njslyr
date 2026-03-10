@@ -15,15 +15,11 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
 }
 
-# Load Cloudflare credentials
+# Load Cloudflare credentials (env vars from op run, or fallback to file)
 ENV_FILE="$PROJECT_ROOT/config/api_keys.env"
-if [[ ! -f "$ENV_FILE" ]]; then
-    log "ERROR: $ENV_FILE not found"
-    exit 1
+if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]] && [[ -f "$ENV_FILE" ]]; then
+    eval "$(grep -E '^(CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|CLOUDFLARE_KV_NAMESPACE_ID)=' "$ENV_FILE" | tr -d '\r')"
 fi
-
-# Source safely (grep to avoid non-ASCII issues)
-eval "$(grep -E '^(CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|CLOUDFLARE_KV_NAMESPACE_ID)=' "$ENV_FILE" | tr -d '\r')"
 
 if [[ -z "${CLOUDFLARE_API_TOKEN:-}" || -z "${CLOUDFLARE_ACCOUNT_ID:-}" || -z "${CLOUDFLARE_KV_NAMESPACE_ID:-}" ]]; then
     log "ERROR: Missing CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, or CLOUDFLARE_KV_NAMESPACE_ID in $ENV_FILE"
