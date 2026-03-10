@@ -154,7 +154,7 @@ def call_gemini(system_prompt: str, user_message: str) -> dict:
 
     def _do():
         resp = requests.post(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent",
             headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
             json={
                 "systemInstruction": {"parts": [{"text": system_prompt}]},
