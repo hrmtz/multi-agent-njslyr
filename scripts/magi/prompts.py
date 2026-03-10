@@ -9,7 +9,6 @@ Mode 2: DELIBERATE — discussion producing actionable improvements (default)
 PERSONAS = {
     "MELCHIOR": {
         "name": "MELCHIOR-1",
-        "model_label": "Claude Sonnet",
         "perspective": "科学者",
         "system_prompt": (
             "You are MELCHIOR-1, the Scientist perspective of the MAGI system. "
@@ -22,7 +21,6 @@ PERSONAS = {
     },
     "BALTHASAR": {
         "name": "BALTHASAR-2",
-        "model_label": "GPT-4o",
         "perspective": "実用主義者",
         "system_prompt": (
             "You are BALTHASAR-2, the Pragmatist perspective of the MAGI system. "
@@ -34,7 +32,6 @@ PERSONAS = {
     },
     "CASPER": {
         "name": "CASPER-3",
-        "model_label": "Gemini Flash",
         "perspective": "ビジョナリー",
         "system_prompt": (
             "You are CASPER-3, the Visionary perspective of the MAGI system. "
@@ -171,7 +168,6 @@ def get_walkthrough_personas(target_context: str = "") -> dict:
         return {
             "MELCHIOR": {
                 "name": "MELCHIOR-1",
-                "model_label": "Claude Sonnet",
                 "reader_type": "慎重な情報収集者",
                 "reader_prompt": (
                     "You are simulating a cautious male reader (age 25-35) researching cosmetic surgery. "
@@ -183,7 +179,6 @@ def get_walkthrough_personas(target_context: str = "") -> dict:
             },
             "BALTHASAR": {
                 "name": "BALTHASAR-2",
-                "model_label": "GPT-4o",
                 "reader_type": "衝動的スキマー",
                 "reader_prompt": (
                     "You are simulating an impulsive male reader (age 20-28) with LOW attention span "
@@ -197,7 +192,6 @@ def get_walkthrough_personas(target_context: str = "") -> dict:
             },
             "CASPER": {
                 "name": "CASPER-3",
-                "model_label": "Gemini Flash",
                 "reader_type": "懐疑的な比較検討者",
                 "reader_prompt": (
                     "You are simulating a skeptical male reader (age 30-40) comparing clinics. "
@@ -213,7 +207,6 @@ def get_walkthrough_personas(target_context: str = "") -> dict:
         return {
             "MELCHIOR": {
                 "name": "MELCHIOR-1",
-                "model_label": "Claude Sonnet",
                 "reader_type": "慎重な情報収集者",
                 "reader_prompt": (
                     "You are simulating a cautious female reader (age 25-35) who carefully reads "
@@ -224,7 +217,6 @@ def get_walkthrough_personas(target_context: str = "") -> dict:
             },
             "BALTHASAR": {
                 "name": "BALTHASAR-2",
-                "model_label": "GPT-4o",
                 "reader_type": "衝動的スキマー",
                 "reader_prompt": (
                     "You are simulating an impulsive female reader (age 20-30) with LOW attention span "
@@ -238,7 +230,6 @@ def get_walkthrough_personas(target_context: str = "") -> dict:
             },
             "CASPER": {
                 "name": "CASPER-3",
-                "model_label": "Gemini Flash",
                 "reader_type": "懐疑的な比較検討者",
                 "reader_prompt": (
                     "You are simulating a skeptical female reader (age 30-40) who is comparing "
