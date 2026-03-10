@@ -84,6 +84,17 @@ else
     MONITOR_AGENT="master_tortoise"
 fi
 
+# 1Password: シークレットをop readで取得しexport（tmux環境にも注入）
+OP_REFS="$SCRIPT_DIR/config/op_refs.env"
+if [ -f "$OP_REFS" ] && command -v op &>/dev/null && [ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
+    echo "🔐 1Password: シークレット取得中..."
+    while IFS='=' read -r key ref; do
+        [[ -z "$key" || "$key" =~ ^# ]] && continue
+        val=$(op read "$ref" 2>/dev/null) && export "$key=$val"
+    done < "$OP_REFS"
+    echo "🔐 1Password: 完了"
+fi
+
 # DeepSeek API Key読み込み（config/deepseek.env が存在する場合）
 if [ -f "$SCRIPT_DIR/config/deepseek.env" ]; then
     source "$SCRIPT_DIR/config/deepseek.env"
@@ -810,6 +821,15 @@ else
     log_success "  └─ ラオモトのホンジン（darkninja + tortoise）、コンストラクト完了！ワザマエ！"
 fi
 
+# 1Password: mainセッションにもシークレット注入
+if [ -f "$OP_REFS" ] && [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    while IFS='=' read -r key ref; do
+        [[ -z "$key" || "$key" =~ ^# ]] && continue
+        val="${!key}"
+        [ -n "$val" ] && tmux set-environment -t main "$key" "$val"
+    done < "$OP_REFS"
+fi
+
 # NOTE: window-size latest + aggressive-resize on は全ペイン分割完了後に設定する（STEP 5.3）
 # 分割前に設定するとクライアントサイズ(132x40等)に縮小されno space for new paneが発生する
 echo ""
@@ -842,6 +862,17 @@ fi
 
 # NOTE: "agents" → "neosaitama" のリネームは multiagent:agents の全操作完了後に実施（STEP 5.2後）
 # SSH窓(kyoto)は廃止。ネオサイタマはローカルペインのみ。
+
+# 1Password: tmuxセッション環境変数にシークレットを注入
+# → respawn-paneや新規paneでも継承される（ファイルには残らない）
+if [ -f "$OP_REFS" ] && [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    while IFS='=' read -r key ref; do
+        [[ -z "$key" || "$key" =~ ^# ]] && continue
+        val="${!key}"  # indirect expansion: 既にexport済みの値を取得
+        [ -n "$val" ] && tmux set-environment -t multiagent "$key" "$val"
+    done < "$OP_REFS"
+    echo "  🔐 1Password: tmuxセッションにシークレット注入完了"
+fi
 
 # DISPLAY_MODE: shout (default) or silent (--silent flag)
 if [ "$SILENT_MODE" = true ]; then
