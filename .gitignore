@@ -117,6 +117,12 @@
 !scripts/cron_audit.sh
 !scripts/cron_status_push.sh
 !scripts/pane_title.sh
+!scripts/magi/
+!scripts/magi/*.py
+!scripts/magi/*.sh
+!scripts/magi/CLAUDE.md
+!scripts/infographics/
+!scripts/infographics/*.py
 
 # Services
 !services/
