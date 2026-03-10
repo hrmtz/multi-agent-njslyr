@@ -97,6 +97,7 @@ System manages ALL white-collar work. `projects/` is git-ignored.
 | D007 | `mkfs`, `dd if=`, `fdisk`, `mount`, `umount` | Disk/partition destruction |
 | D008 | `curl|bash`, `wget -O-|sh`, `curl|sh` (pipe-to-shell patterns) | Remote code execution |
 | D009 | Scripts, generated files, or intermediate files placed in `/tmp/` | Volatile storage — files lost on OS reboot |
+| D010 | Hardcoding sensitive values (API keys, tokens, IPs, hostnames, account IDs) in git-tracked files | Use `config/*.env` (gitignored) + `config/*.env.sample` (tracked, placeholder only). Memory MCP entries must also be sanitized before commit |
 
 ## Tier 2: STOP-AND-REPORT (halt work, notify Gryakuza/Darkninja)
 
@@ -162,11 +163,14 @@ _Last updated: 2026-03-10 | 25 active memories, 788 total_
 
 ## Architecture
 - dotfiles zsh configuration uses OS-based file branching pattern with `.zsh/zshrc.linux` and `.zsh/zshrc.macos` for pl... [dotfiles, zsh, wsl]
+- instagram-slides/CLAUDE.md serves as operational reference document with structured sections including Kyoto Quick St... [instagram-slides, documentation, runbook]
+- surgery-log-app is a Flask application running on NeoSaitama in Docker (see config/sensitive_local.env for host/port)... [architecture, surgery-log-app, flask, data-persistence]
 - Agent inbox architecture uses mixed directory structure: yakuza7 and soukaiya use /home/hrmtz/project/multi-agent-njs... [agent-architecture, inbox-structure, authentication]
 
 ## Key Decisions
-- Role separation and identity verification enforcement: darkninja refrains from direct NAS deployment... [role-separation, identity-verification, escalation-hierarchy]
+- Role separation and identity verification enforcement: darkninja refrains from direct NAS deployment, surgery-log-app... [role-separation, identity-verification, escalation-hierarchy]
 - NLM MCP tool unavailability recovery: use ToolSearch rediscovery pattern ('select:mcp__notebooklm__source_add') inste... [nlm, mcp-recovery, authentication, resilience]
+- surgery-log-app backup mechanism implemented: pre-save logic now copies source .md file to .md.bak before write_text(... [surgery-log-app, backup, deployment]
 - Agent environment management and credential distribution: after identifying and removing tmux global ANTHROPIC_API_KE... [agent-management, tmux, credentials, authentication]
 
 ## Patterns & Conventions
@@ -185,10 +189,14 @@ _Last updated: 2026-03-10 | 25 active memories, 788 total_
 ## Current Progress
 - NLM Wave 2 batch completion status finalized: yakuza1 B0 (50/50 upload, 50 query), yakuza2 B1 (49/50 upload with 1 de... [progress, nlm-batch, yakuza-fleet]
 - Kyoto yakuza authentication and infrastructure cleanup completed: darkninja restored `/login` command and Claude Max ... [authentication, infrastructure, deployment]
+- subtask_324a (instagram-slides CLAUDE.md improvement) completed with QC PASS verdict by soukaiya agent: all 8 accepta... [qc_pass, instagram_slides, soukaiya]
+- surgery-log-app edit and PDF download features completed and deployed to NAS... [surgery-log-app, deployment, feature-complete]
 
 ## Context
 - master_tortoise heartbeat failure sustained at 7900+ seconds (131+ minutes) at 21:59:15 JST, critically exceeding cra... [monitoring, crane, critical]
 - NotebookLM source_add (batch upload) operations do not trigger rate-limiting even at scale (50 PDFs uploaded successf... [nlm, rate-limiting, batch-processing]
+- surgery-log-app web interface accessible via Tailscale (see config/sensitive_local.env for IP/port)... [deployment, surgery_log_app, network]
+- Zotero User ID stored in config/api_keys.env (see .sample for format)... [zotero, api, configuration]
 
 _For deeper context, use memory_search, memory_related, or memory_ask tools._
 <!-- MEMORY:END -->
