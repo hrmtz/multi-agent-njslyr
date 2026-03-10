@@ -2,14 +2,14 @@
 
 # multi-agent-njslyr
 
-**19体のAIエージェント。二機のマシン。二人のグレーターヤクザ。調整コストゼロ。**
+**19体のAIエージェント。三都市。二人のグレーターヤクザ。調整コストゼロ。**
 
 ソウカイ・シンジケートの指揮系統でtmux上に統率。
-キョート（Ryzen WSL）＋ネオサイタマ（MBP）。TailscaleのSSHで繋ぎ、YAMLで動かす。
+キョート（Ryzen WSL）＋ネオサイタマ（MBP）＋TOKYO-3（MAGI審議システム）。TailscaleのSSHで繋ぎ、YAMLで動かす。
 
 [![GitHub Stars](https://img.shields.io/github/stars/hrmtz/multi-agent-njslyr?style=social)](https://github.com/hrmtz/multi-agent-njslyr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![v5.0 Cross-Machine](https://img.shields.io/badge/v5.0-Cross--Machine-ff6600?style=flat-square)](https://github.com/hrmtz/multi-agent-njslyr)
+[![v6.0 TOKYO-3](https://img.shields.io/badge/v6.0-TOKYO--3-ff6600?style=flat-square)](https://github.com/hrmtz/multi-agent-njslyr)
 [![BATS 243/243](https://img.shields.io/badge/BATS-243%2F243_PASS-brightgreen?style=flat-square)]()
 
 [English](README.md) | [日本語](README_ja.md)
@@ -28,9 +28,9 @@
 
 ## これは何？
 
-tmux上で最大19体のAIコーディングエージェントを並列稼働させ、ソウカイ・シンジケートの指揮系統でYAMLファイルを通じて統率するシステム。APIオーバーヘッドゼロ、ポーリングゼロ。
+tmux上で最大19体のAIコーディングエージェントを並列稼働させ、3つのAIによる合議審議システム（MAGI）を備えた統合開発指揮システム。ソウカイ・シンジケートの指揮系統でYAMLファイルを通じて統率する。APIオーバーヘッドゼロ、ポーリングゼロ。
 
-**二機体制。二人のグレーターヤクザ。頂点にダークニンジャ一人。**
+**三都市体制。二人のグレーターヤクザ。頂点にダークニンジャ一人。**
 
 ```
          あなた（ラオモト）
@@ -52,10 +52,10 @@ tmux上で最大19体のAIコーディングエージェントを並列稼働さ
  │  +-+-+-+-+-+-+-+-+------------------+                          │
  │  |1|2|3|4|5|6|7|  | SOUKAIYA_KYO  |  クローンヤクザ7体＋1体   │
  │  +-+-+-+-+-+-+-+-+------------------+                          │
- └────────────────────────┬───────────────────────────────────────┘
-                          │  SSH（Tailscale）— Tier 1
-                          │  ntfy — Tier 2（フォールバック）
- ┌────────────────────────┴───────────────────────────────────────┐
+ └───────────┬────────────────────────────────────────────────────┘
+             │  SSH（Tailscale）— Tier 1
+             │  ntfy — Tier 2（フォールバック）
+ ┌───────────┴────────────────────────────────────────────────────┐
  │  ネオサイタマ  (MBP — Secondary / Slave)                       │
  │                                                                │
  │  +--------------------+                                        │
@@ -71,10 +71,24 @@ tmux上で最大19体のAIコーディングエージェントを並列稼働さ
  │  |1|2|3|4|5|6|7|  | SOUKAIYA_NEO  |  クローンヤクザ7体＋1体   │
  │  +-+-+-+-+-+-+-+-+------------------+                          │
  └────────────────────────────────────────────────────────────────┘
+
+ ┌────────────────────────────────────────────────────────────────┐
+ │  TOKYO-3  (MAGI — マルチAPI審議システム)                       │
+ │                                                                │
+ │  ┌───────────────┬───────────────┬───────────────┐             │
+ │  │  MELCHIOR-1   │  BALTHASAR-2  │   CASPER-3    │             │
+ │  │  Claude       │  GPT          │   Gemini      │             │
+ │  │  （科学者）    │  （実用主義者） │  （ビジョナリー）│             │
+ │  └───────┬───────┴───────┬───────┴───────┬───────┘             │
+ │          └──── クロスレビュー ────────────┘                     │
+ │                      │                                         │
+ │              合意形成 + タスクYAML  ──→  モンジュアダプター     │
+ └────────────────────────────────────────────────────────────────┘
 ```
 
 **なぜ使うのか？**
 - 1つの命令で最大19体のAIワーカーが二機にまたがって並列実行
+- MAGI三体審議（Claude + GPT + Gemini）で戦略判断・コードレビューの合議形成
 - 待ち時間なし — バックグラウンド実行中も次の命令を出せる
 - 自己回復: 3段階エスカレーション（スリケン→チョップ→スレイ）+ Claude Agent Tool自動復旧
 - 通信はすべてディスク上のYAML — 完全に透明、差分管理、バージョン管理可能
@@ -87,6 +101,7 @@ tmux上で最大19体のAIコーディングエージェントを並列稼働さ
 | | Claude Code `Task` | LangGraph | CrewAI | **njslyr** |
 |---|---|---|---|---|
 | **並列性** | 逐次 | グラフノード | 限定的 | **二機合計19体の独立エージェント** |
+| **マルチベンダーAI** | Claudeのみ | 設定次第 | 設定次第 | **MAGI: Claude + GPT + Gemini審議** |
 | **調整コスト** | Taskごとにapi呼び出し | API+インフラ | API+プラットフォーム | **ゼロ**（YAML+tmux） |
 | **可観測性** | ログのみ | LangSmith | OpenTelemetry | **ライブtmuxペイン** |
 | **自己回復** | なし | 手動 | なし | **3段階エスカレーション+Agent Tool自動復旧** |
@@ -236,15 +251,29 @@ bash scripts/njslyr_cmd.sh suriken gryakuza  # 管理エージェントを起床
 
 スミス/ヤマヒロが過負荷のとき、Claude **Agent Tool**がサブエージェントを自動spawnしてタスクを並列処理。v5.1でヤクザ天狗（旧緊急スーパーバイザー）から移行。
 
+### MAGIシステム — 三体AI審議（TOKYO-3）
+
+3つの異なるAI（Claude / GPT / Gemini）に同一の議題を並列で分析させ、クロスレビューで合意形成する汎用審議システム。コードレビュー、戦略判断、設計決定、コンテンツ評価など、あらゆる意思決定に対応。
+
+```
+              Phase 1（並列分析）              Phase 2（クロスレビュー）
+MELCHIOR (Claude, 科学者)       ──┐     ┌──→  修正済み意見
+BALTHASAR (GPT, 実用主義者)     ──┼──→──┼──→  合意プラン
+CASPER (Gemini, ビジョナリー)   ──┘     └──→  タスクYAML（モンジュアダプター経由）
+```
+
+3モード: **judge**（承認/却下投票）、**deliberate**（改善提案＋合意プラン）、**walkthrough**（ペルソナベース体験シミュレーション）。4セッション: general、code_review、strategy、article_review。
+
+```bash
+python3 scripts/magi/magi.py --mode judge "マイクロサービスに移行すべきか？"
+python3 scripts/magi/magi.py --mode deliberate --session code_review --file auth.py
+```
+
+審議結果はモンジュアダプター経由でYAMLタスクに変換され、ヤクザ群団に投入される。詳細: [`scripts/magi/README.md`](scripts/magi/README.md)
+
 ### モンジュ — Opus3体相互批判QC
 
-アルファ/ベータ版スクリプトに対し、Opus3体が独立にコードレビュー → 相互批判 → バグ修正を統合。「三人寄れば文殊の知恵」から命名。
-
-```
-体A（セキュリティレビュー）  →\
-体B（ロジックレビュー）      →-+→ 相互批判 → バグリスト統合 → 修正
-体C（パフォーマンス）        →/
-```
+アルファ/ベータ版スクリプトに対し、Opus3体が独立にコードレビュー → 相互批判 → バグ修正を統合。「三人寄れば文殊の知恵」から命名。MAGIシステムはこの概念を異なるAIベンダーに拡張したもの。
 
 使い所: インフラデーモン、通信スクリプト、セキュリティ重要コード。
 
@@ -507,6 +536,11 @@ multi-agent-njslyr/
 │   └── cli_specific/          # CLI固有ツール記述
 │
 ├── scripts/
+│   ├── magi/                  # MAGIシステム（TOKYO-3）
+│   │   ├── core/              # orchestrator/models/prompts/schemas/utils
+│   │   ├── adapters/          # モンジュアダプター（結果→YAMLタスク変換）
+│   │   ├── cli.py             # CLIエントリポイント
+│   │   └── magi.py            # 後方互換ラッパー
 │   ├── njslyr.sh              # 監視デーモン
 │   ├── njslyr_cmd.sh          # オペレーションコマンド（suriken/chop/slay/detox）
 │   ├── njslyr_lib.sh          # 共有ライブラリ
@@ -641,6 +675,17 @@ mcp__memory__read_graph()
 
 ## 更新履歴
 
+### v6.0 — TOKYO-3（MAGIシステム）
+
+- **MAGI三体AI審議** — Claude（MELCHIOR）＋GPT（BALTHASAR）＋Gemini（CASPER）に同一議題を並列分析させ、クロスレビューで合意形成。コードレビュー、戦略判断、設計決定、コンテンツ評価に対応する汎用審議システム。
+- **三都市ネットワーク** — キョート（オペレーション）＋ネオサイタマ（コンテンツパイプライン）＋TOKYO-3（MAGI審議）。ダークニンジャがMAGIに諮問し、合議結果をYAMLタスクに変換してヤクザ群団に投入。
+- **3つの審議モード** — `judge`（承認/却下投票）、`deliberate`（改善提案＋合意プラン）、`walkthrough`（ペルソナベース体験シミュレーション＋離脱追跡）。
+- **モンジュアダプター** — MAGI合意結果をYAMLタスク形式に自動変換。審議→実行のフルループを実現。
+- **magi_coreパッケージ化** (cmd_384) — モノリシックな `magi.py` を `core/` パッケージに分離。orchestrator / models / prompts / schemas / utils の5モジュール構成。
+- **MAGI衛生修正** — MODEL_CONFIG一元管理、APIキー未設定時のフェイルファスト、指数バックオフ（429/502/503）、Phase 2クロスレビュー圧縮、Jaccard類似度による重複排除（閾値0.7）、モード別スキーマバリデーション。
+- **SDK-freeアーキテクチャ** — 全API呼び出しをREST直叩き（`requests`）。anthropic/openai/google SDKに非依存。`--skip` で部分稼働可能（2体以上で合議成立）。
+- **モデルアップグレード** — MELCHIOR: Claude Sonnet 5、BALTHASAR: GPT-5.2、CASPER: Gemini 3 Pro。
+
 ### v5.1 — インフラ最適化＆ヤクザ天狗退役
 
 - **監視エージェントHaiku化** — master_tortoise/master_craneをSonnetからHaikuモデルに移行。機械的な監視タスクにOpus/Sonnetは過剰。トークン消費を大幅削減。
@@ -712,6 +757,6 @@ mcp__memory__read_graph()
 
 <div align="center">
 
-**コマンド1つ。19体のエージェント。二機のマシン。二人のグレーターヤクザ。調整コストゼロ。**
+**コマンド1つ。19体のエージェント。三都市。二人のグレーターヤクザ。調整コストゼロ。**
 
 </div>
