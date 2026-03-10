@@ -790,9 +790,10 @@ SLAY_EOF
     rm -f "$STATE_DIR/njslyr_${agent_id}_idle_start"  # TODO(UNIFIED-MED-003): idle_start廃止後は削除
 
     # Step 5: Restart agent using respawn-pane (M3 fix - preserves grid layout)
+    # Clear DeepSeek bridge env vars to prevent API Usage Billing on restart
     log "◆再ショウカン◆ ${agent_id}（type: ${agent_type}, model: ${model}, bg: ${bg_color}）…ニンジャソウル再覚醒！"
     sleep 1
-    tmux respawn-pane -k -t "$pane_target" "claude --model ${model} --dangerously-skip-permissions" 2>/dev/null || true
+    tmux respawn-pane -k -t "$pane_target" "unset ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_MODEL ANTHROPIC_SMALL_FAST_MODEL; claude --model ${model} --dangerously-skip-permissions" 2>/dev/null || true
     sleep 2
 
     # Step 6: Reset pane background (keep remain-on-exit ON permanently)

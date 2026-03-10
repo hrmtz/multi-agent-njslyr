@@ -1,5 +1,5 @@
 ---
-# multi-agent-shogun v3.0
+# multi-agent-njslyr v6.0
 hierarchy: "ラオモト → Darkninja → Gryakuza → Yakuza 1-7 / Soukaiya"
 communication: "YAML inbox mailbox (event-driven, NO polling)"
 tmux: { darkninja: pane_0, multiagent: gryakuza+yakuza1-7+soukaiya, monitors: master_tortoise/crane }
@@ -54,6 +54,14 @@ Layer1: Memory MCP(persistent) → Layer2: Project files → Layer3: YAML Queue(
 
 # Cross-Machine Operation
 **Kyoto/Ryzen**(Primary) / **NeoSaitama/MBP**(Secondary)。Exclusive operation。Details: docs/protocols/cross_machine.md
+
+# MAGI System (TOKYO-3)
+3-way AI deliberation: MELCHIOR(Claude) / BALTHASAR(GPT) / CASPER(Gemini)。Phase1独立分析→Phase2クロスレビュー→合意形成。
+- Modes: judge(投票) / deliberate(改善提案) / walkthrough(ペルソナ体験シミュレーション)
+- Sessions: general / code_review / strategy / article_review
+- Location: `scripts/magi/`。Details: `scripts/magi/README.md`
+- Monju Adapter: MAGI合意→YAMLタスク変換（`scripts/magi/adapters/monju_adapter.py`）
+- 汎用審議システム。コードレビュー・戦略判断・設計決定・コンテンツ評価すべてに使える
 
 # Project Management
 System manages ALL white-collar work. `projects/` is git-ignored.
@@ -150,7 +158,7 @@ System manages ALL white-collar work. `projects/` is git-ignored.
 <!-- MEMORY:START -->
 # multi-agent-njslyr
 
-_Last updated: 2026-03-09 | 25 active memories, 788 total_
+_Last updated: 2026-03-10 | 25 active memories, 788 total_
 
 ## Architecture
 - dotfiles zsh configuration uses OS-based file branching pattern with `.zsh/zshrc.linux` and `.zsh/zshrc.macos` for pl... [dotfiles, zsh, wsl]

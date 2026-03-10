@@ -42,19 +42,29 @@ while IFS= read -r line; do
     fi
 
     if [[ -n "$script_path" && ! -f "$script_path" ]]; then
-        ISSUES+=("GHOST: スクリプト不在 '$script_path' ← cron: ${line:0:80}")
-        log "GHOST: $script_path not found"
+        # 相対パスの場合、cron行内のcd先と結合して再チェック
+        resolved=false
+        if [[ ! "$script_path" =~ ^/ && "$line" =~ cd[[:space:]]+([^[:space:]&;]+) ]]; then
+            cd_dir="${BASH_REMATCH[1]}"
+            if [[ -f "$cd_dir/$script_path" ]]; then
+                resolved=true
+            fi
+        fi
+        if [[ "$resolved" == false ]]; then
+            ISSUES+=("GHOST: スクリプト不在 '$script_path' ← cron: ${line:0:80}")
+            log "GHOST: $script_path not found"
+        fi
     fi
 done < <(crontab -l 2>/dev/null)
 
-# --- 2. Duplicate entries: 同じスクリプトが複数回登録 ---
-dupes=$(crontab -l 2>/dev/null | grep -v '^#' | grep -v '^$' | \
-    sed -n 's/.*bash \([^ >]*\).*/\1/p' | sort | uniq -d)
+# --- 2. Duplicate entries: 完全同一のcron行が複数回登録 ---
+dupes=$(crontab -l 2>/dev/null | grep -v '^#' | grep -v '^$' | sort | uniq -d)
 if [[ -n "$dupes" ]]; then
     while IFS= read -r dup; do
-        count=$(crontab -l 2>/dev/null | grep -c "$dup")
-        ISSUES+=("DUPE: '$dup' が${count}回登録されている")
-        log "DUPE: $dup x$count"
+        [[ -z "$dup" ]] && continue
+        count=$(crontab -l 2>/dev/null | grep -cF "$dup")
+        ISSUES+=("DUPE: 完全同一行が${count}回: ${dup:0:80}")
+        log "DUPE: x$count: ${dup:0:80}"
     done <<< "$dupes"
 fi
 

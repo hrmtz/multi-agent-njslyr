@@ -2,14 +2,14 @@
 
 # multi-agent-njslyr
 
-**Nineteen agents. Two machines. Two Greater Yakuza. Zero coordination overhead.**
+**Nineteen agents. Three cities. Two Greater Yakuza. Zero coordination overhead.**
 
 Claude Code agents running in parallel — orchestrated through the Soukai Syndicate hierarchy on tmux.
-Kyoto (Ryzen/WSL) + NeoSaitama (MBP). Separated by Tailscale. United by YAML.
+Kyoto (Ryzen/WSL) + NeoSaitama (MBP) + TOKYO-3 (MAGI). Separated by Tailscale. United by YAML.
 
 [![GitHub Stars](https://img.shields.io/github/stars/hrmtz/multi-agent-njslyr?style=social)](https://github.com/hrmtz/multi-agent-njslyr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![v5.0 Cross-Machine](https://img.shields.io/badge/v5.0-Cross--Machine-ff6600?style=flat-square)](https://github.com/hrmtz/multi-agent-njslyr)
+[![v6.0 TOKYO-3](https://img.shields.io/badge/v6.0-TOKYO--3-ff6600?style=flat-square)](https://github.com/hrmtz/multi-agent-njslyr)
 [![BATS 123/123](https://img.shields.io/badge/BATS-123%2F123_PASS-brightgreen?style=flat-square)]()
 
 [English](README.md) | [Japanese](README_ja.md)
@@ -33,9 +33,9 @@ Kyoto (Ryzen/WSL) + NeoSaitama (MBP). Separated by Tailscale. United by YAML.
 
 ## What is this?
 
-A system that deploys up to 19 AI coding agents in parallel across two machines on tmux, orchestrated through a Soukai Syndicate chain of command. All communication via YAML files on disk — zero API overhead, zero polling.
+A system that deploys up to 19 AI coding agents in parallel across two machines on tmux, with a three-way AI deliberation system (MAGI) for strategic decisions. Orchestrated through the Soukai Syndicate chain of command. All communication via YAML files on disk — zero API overhead, zero polling.
 
-**Two machines. Two Greater Yakuza. One Darkninja at the top.**
+**Three cities. Two Greater Yakuza. One Darkninja at the top.**
 
 ```
          You (Laomoto / The Boss)
@@ -57,10 +57,10 @@ A system that deploys up to 19 AI coding agents in parallel across two machines 
  │  +-+-+-+-+-+-+-+-------------+                                  │
  │  |1|2|3|4|5|6|7| SOUKAIYA_KYO|  7 Yakuza + 1 Soukaiya          │
  │  +-+-+-+-+-+-+-+-------------+                                  │
- └─────────────────────────┬───────────────────────────────────────┘
-                           │  SSH (Tailscale) — Tier 1
-                           │  ntfy — Tier 2 fallback
- ┌─────────────────────────┴───────────────────────────────────────┐
+ └──────────┬──────────────────────────────────────────────────────┘
+            │  SSH (Tailscale) — Tier 1
+            │  ntfy — Tier 2 fallback
+ ┌──────────┴──────────────────────────────────────────────────────┐
  │  NEOSAITAMA  (MBP — Secondary / Slave)                          │
  │                                                                 │
  │  +-------------------+                                          │
@@ -76,12 +76,26 @@ A system that deploys up to 19 AI coding agents in parallel across two machines 
  │  |1|2|3|4|5|6|7| SOUKAIYA_NEO|  7 Yakuza + 1 Soukaiya          │
  │  +-+-+-+-+-+-+-+-------------+                                  │
  └─────────────────────────────────────────────────────────────────┘
+
+ ┌─────────────────────────────────────────────────────────────────┐
+ │  THIRD NEW TOKYO CITY  (MAGI — Multi-API Deliberation)          │
+ │                                                                 │
+ │  ┌───────────────┬───────────────┬───────────────┐              │
+ │  │  MELCHIOR-1   │  BALTHASAR-2  │   CASPER-3    │              │
+ │  │  Claude       │  GPT          │   Gemini      │              │
+ │  │  (Scientist)  │  (Pragmatist) │  (Visionary)  │              │
+ │  └───────┬───────┴───────┬───────┴───────┬───────┘              │
+ │          └───── cross-review ────────────┘                      │
+ │                      │                                          │
+ │              Consensus + Task YAML  ──→  Monju Adapter          │
+ └─────────────────────────────────────────────────────────────────┘
 ```
 
 **Why use it?**
 - One command spawns up to 19 parallel AI workers across two machines
+- MAGI three-way AI deliberation (Claude + GPT + Gemini) for strategic decisions and code review
 - Zero wait time — give your next order while tasks run in the background
-- Self-healing: 3-stage watchdog (Shuriken → Chop → Slay) + Yakuza Tengu emergency supervisor
+- Self-healing: 3-stage watchdog (Shuriken → Chop → Slay) + Claude Agent Tool auto-recovery
 - All communication is plain YAML on disk — fully transparent, diffable, version-controllable
 - CLI flat-rate subscriptions make 24/7 multi-agent operation economically viable
 
@@ -92,9 +106,10 @@ A system that deploys up to 19 AI coding agents in parallel across two machines 
 | | Claude Code `Task` | LangGraph | CrewAI | **njslyr** |
 |---|---|---|---|---|
 | **Parallelism** | Sequential | Graph nodes | Limited | **Up to 19 agents across 2 machines** |
+| **Multi-vendor AI** | Claude only | Configurable | Configurable | **MAGI: Claude + GPT + Gemini deliberation** |
 | **Coordination cost** | API calls per Task | API + infra (Postgres/Redis) | API + platform | **Zero** (YAML + tmux) |
 | **Observability** | Logs only | LangSmith | OpenTelemetry | **Live tmux panes** |
-| **Self-healing** | None | Manual | None | **3-stage escalation + Yakuza Tengu** |
+| **Self-healing** | None | Manual | None | **3-stage escalation + Agent Tool auto-recovery** |
 | **Cost (8 Opus agents)** | ~$100+/hour (API) | ~$100+/hour (API) | ~$100+/hour (API) | **~$200/month** (CLI flat-rate) |
 
 CLI subscriptions make 24/7 multi-agent operation economically viable. The cost is the same whether agents work 1 hour or 24 hours.
@@ -112,9 +127,8 @@ CLI subscriptions make 24/7 multi-agent operation economically viable. The cost 
 | **Yamahiro** (`gryakuza_neo`) | Taku Yamahiro. Kill-Elephant Yakuza Clan. Straight-laced, moral compass. Missing one finger. Elephant tattoo. Self-claimed Karate 20-dan. | NeoSaitama task distribution, local execution oversight | NeoSaitama |
 | **Soukaiya** (×2) | `soukaiya_kyo` / `soukaiya_neo` | Quality control, dashboard aggregation | Both |
 | **Clone Yakuza 1-7** | Senior Engineer, QA, DevOps, etc. | Implementation: code, research, file operations | Both (14 total) |
-| **Yakuza Tengu** | Emergency supervisor | Auto-spawns when manager overloaded, despawns on recovery | Either |
-| **Master Tortoise** | Predictive monitor | Context overflow prediction, response pattern analysis | Kyoto |
-| **Master Crane** | Post-mortem analyst | Failure root cause identification, prevention pattern DB | NeoSaitama |
+| **Master Tortoise** | Predictive monitor | Context overflow prediction, response pattern analysis (Haiku model, 3-min cycle) | Kyoto |
+| **Master Crane** | Post-mortem analyst | Failure root cause identification, prevention pattern DB (Haiku model, 3-min cycle) | NeoSaitama |
 
 ### Two Greater Yakuza System
 
@@ -240,17 +254,31 @@ Automatic agent health monitoring with three-stage escalation:
 | **Chop** | Still unresponsive 4 min | Force `/clear` session reset |
 | **Slay** | Unresponsive 6 min | `kill -9` + auto-restart |
 
-When Smith/Yamahiro is overloaded, **Yakuza Tengu** auto-spawns: takes over an idle Yakuza pane, distributes stacked tasks, then despawns when the manager recovers.
+When Smith/Yamahiro is overloaded, Claude **Agent Tool** auto-spawns subagents to handle tasks in parallel. Replaced Yakuza Tengu (legacy emergency supervisor) in v5.1.
+
+### MAGI System — Three-way AI Deliberation
+
+Three different AI models (Claude / GPT / Gemini) analyze the same question in parallel, then cross-review each other's findings to reach consensus. Named after NERV's MAGI supercomputers.
+
+```
+              Phase 1 (parallel)              Phase 2 (cross-review)
+MELCHIOR (Claude, Scientist)    ──┐     ┌──→  Revised opinions
+BALTHASAR (GPT, Pragmatist)     ──┼──→──┼──→  Consensus plan
+CASPER (Gemini, Visionary)      ──┘     └──→  Actionable tasks (via Monju Adapter)
+```
+
+Three modes: **judge** (approve/reject voting), **deliberate** (improvement proposals + consensus plan), **walkthrough** (persona-based experience simulation). Four session types: general, code_review, strategy, article_review.
+
+```bash
+python3 scripts/magi/magi.py --mode judge "Should we migrate to microservices?"
+python3 scripts/magi/magi.py --mode deliberate --session code_review --file auth.py
+```
+
+Results flow back into the agent fleet via Monju Adapter — MAGI consensus items become YAML tasks for Yakuza execution. See [`scripts/magi/README.md`](scripts/magi/README.md) for full documentation.
 
 ### Monju — Opus 3-Body Review
 
-For alpha/beta scripts: 3 Opus agents independently review the code, cross-critique each other's findings, then merge fixes. Named after the Japanese proverb "三人寄れば文殊の知恵" (three heads are better than one).
-
-```
-Body A (Security review)  →\
-Body B (Logic review)     →-+→ Cross-critique → Unified bug list → Fix
-Body C (Performance)      →/
-```
+For alpha/beta scripts: 3 Opus agents independently review the code, cross-critique each other's findings, then merge fixes. Named after the Japanese proverb "三人寄れば文殊の知恵" (three heads are better than one). MAGI System automates and extends this concept across different AI vendors.
 
 Use Monju for: infrastructure daemons, communication scripts, security-sensitive code.
 
@@ -646,12 +674,29 @@ mcp__memory__read_graph()
 
 ## Changelog
 
+### v6.0 — TOKYO-3 (MAGI System)
+
+- **MAGI three-way AI deliberation** — Claude (MELCHIOR) + GPT (BALTHASAR) + Gemini (CASPER) に同一議題を並列分析させ、クロスレビューで合意形成。コードレビュー、戦略判断、設計決定、コンテンツ評価に対応する汎用審議システム。
+- **Three cities network** — Kyoto (operations) + NeoSaitama (content pipeline) + TOKYO-3 (MAGI deliberation). Darkninja がMAGIに諮問し、合議結果をYAMLタスクに変換してヤクザ群団に投入。
+- **Three deliberation modes** — `judge` (approve/reject voting), `deliberate` (improvement proposals + consensus plan), `walkthrough` (persona-based experience simulation with dropout tracking).
+- **Monju Adapter** — MAGI合意結果をYAMLタスク形式に自動変換。審議→実行のフルループを実現。
+- **magi_core packaging** (cmd_384) — Monolithic `magi.py` を `core/` パッケージに分離。orchestrator / models / prompts / schemas / utils の5モジュール構成。
+- **MAGI hygiene fixes** — MODEL_CONFIG single source of truth, fail-fast on missing API keys, exponential backoff (429/502/503), Phase 2 cross-review compression, Jaccard similarity deduplication (threshold 0.7), per-mode schema validation.
+- **SDK-free architecture** — All API calls via raw REST (`requests`). No anthropic/openai/google SDK dependencies. `--skip` で部分稼働可能（2体以上で合議成立）。
+- **Model upgrades** — MELCHIOR: Claude Sonnet 5, BALTHASAR: GPT-5.2, CASPER: Gemini 3 Pro.
+
+### v5.1 — Infrastructure Optimization & Yakuza Tengu Retirement
+
+- **Monitor agents → Haiku** — Master Tortoise/Crane migrated from Sonnet to Haiku model. Mechanical monitoring tasks don't need Opus/Sonnet-class intelligence. Significant token savings.
+- **Cron cycle → 3 minutes** — Suriken/guardian/status_push intervals optimized from 60s to 180s. Token consumption reduced to ~1/3.
+- **Yakuza Tengu retired** — Claude Agent Tool enables managers to spawn subagents directly, making the dedicated emergency supervisor redundant. spawn_tengu/despawn_tengu commands retained for backward compatibility.
+
 ### v5.0 — Cross-Machine Distributed Operation
 
 - **Two Greater Yakuza system** — Smith (`gryakuza_kyo`, Kyoto) + Yamahiro (`gryakuza_neo`, NeoSaitama). Full fleet on each machine. Smith holds Master authority.
 - **Dual-machine architecture** (cmd_274) — Kyoto (server) + NeoSaitama (client). Up to 19 agents across two machines. Machine role auto-detection via `config/settings.yaml`.
 - **Cross-machine communication** (cmd_276-299) — SSH tier1 + ntfy tier2 fallback. `cross_sync.sh` for rsync-based state sync. `ntfy_send_dispatch.sh` / `ntfy_send_report.sh` for cross-machine task/report delivery.
-- **Monitoring agents** — Master Tortoise (Kyoto, predictive: context overflow, response patterns) + Master Crane (NeoSaitama, post-mortem: failure root cause, prevention DB). 60s heartbeat cycle.
+- **Monitoring agents** — Master Tortoise (Kyoto, predictive: context overflow, response patterns) + Master Crane (NeoSaitama, post-mortem: failure root cause, prevention DB). 60s heartbeat cycle (optimized to 3-min in v5.1, migrated to Haiku model).
 - **Monju 3-body review** (cmd_299) — Opus×3 independent code review + cross-critique for infrastructure scripts.
 - **Standalone mode** (cmd_301) — Single-machine operation with `operation_mode: standalone`. All cross-machine communication skipped automatically.
 - **Machine codenames** (cmd_279) — `kyoto` (formerly `ryzen`), `neosaitama` (formerly `mbp`). Backward compatible.
@@ -673,9 +718,9 @@ mcp__memory__read_graph()
 - Barikidorink failsafe — Idempotent Opus injection, auto re-nudge after model switch
 - Watcher supervisor — Dynamic pane discovery, atomic rescan signaling, auto-restart crashed watchers
 
-### v3.5 — Yakuza Tengu
+### v3.5 — Yakuza Tengu (retired in v5.1)
 
-- Yakuza Tengu emergency supervisor (auto-spawn on manager overload)
+- Yakuza Tengu emergency supervisor (auto-spawn on manager overload) — replaced by Agent Tool in v5.1
 - Named agents (Gryakuza → Yamahiro)
 - Yakuza persona enforcement after `/clear`
 
@@ -718,6 +763,6 @@ Fork of [multi-agent-shogun](https://github.com/yohey-w/multi-agent-shogun) by [
 
 <div align="center">
 
-**One command. Nineteen agents. Two machines. Two Greater Yakuza. Zero coordination cost.**
+**One command. Nineteen agents. Three cities. Two Greater Yakuza. Zero coordination cost.**
 
 </div>
