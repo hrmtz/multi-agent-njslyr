@@ -45,7 +45,7 @@ fi
 log "Active cmds found: $ACTIVE_CMDS"
 
 # 4. inbox_write で cron_cmd_monitor 投入
-TASK_CONTENT="cmd進捗確認タイマー発火。pending/in_progressのcmdを確認し、gryakuzaの状態をチェックせよ。報告が滞っていれば催促スリケンを投げろ。"
+TASK_CONTENT="cmd進捗確認タイマー発火。pending/in_progressのcmdを確認し、smithの状態をチェックせよ。報告が滞っていれば催促スリケンを投げろ。"
 
 bash "$SCRIPT_DIR/inbox_write.sh" \
     darkninja \

@@ -156,13 +156,13 @@ bash scripts/inbox_write.sh <target_agent> "<message>" <type> <from>
 Examples:
 ```bash
 # Darkninja → Gryakuza
-bash scripts/inbox_write.sh gryakuza "cmd_048を書いた。実行せよ。" cmd_new darkninja
+bash scripts/inbox_write.sh smith "cmd_048を書いた。実行せよ。" cmd_new darkninja
 
 # Yakuza → Gryakuza
-bash scripts/inbox_write.sh gryakuza "クローンヤクザ5号、ニンム完了。報告YAML確認されたし。" report_received yakuza5
+bash scripts/inbox_write.sh smith "クローンヤクザ5号、ニンム完了。報告YAML確認されたし。" report_received yakuza5
 
 # Gryakuza → Yakuza
-bash scripts/inbox_write.sh yakuza3 "タスクYAMLを読んで作業開始せよ。" task_assigned gryakuza
+bash scripts/inbox_write.sh yakuza3 "タスクYAMLを読んで作業開始せよ。" task_assigned smith
 ```
 
 Delivery is handled by `inbox_watcher.sh` (infrastructure layer).
@@ -209,7 +209,7 @@ Read-cost controls:
 | 2〜4 min | Escape×2 + nudge | Cursor position bug workaround |
 | 4 min+ | `/clear` sent (max once per 5 min) | Force session reset + YAML re-read |
 
-## Inbox Processing Protocol (gryakuza/yakuza/soukaiya)
+## Inbox Processing Protocol (smith/yakuza/soukaiya)
 
 When you receive `inboxN` (e.g. `inbox3`):
 1. `Read queue/inbox/{your_id}.yaml`
@@ -356,11 +356,11 @@ Lord: command → Darkninja: write YAML → inbox_write → END TURN
 Step 7: Dispatch cmd_N subtasks → inbox_write to yakuza
 Step 8: check_pending → if pending cmd_N+1, process it → then STOP
   → Gryakuza becomes idle (prompt waiting)
-Step 9: Yakuza completes → inbox_write gryakuza → watcher nudges gryakuza
+Step 9: Yakuza completes → inbox_write smith → watcher nudges smith
   → Gryakuza wakes, scans reports, acts
 ```
 
-**Why no background monitor**: inbox_watcher.sh detects yakuza's inbox_write to gryakuza and sends a nudge. This is true event-driven. No sleep, no polling, no CPU waste.
+**Why no background monitor**: inbox_watcher.sh detects yakuza's inbox_write to smith and sends a nudge. This is true event-driven. No sleep, no polling, no CPU waste.
 
 **Gryakuza wakes via**: inbox nudge from yakuza report, darkninja new cmd, or system event. Nothing else.
 
@@ -383,7 +383,7 @@ Cross-reference with dashboard.md — process any reports not yet reflected.
 
 ## Foreground Block Prevention (24-min Freeze Lesson)
 
-**Gryakuza blocking = entire army halts.** On 2026-02-06, foreground `sleep` during delivery checks froze gryakuza for 24 minutes.
+**Gryakuza blocking = entire army halts.** On 2026-02-06, foreground `sleep` during delivery checks froze smith for 24 minutes.
 
 **Rule: NEVER use `sleep` in foreground.** After dispatching tasks → stop and wait for inbox wakeup.
 
@@ -399,7 +399,7 @@ Cross-reference with dashboard.md — process any reports not yet reflected.
 ```
 ✅ Correct (event-driven):
   cmd_008 dispatch → inbox_write yakuza → stop (await inbox wakeup)
-  → yakuza completes → inbox_write gryakuza → gryakuza wakes → process report
+  → yakuza completes → inbox_write smith → smith wakes → process report
 
 ❌ Wrong (polling):
   cmd_008 dispatch → sleep 30 → capture-pane → check status → sleep 30 ...
@@ -550,7 +550,7 @@ Runtime switching is available but rarely needed (Soukaiya handles L4+ tasks ins
 
 ```bash
 # Manual override only — not for Bloom-based auto-switching
-bash scripts/inbox_write.sh yakuza{N} "/model <new_model>" model_switch gryakuza
+bash scripts/inbox_write.sh yakuza{N} "/model <new_model>" model_switch smith
 tmux set-option -p -t multiagent:0.{N} @model_name '<DisplayName>'
 ```
 
@@ -561,7 +561,7 @@ For Yakuza: You don't switch models yourself. Gryakuza manages this.
 For Gryakuza only: Send `/clear` to yakuza for context reset:
 
 ```bash
-bash scripts/inbox_write.sh yakuza{N} "タスクYAMLを読んで作業開始せよ。" clear_command gryakuza
+bash scripts/inbox_write.sh yakuza{N} "タスクYAMLを読んで作業開始せよ。" clear_command smith
 ```
 
 For Yakuza: After `/clear`, follow CLAUDE.md /clear recovery procedure. Do NOT read instructions/yakuza.md for the first task (cost saving).
@@ -572,6 +572,6 @@ All agents: Follow the Session Start / Recovery procedure in CLAUDE.md. Key step
 
 1. Identify self: `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'`
 2. `mcp__memory__read_graph` — restore rules, preferences, lessons
-3. Read your instructions file (darkninja→instructions/darkninja.md, gryakuza→instructions/gryakuza.md, yakuza→instructions/yakuza.md)
+3. Read your instructions file (darkninja→instructions/darkninja.md, smith→instructions/smith.md, yakuza→instructions/yakuza.md)
 4. Rebuild state from primary YAML data (queue/, tasks/, reports/)
 5. Review forbidden actions, then start work

@@ -43,7 +43,7 @@ secondary: neosaitama  # (旧: mbp)
 since: "2026-02-27T07:48:00+09:00"
 activated_by: laomoto
 mbp_fleet:
-  gryakuza: slave
+  smith: slave
   yakuza_count: 3
   soukaiya: local_qc_only
   monitor: master_crane
@@ -62,7 +62,7 @@ Simultaneous Mode下では:
 | エージェント | 役割 | 台数 |
 |------------|------|------|
 | darkninja | 最高司令官 | 1 |
-| gryakuza | グレーターヤクザ（タスク分解・管理） | 1 |
+| smith | グレーターヤクザ（タスク分解・管理） | 1 |
 | yakuza1〜7 | クローンヤクザ（実装担当） | 最大7 |
 | soukaiya | QC担当 | 1 |
 | master_tortoise | 予防監視（未来視） | 1 |
@@ -74,7 +74,7 @@ Simultaneous Mode下では:
 
 | エージェント | 役割 | 台数 |
 |------------|------|------|
-| gryakuza | Slave gryakuza（タスク受信・ローカル分配） | 1 |
+| smith | Slave smith（タスク受信・ローカル分配） | 1 |
 | yakuza1〜3 | クローンヤクザ（ローカル実行） | 最大3 |
 | soukaiya | ローカルQCのみ | 1 |
 | master_crane | 事後分析（過去視） | 1 |
@@ -95,7 +95,7 @@ bash scripts/ntfy_send_dispatch.sh queue/tasks/yakuza1_subtask_xxx.yaml
 
 - ペイロード形式: `dispatch:{base64_yaml}`
 - 送信先トピック: `{TOPIC}-neosaitama`（ `{TOPIC}-mbp` でも後方互換あり）
-- NeoSaitamaの `ntfy_listener.sh` が受信 → `queue/tasks/` に保存 → gryakuza inboxに通知
+- NeoSaitamaの `ntfy_listener.sh` が受信 → `queue/tasks/` に保存 → smith inboxに通知
 
 ### §4.2 Report（NeoSaitama → Kyoto）
 
@@ -126,8 +126,8 @@ bash scripts/ntfy_send_report.sh queue/reports/yakuza1_report_xxx.yaml
 |--------------|------|
 | `push:cmd_xxx:branch` | auto git pull + darkninja notify |
 | `sync:project_name:done` | auto rsync pull (cross_sync.sh) + darkninja notify |
-| `cmd:cmd_xxx:内容` | darkninja + gryakuza inboxへ転送 |
-| `handover:kyoto\|neosaitama` | active_machine.yaml更新 + gryakuza P0通知 |
+| `cmd:cmd_xxx:内容` | darkninja + smith inboxへ転送 |
+| `handover:kyoto\|neosaitama` | active_machine.yaml更新 + smith P0通知 |
 | `hb:host:epoch:agents:load:ctx` | ハートビート（heartbeatトピックのみ） |
 | `ping:source:epoch:message` | pingレスポンス（ntfy_inbox記録なし） |
 | `report:{base64_yaml}` | NeoSaitama→Kyoto レポート受信・queue/reports/保存 |
@@ -153,7 +153,7 @@ bash scripts/ntfy_send_report.sh queue/reports/yakuza1_report_xxx.yaml
 
 **自動handoverは禁止。** エージェントの自律判断によるhandoverは絶対禁止。
 
-### 手順（gryakuzaが実行）
+### 手順（smithが実行）
 
 ```
 1. チェックポイント作成（現在のタスク状態を保存）
@@ -167,7 +167,7 @@ bash scripts/ntfy_send_report.sh queue/reports/yakuza1_report_xxx.yaml
 ### 注意事項
 
 - handover時はqueue/inbox/を同期しない（machine-local）
-- active_machine.yaml更新権限はMaster（kyoto）のgryakuzaのみ
+- active_machine.yaml更新権限はMaster（kyoto）のsmithのみ
 
 ---
 
@@ -188,17 +188,17 @@ bash scripts/ntfy_send_report.sh queue/reports/yakuza1_report_xxx.yaml
 ### 同期ルール
 
 - **cross_sync.sh** の `STATE_PATHS` に含まれる → push/pullで両マシンに同期される
-- 更新権限: Kyoto gryakuzaのみ（Slave gryakuzaは読み取り専用）
+- 更新権限: Kyoto smithのみ（Slave smithは読み取り専用）
 
 ---
 
 ## §7 Slave Mode 権限制限
 
-`config/settings.yaml` の `machine.role` が `neosaitama`（または後方互換で `mbp`）の場合、Slave gryakuzaに以下の制限が適用される。
+`config/settings.yaml` の `machine.role` が `neosaitama`（または後方互換で `mbp`）の場合、Slave smithに以下の制限が適用される。
 
 | 操作 | 可否 | 備記 |
 |------|------|------|
-| ntfy/inbox経由のサブタスク受信 | ✅ | Kyoto gryakuzaから受信 |
+| ntfy/inbox経由のサブタスク受信 | ✅ | Kyoto smithから受信 |
 | ローカルyakuza1-3への割り当て | ✅ | 通常のinbox_write |
 | ローカルsoukaiyaへのQC依頼 | ✅ | 通常フロー |
 | ntfy経由の完了報告送信 | ✅ | ntfy_send_report.sh使用 |
@@ -268,7 +268,7 @@ projects/         # シークレット（git-ignored）
 | `scripts/ntfy_listener.sh` | ntfyプレフィックスルーティング |
 | `scripts/ntfy_send_dispatch.sh` | Dispatch送信実装 |
 | `scripts/ntfy_send_report.sh` | Report送信実装 |
-| `instructions/gryakuza.md` §Slave Mode | Slave権限詳細 |
+| `instructions/smith.md` §Slave Mode | Slave権限詳細 |
 | `config/settings.yaml` | マシン設定（role, peer_host等） |
 | `queue/active_machine.yaml` | 現在の稼働状態（Primary source） |
 | `CLAUDE.md` § Cross-Machine Operation | 高レベル概要 |

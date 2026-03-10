@@ -1,7 +1,7 @@
 #!/bin/bash
 # inbox_archive.sh — 既読メッセージを自動アーカイブ（排他ロック付き）
 # Usage: bash scripts/inbox_archive.sh <agent_id> [--keep N]
-# Example: bash scripts/inbox_archive.sh gryakuza --keep 5
+# Example: bash scripts/inbox_archive.sh smith --keep 5
 
 set -e
 
@@ -50,7 +50,7 @@ done
 # Validate arguments
 if [ -z "$AGENT_ID" ]; then
     echo "Usage: inbox_archive.sh <agent_id> [--keep N]" >&2
-    echo "  agent_id: Agent ID (e.g. gryakuza, yakuza1, soukaiya)" >&2
+    echo "  agent_id: Agent ID (e.g. smith, yakuza1, soukaiya)" >&2
     echo "  --keep N: Number of recent read:true messages to keep (default: 5)" >&2
     exit 1
 fi

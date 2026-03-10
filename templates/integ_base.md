@@ -33,7 +33,7 @@ When a contradiction is found:
 
 ### Step 3: Escalate Only If Unresolvable
 
-If primary sources cannot resolve the contradiction → report to gryakuza with details.
+If primary sources cannot resolve the contradiction → report to smith with details.
 Gryakuza escalates to darkninja → ラオモト if needed.
 
 ## Gryakuza's Responsibility

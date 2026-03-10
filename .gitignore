@@ -27,7 +27,10 @@
 # Instructions (core OSS)
 !instructions/
 !instructions/darkninja.md
-!instructions/gryakuza.md
+!instructions/smith.md
+!instructions/yamahiro.md
+!instructions/tajiba.md
+!instructions/kusuba.md
 !instructions/yakuza.md
 !instructions/soukaiya.md
 !instructions/yakuzatengu.md
@@ -144,15 +147,15 @@
 # Docs
 !docs/
 !docs/philosophy.md
-!docs/gryakuza_faq.md
-!docs/gryakuza_advanced.md
+!docs/smith_faq.md
+!docs/smith_advanced.md
 !docs/njslyr_design.md
 # docs/diary_*.md — excluded (sensitive business diary)
 # docs/blog_*.md — excluded (sensitive business content)
-!docs/gryakuza_workflow.md
-!docs/gryakuza_redo.md
-!docs/gryakuza_escalation.md
-!docs/gryakuza_slave.md
+!docs/smith_workflow.md
+!docs/smith_redo.md
+!docs/smith_escalation.md
+!docs/smith_slave.md
 
 # Protocols
 !docs/protocols/

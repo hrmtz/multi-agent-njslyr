@@ -3,7 +3,7 @@
 # ntfy_send_dispatch.sh — Ryzen→MBP タスクディスパッチ送信ヘルパー (cmd_278 FIX-001)
 # Usage: bash scripts/ntfy_send_dispatch.sh <task_yaml_path>
 #
-# Ryzen側 gryakuza/darkninja がタスクをMBPへ転送する際に呼び出す。
+# Ryzen側 smith/darkninja がタスクをMBPへ転送する際に呼び出す。
 # タスクYAMLをbase64エンコードし、ntfy経由で ネオサイタマ(MBP) へ送信する。
 # MBP側 ntfy_listener.sh の handle_task_dispatch() が受信・保存する。
 # ═══════════════════════════════════════════════════════════════
@@ -98,9 +98,9 @@ _dispatch_ssh_primary() {
     # 2. SSH でリモートinbox_write実行（task_assigned通知）
     # shellcheck disable=SC2086
     if ssh ${SSH_OPTS} "$peer_host" \
-        "bash '${peer_project}/scripts/inbox_write.sh' gryakuza \
+        "bash '${peer_project}/scripts/inbox_write.sh' smith \
         'SSH dispatch受信: ${task_id} → queue/tasks/${task_filename} 保存済み。確認して割り当てよ。' \
-        task_assigned gryakuza '${remote_task_path}'" 2>/dev/null; then
+        task_assigned smith '${remote_task_path}'" 2>/dev/null; then
         echo "[$(date '+%Y-%m-%dT%H:%M:%S')] SSH primary SUCCESS → ${peer_host}:${remote_task_path}" >> "$log_file"
         echo "[ntfy_send_dispatch] SSH primary SUCCESS: ${task_realpath} → ${peer_host}:${remote_task_path}" >&2
         return 0

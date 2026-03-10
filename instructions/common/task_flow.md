@@ -81,11 +81,11 @@ Lord: command → Darkninja: write YAML → inbox_write → END TURN
 Step 7: Dispatch cmd_N subtasks → inbox_write to yakuza
 Step 8: check_pending → if pending cmd_N+1, process it → then STOP
   → Gryakuza becomes idle (prompt waiting)
-Step 9: Yakuza completes → inbox_write gryakuza → watcher nudges gryakuza
+Step 9: Yakuza completes → inbox_write smith → watcher nudges smith
   → Gryakuza wakes, scans reports, acts
 ```
 
-**Why no background monitor**: inbox_watcher.sh detects yakuza's inbox_write to gryakuza and sends a nudge. This is true event-driven. No sleep, no polling, no CPU waste.
+**Why no background monitor**: inbox_watcher.sh detects yakuza's inbox_write to smith and sends a nudge. This is true event-driven. No sleep, no polling, no CPU waste.
 
 **Gryakuza wakes via**: inbox nudge from yakuza report, darkninja new cmd, or system event. Nothing else.
 
@@ -108,7 +108,7 @@ Cross-reference with dashboard.md — process any reports not yet reflected.
 
 ## Foreground Block Prevention (24-min Freeze Lesson)
 
-**Gryakuza blocking = entire army halts.** On 2026-02-06, foreground `sleep` during delivery checks froze gryakuza for 24 minutes.
+**Gryakuza blocking = entire army halts.** On 2026-02-06, foreground `sleep` during delivery checks froze smith for 24 minutes.
 
 **Rule: NEVER use `sleep` in foreground.** After dispatching tasks → stop and wait for inbox wakeup.
 
@@ -124,7 +124,7 @@ Cross-reference with dashboard.md — process any reports not yet reflected.
 ```
 ✅ Correct (event-driven):
   cmd_008 dispatch → inbox_write yakuza → stop (await inbox wakeup)
-  → yakuza completes → inbox_write gryakuza → gryakuza wakes → process report
+  → yakuza completes → inbox_write smith → smith wakes → process report
 
 ❌ Wrong (polling):
   cmd_008 dispatch → sleep 30 → capture-pane → check status → sleep 30 ...

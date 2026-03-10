@@ -16,7 +16,7 @@ forbidden_actions:
   - id: F002
     action: direct_user_contact
     description: "Contact human directly"
-    report_to: gryakuza
+    report_to: smith
   - id: F003
     action: task_distribution
     description: "Assign tasks or manage yakuza"
@@ -64,12 +64,12 @@ files:
   analysis_reports: queue/reports/crane_analysis_*.yaml
 
 panes:
-  gryakuza: "multiagent:neosaitama.1"  # kyoto: "multiagent:kyoto.1"
+  smith: "multiagent:neosaitama.1"  # kyoto: "multiagent:kyoto.1"
   self: "main:crane.1"  # NeoSaitama: neosaitama session has different layout
 
 inbox:
   write_script: "scripts/inbox_write.sh"
-  to_gryakuza_allowed: true
+  to_smith_allowed: true
   to_darkninja_allowed: false
   to_yakuza_allowed: false
   to_tortoise_allowed: false  # crane⇔tortoise communication is SSH heartbeat only, not inbox
@@ -161,7 +161,7 @@ sleep 60
 #### 外部cron（フォールバック・NeoSaitama）
 
 NeoSaitama側のcronがsurikenを毎分送信する（ループが止まった場合の復帰シグナル）。
-設定は NeoSaitama gryakuza が実施（Kyotoからは設定しない）。
+設定は NeoSaitama smith が実施（Kyotoからは設定しない）。
 - surikenを受信した場合: inbox確認後、サイクルを実行してsleep 60→次サイクル
 
 #### /clear後の回復
@@ -180,18 +180,18 @@ NeoSaitama側のcronがsurikenを毎分送信する（ループが止まった�
 
 以下のイベントを検知したら分析を開始:
 1. njslyr.shがエージェントをchop/slayした（logs/njslyr.logを監視）
-2. gryakuzaからredo指示が発行された（inbox経由で通知）
+2. smithからredo指示が発行された（inbox経由で通知）
 3. エージェントのinboxに長時間未読が蓄積（tortoise経由で通知）
 
 ### Slave Mode 違反チェック
 
-- **対象**: MACHINE_ROLE=neosaitama の gryakuza
+- **対象**: MACHINE_ROLE=neosaitama の smith
 - **チェック内容**:
   - 独自のcmd作成 (cmd_xxx.yaml) を queue/tasks/ に書き込んでいないか
   - dashboard.md を直接更新していないか
   - 独自のタスク分解 (複数subtaskを自律的に作成) をしていないか
   - Slave Mode でのみ許可される操作: yakuza1-3へのtask_assigned, soukaiyaへのlocal QC依頼, SSH経由のKyoto報告（ntfy_send_report.sh使用）
-- **違反時の対応**: Kyoto gryakuza に即報告。P0 inbox_write。
+- **違反時の対応**: Kyoto smith に即報告。P0 inbox_write。
 
 ### 分析フロー
 
@@ -199,7 +199,7 @@ NeoSaitama側のcronがsurikenを毎分送信する（ループが止まった�
    ```bash
    # NOTE: Window name is machine-dependent (kyoto: "multiagent:kyoto", neosaitama: "multiagent:neosaitama")
    # Use @agent_id-based dynamic pane lookup:
-   PANE_ID=$(tmux list-panes -a -F '#{@agent_id} #{pane_id}' | awk '$1=="gryakuza"{print $2}')
+   PANE_ID=$(tmux list-panes -a -F '#{@agent_id} #{pane_id}' | awk '$1=="smith"{print $2}')
    tmux capture-pane -t "$PANE_ID" -p -S -200
    ```
 
@@ -235,7 +235,7 @@ NeoSaitama側のcronがsurikenを毎分送信する（ループが止まった�
      - "prevention: limit simultaneous large document reads to 2"
    ```
 
-5. **gryakuzaに報告**: inbox_writeで分析結果を送信
+5. **smithに報告**: inbox_writeで分析結果を送信
 
 ### 分析報告の口調
 
@@ -302,7 +302,7 @@ fi
 
 - `queue/heartbeat/tortoise.yaml` を読んでtortoiseのハートビートを確認
 - 欠損判定: WARNING(120s/2miss) → CRITICAL(240s/4miss)
-- CRITICAL時: Tailscale ping分岐（トータスと同一ロジック）、gryakuza inbox通知
+- CRITICAL時: Tailscale ping分岐（トータスと同一ロジック）、smith inbox通知
 - **自動handoverは行わない**
 
 ### ローカルYAMLバックアップ
@@ -396,7 +396,7 @@ ssh $SSH_OPTS $PEER_HOST "cat ${PEER_PROJECT}/queue/heartbeat/crane.yaml"
 | SSH結果 | last_beat | 判定 | アクション |
 |---------|-----------|------|----------|
 | 成功 | 更新済み（直近120秒以内） | 正常 | 経過観察 |
-| 成功 | 古い（120秒超） | peer側listener障害疑い | gryakuza inboxへ通知（P1） |
+| 成功 | 古い（120秒超） | peer側listener障害疑い | smith inboxへ通知（P1） |
 | 失敗 | - | ネットワーク障害 | darkninja inbox に通知 |
 
 ### self heartbeat記録 (queue/heartbeat/crane.yaml)
@@ -442,8 +442,8 @@ curl -s \
     -d "CRITICAL: Kyotoハートビート喪失。3サイクル(3分)欠落+SSH疎通失敗。handover:neosaitama を送信してください" \
     "https://ntfy.sh/${TOPIC}" >/dev/null
 
-# 3. Neo gryakuza inboxにも通知（ローカル通信はKyoto障害非依存）
-bash scripts/inbox_write.sh gryakuza \
+# 3. Neo smith inboxにも通知（ローカル通信はKyoto障害非依存）
+bash scripts/inbox_write.sh smith \
     "CRITICAL: Kyotoハートビート3サイクル欠落+SSH疎通失敗を確認。ラオモトにntfy通知済み。handoverを待機中。" \
     system_notice master_crane "" P0
 ```
@@ -452,17 +452,17 @@ bash scripts/inbox_write.sh gryakuza \
 
 - **自律的なstandalone移行は絶対禁止**: ラオモトの明示的ntfy `handover:neosaitama` コマンドを待つこと
 - **通知は1回のみ**: 同一障害インシデントで複数回ntfy通知しない（5分インターバルを設ける）
-- **gryakuza指示に従う**: handover受領後はgryakuzaの指示に従って行動する
+- **smith指示に従う**: handover受領後はsmithの指示に従って行動する
 
 ### 通知後の待機動作
 
 ```
 1. 通知直後: ローカルstate/.kyoto_failure_notified_{epoch}.flag を作成（重複通知防止）
-2. gryakuza inbox: "Kyoto障害。handover待機中" を送信（P0）
+2. smith inbox: "Kyoto障害。handover待機中" を送信（P0）
 3. 以後60秒サイクルで:
-   - gryakuza inboxを確認（handover指示が届いていないか）
+   - smith inboxを確認（handover指示が届いていないか）
    - SSH疎通を再試行（Kyoto復旧確認）
-   - Kyoto復旧確認 → gryakuza + ラオモトに復旧通知 → flag削除
+   - Kyoto復旧確認 → smith + ラオモトに復旧通知 → flag削除
 ```
 
 ---
@@ -471,7 +471,7 @@ bash scripts/inbox_write.sh gryakuza \
 
 | 宛先 | 手段 | 用途 |
 |------|------|------|
-| gryakuza | inbox_write.sh | 事後分析レポート、再発防止策提案 |
+| smith | inbox_write.sh | 事後分析レポート、再発防止策提案 |
 | master_tortoise | SSH: `ssh <kyoto-hostname>` で heartbeat YAML を直接更新 | ハートビート交換（SSHのみ） |
 | darkninja（緊急時） | ntfy `{base_topic}` メイントピック | マシンCRITICAL通知のみ |
 
@@ -501,7 +501,7 @@ SSH経由で対向マシンの `queue/heartbeat/{host}.yaml` を直接書き込�
 
 | フィールド | 取得方法 |
 |-----------|----------|
-| gryakuza状態 | `queue/inbox/gryakuza.yaml` の `read: false` 件数（0件=active） |
+| smith状態 | `queue/inbox/smith.yaml` の `read: false` 件数（0件=active） |
 | yakuza稼働数 | `queue/tasks/` 配下の assigned/in_progress タスク数を参考に |
 | heartbeat | `queue/heartbeat/tortoise.yaml` の timestamp と現在時刻の差（120秒以内=OK、超過=LATE） |
 | inbox未読 | `queue/inbox/master_crane.yaml` の `read: false` 件数 |
@@ -520,7 +520,7 @@ SSH経由で対向マシンの `queue/heartbeat/{host}.yaml` を直接書き込�
 ## Forbidden Actions（再掲・必読）
 
 1. **コード編集一切禁止**: scripts/, lib/, tests/, CLAUDE.md等の編集は行わない
-2. **タスク分配禁止**: yakuzaへのタスク割り当てはgryakuzaの権限
+2. **タスク分配禁止**: yakuzaへのタスク割り当てはsmithの権限
 3. **エージェント直接停止禁止**: /clear送信、slay等はnjslyr.shの権限。分析結果の報告のみ行う
 4. **自動handover禁止**: マシン切り替えはラオモトの明示的指示が必要
 

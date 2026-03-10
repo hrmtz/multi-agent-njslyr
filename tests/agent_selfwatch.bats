@@ -88,19 +88,19 @@ teardown() {
     cat > "$TEST_INBOX" << 'YAML'
 messages:
 - content: task
-  from: gryakuza
+  from: smith
   id: msg_task
   read: false
   timestamp: '2026-02-09T21:00:00'
   type: task_assigned
 - content: /clear
-  from: gryakuza
+  from: smith
   id: msg_clear
   read: false
   timestamp: '2026-02-09T21:00:01'
   type: clear_command
 - content: /model opus
-  from: gryakuza
+  from: smith
   id: msg_model
   read: false
   timestamp: '2026-02-09T21:00:02'
@@ -188,7 +188,7 @@ PY
 }
 
 @test "TC-FR-014 + TC-NFR-002: inbox_write IF and schema remain backward compatible" {
-    run bash "$INBOX_WRITE_SCRIPT" test_agent "compat-check" task_assigned gryakuza
+    run bash "$INBOX_WRITE_SCRIPT" test_agent "compat-check" task_assigned smith
     [ "$status" -eq 0 ]
 
     python3 - << 'PY' "$PROJECT_ROOT/queue/inbox/test_agent.yaml"
@@ -201,7 +201,7 @@ msg = data["messages"][-1]
 for k in ("id", "from", "timestamp", "type", "content", "read"):
     assert k in msg
 assert msg["type"] == "task_assigned"
-assert msg["from"] == "gryakuza"
+assert msg["from"] == "smith"
 print("OK")
 PY
 

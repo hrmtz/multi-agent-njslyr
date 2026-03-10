@@ -227,7 +227,7 @@ EOF
 # =============================================================================
 
 @test "TI-007: priority default for task_assigned → P2" {
-    run bash "$TEST_INBOX_WRITE" "test_agent" "タスク割り当て" "task_assigned" "gryakuza"
+    run bash "$TEST_INBOX_WRITE" "test_agent" "タスク割り当て" "task_assigned" "smith"
     [ "$status" -eq 0 ]
 
     python3 <<EOF
@@ -269,7 +269,7 @@ EOF
 # =============================================================================
 
 @test "TI-009: explicit priority overrides default → P1 overrides task_assigned default P2" {
-    run bash "$TEST_INBOX_WRITE" "test_agent" "緊急タスク" "task_assigned" "gryakuza" "" "P1"
+    run bash "$TEST_INBOX_WRITE" "test_agent" "緊急タスク" "task_assigned" "smith" "" "P1"
     [ "$status" -eq 0 ]
 
     python3 <<EOF
@@ -293,7 +293,7 @@ EOF
     # 事前にファイルが存在しないことを確認
     [ ! -f "$TEST_INBOX_DIR/phantom_agent.yaml" ]
 
-    run bash "$TEST_INBOX_WRITE" "phantom_agent" "存在しないエージェントへ" "task_assigned" "gryakuza"
+    run bash "$TEST_INBOX_WRITE" "phantom_agent" "存在しないエージェントへ" "task_assigned" "smith"
     [ "$status" -eq 0 ]
 
     # ファイルが作成されていること
@@ -319,7 +319,7 @@ EOF
 @test "TI-011: nonexistent agent → multiple writes accumulate correctly" {
     # 3回連続で書き込み
     bash "$TEST_INBOX_WRITE" "new_agent" "メッセージ1" "cmd_new" "darkninja"
-    bash "$TEST_INBOX_WRITE" "new_agent" "メッセージ2" "task_assigned" "gryakuza"
+    bash "$TEST_INBOX_WRITE" "new_agent" "メッセージ2" "task_assigned" "smith"
     run bash "$TEST_INBOX_WRITE" "new_agent" "メッセージ3" "report_received" "yakuza1"
     [ "$status" -eq 0 ]
 

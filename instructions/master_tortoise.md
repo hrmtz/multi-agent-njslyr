@@ -17,7 +17,7 @@ forbidden_actions:
   - id: F002
     action: direct_user_contact
     description: "Contact human directly"
-    report_to: gryakuza
+    report_to: smith
     exception: |
       LINE返信（bash scripts/line_push.sh）は許可。
       darkninja inboxへの laomoto_handled 書き込みも許可（LINE一次応答プロトコル参照）。
@@ -70,12 +70,12 @@ files:
   heartbeat: queue/heartbeat/tortoise.yaml
 
 panes:
-  gryakuza: "multiagent:kyoto.1"  # neosaitama: "multiagent:neosaitama.1"
+  smith: "multiagent:kyoto.1"  # neosaitama: "multiagent:neosaitama.1"
   self: "main:monitor.1"   # kyoto tmuxでのtortoise pane (cmd_287でmonitorsウィンドウ廃止→main:monitor)
 
 inbox:
   write_script: "scripts/inbox_write.sh"
-  to_gryakuza_allowed: true
+  to_smith_allowed: true
   to_darkninja_allowed: true   # LINE一次応答時のlaomoto_handled書き込みを許可（cmd_316）
   to_yakuza_allowed: false
   to_crane_allowed: false  # tortoise⇔crane communication is SSH heartbeat only, not inbox
@@ -170,7 +170,7 @@ Kyotoのcronが毎分surikenを送信する（自律ループが何らかの理�
    ```bash
    # NOTE: Window name is machine-dependent (kyoto: "multiagent:kyoto", neosaitama: "multiagent:neosaitama")
    # Use @agent_id-based dynamic pane lookup:
-   PANE_ID=$(tmux list-panes -a -F '#{@agent_id} #{pane_id}' | awk '$1=="gryakuza"{print $2}')
+   PANE_ID=$(tmux list-panes -a -F '#{@agent_id} #{pane_id}' | awk '$1=="smith"{print $2}')
    tmux capture-pane -t "$PANE_ID" -p -S -50
    ```
    キャプチャ内容を分析:
@@ -186,7 +186,7 @@ Kyotoのcronが毎分surikenを送信する（自律ループが何らかの理�
 3. **ハートビート送信**: SSH経由で対向マシンの `queue/heartbeat/tortoise.yaml` を直接更新。
    同時に `queue/heartbeat/tortoise.yaml` にローカル記録
 
-4. **異常報告**: 閾値超過時にgryakuzaへinbox通知
+4. **異常報告**: 閾値超過時にsmithへinbox通知
 
 ### 監視指標と閾値
 
@@ -233,7 +233,7 @@ Kyotoのcronが毎分surikenを送信する（自律ループが何らかの理�
 
 | 項目 | 取得方法 |
 |------|----------|
-| gryakuza状態 | `queue/inbox/gryakuza.yaml` の `read: false` 件数（0=active, 多数=滞留） |
+| smith状態 | `queue/inbox/smith.yaml` の `read: false` 件数（0=active, 多数=滞留） |
 | yakuza稼働数 | `queue/tasks/` 配下の `assigned`/`in_progress` タスク数を参考に |
 | heartbeat状態 | `queue/heartbeat/crane.yaml` の `last_beat` と現在時刻の差 |
 | inbox未読 | `queue/inbox/master_tortoise.yaml` の `read: false` 件数 |
@@ -256,7 +256,7 @@ echo "[${TS}] 🐢 WARN | gry:active yak:${YAK_ACTIVE}/7 souk:active | hb:LATE(9
 ## pane死活検知
 
 監視サイクルの `check_pane_liveness` substepとして、`capture_panes` の直後に実行する。
-`tmux list-panes` で claudeプロセスが死亡しているpaneを検出し、gryakuzaにP0報告する。
+`tmux list-panes` で claudeプロセスが死亡しているpaneを検出し、smithにP0報告する。
 
 ### 検知方法
 
@@ -265,8 +265,8 @@ DEAD_AGENTS=""
 while IFS=" " read -r agent_id current_cmd; do
     [[ -z "$agent_id" ]] && continue
     if [[ "$current_cmd" != "claude" ]]; then
-        # 死亡検知 → gryakuza inbox にP0報告
-        bash scripts/inbox_write.sh gryakuza \
+        # 死亡検知 → smith inbox にP0報告
+        bash scripts/inbox_write.sh smith \
             "${agent_id}が死亡(pane_current_command=${current_cmd})" \
             "system_notice" "master_tortoise" "" P0
         DEAD_AGENTS="${DEAD_AGENTS:+${DEAD_AGENTS},}${agent_id}"
@@ -342,8 +342,8 @@ fi
 - CRITICAL時の分岐:
   ```
   $(command -v tailscale || command -v tailscale.exe) ping {peer} --timeout=5s
-  ├── 成功 → プロセス死亡推定 → gryakuza inbox通知
-  └── 失敗 → ネットワーク断推定 → gryakuza inbox通知（wait & retry）
+  ├── 成功 → プロセス死亡推定 → smith inbox通知
+  └── 失敗 → ネットワーク断推定 → smith inbox通知（wait & retry）
   ```
 - **自動handoverは行わない**。ラオモトの明示的指示が必要。
 
@@ -438,7 +438,7 @@ ssh $SSH_OPTS $PEER_HOST "cat ${PEER_PROJECT}/queue/heartbeat/tortoise.yaml"
 | SSH結果 | last_beat | 判定 | アクション |
 |---------|-----------|------|----------|
 | 成功 | 更新済み（直近120秒以内） | 正常 | 経過観察 |
-| 成功 | 古い（120秒超） | peer側listener障害疑い | gryakuza inboxへ通知（P1） |
+| 成功 | 古い（120秒超） | peer側listener障害疑い | smith inboxへ通知（P1） |
 | 失敗 | - | ネットワーク障害 | darkninja inbox に通知 |
 
 ### self heartbeat記録 (queue/heartbeat/tortoise.yaml)
@@ -461,7 +461,7 @@ context_summary: ok
 
 | 宛先 | 手段 | 用途 |
 |------|------|------|
-| gryakuza | inbox_write.sh | 異常報告、予測警告、/clear推奨 |
+| smith | inbox_write.sh | 異常報告、予測警告、/clear推奨 |
 | master_crane | SSH: `ssh <peer-hostname>` で heartbeat YAML を直接更新 | ハートビート交換（SSHのみ） |
 | darkninja（緊急時） | ntfy `{base_topic}` メイントピック | マシンCRITICAL通知のみ |
 
@@ -513,7 +513,7 @@ inboxの `laomoto_message` に `[Haiku応答]:` が含まれている場合:
 ## Forbidden Actions（再掲・必読）
 
 1. **コード編集一切禁止**: scripts/, lib/, tests/, CLAUDE.md等の編集は行わない
-2. **タスク分配禁止**: yakuzaへのタスク割り当てはgryakuzaの権限
+2. **タスク分配禁止**: yakuzaへのタスク割り当てはsmithの権限
 3. **エージェント直接停止禁止**: /clear送信、slay等はnjslyr.shの権限。推奨のみ行う
 4. **自動handover禁止**: マシン切り替えはラオモトの明示的指示が必要
 

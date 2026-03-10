@@ -2,7 +2,7 @@
 # ═══════════════════════════════════════════════════════════════
 # inbox_watcher.sh — メールボックス監視＆起動シグナル配信
 # Usage: bash scripts/inbox_watcher.sh <agent_id> <pane_target> [cli_type]
-# Example: bash scripts/inbox_watcher.sh gryakuza multiagent:0.0 claude
+# Example: bash scripts/inbox_watcher.sh smith multiagent:0.0 claude
 #
 # 設計思想:
 #   メッセージ本体はファイル（inbox YAML）に書く = 確実
@@ -171,7 +171,7 @@ EOF
 }
 
 # ─── Latency SLA monitoring (P2-施策3) ───
-# FIX-013: Write to .state/alerts/ instead of dashboard.md (eliminates awk race with gryakuza)
+# FIX-013: Write to .state/alerts/ instead of dashboard.md (eliminates awk race with smith)
 check_latency_sla() {
     local latency_sec="$1"
     local alert_dir="${STATE_DIR}/alerts"
@@ -1116,7 +1116,7 @@ process_unread() {
             # FIRST_UNREAD_SEENリセットしない。リセットするとPhase1に戻り無限ループする。
             if [ "$AGENT_ID" = "darkninja" ]; then
                 echo "[$(date)] ESCALATION Phase 3: darkninja — /clear suppressed (human-controlled). ${normal_count} unread, ${age}s." >&2
-                # Alert記録（gryakuza集約用）
+                # Alert記録（smith集約用）
                 mkdir -p "${STATE_DIR}/alerts" 2>/dev/null || true
                 printf 'agent_id: darkninja\ntimestamp: "%s"\nunread_count: %s\nage_sec: %s\naction: phase3_suppressed\n' \
                     "$(date -Iseconds)" "$normal_count" "$age" > "${STATE_DIR}/alerts/darkninja_undeliverable.yaml"

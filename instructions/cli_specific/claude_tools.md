@@ -65,7 +65,7 @@ Runtime switching is available but rarely needed (Soukaiya handles L4+ tasks ins
 
 ```bash
 # Manual override only — not for Bloom-based auto-switching
-bash scripts/inbox_write.sh yakuza{N} "/model <new_model>" model_switch gryakuza
+bash scripts/inbox_write.sh yakuza{N} "/model <new_model>" model_switch smith
 tmux set-option -p -t multiagent:0.{N} @model_name '<DisplayName>'
 ```
 
@@ -76,7 +76,7 @@ For Yakuza: You don't switch models yourself. Gryakuza manages this.
 For Gryakuza only: Send `/clear` to yakuza for context reset:
 
 ```bash
-bash scripts/inbox_write.sh yakuza{N} "タスクYAMLを読んで作業開始せよ。" clear_command gryakuza
+bash scripts/inbox_write.sh yakuza{N} "タスクYAMLを読んで作業開始せよ。" clear_command smith
 ```
 
 For Yakuza: After `/clear`, follow CLAUDE.md /clear recovery procedure. Do NOT read instructions/yakuza.md for the first task (cost saving).
@@ -87,6 +87,6 @@ All agents: Follow the Session Start / Recovery procedure in CLAUDE.md. Key step
 
 1. Identify self: `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'`
 2. `mcp__memory__read_graph` — restore rules, preferences, lessons
-3. Read your instructions file (darkninja→instructions/darkninja.md, gryakuza→instructions/gryakuza.md, yakuza→instructions/yakuza.md)
+3. Read your instructions file (darkninja→instructions/darkninja.md, smith→instructions/smith.md, yakuza→instructions/yakuza.md)
 4. Rebuild state from primary YAML data (queue/, tasks/, reports/)
 5. Review forbidden actions, then start work

@@ -26,7 +26,7 @@
 #
 # 使用例:
 #   bash scripts/njslyr_cmd.sh suriken yakuza3
-#   bash scripts/njslyr_cmd.sh suriken gryakuza "タスク確認せよ" system_notice P1
+#   bash scripts/njslyr_cmd.sh suriken smith "タスク確認せよ" system_notice P1
 #
 # 設計書: context/cmd_269-infra-design.md
 # ═══════════════════════════════════════════════════════════════
@@ -599,7 +599,7 @@ Subcommands:
 
 Examples:
   bash scripts/njslyr_cmd.sh suriken yakuza3
-  bash scripts/njslyr_cmd.sh suriken gryakuza "タスク確認せよ" system_notice P1
+  bash scripts/njslyr_cmd.sh suriken smith "タスク確認せよ" system_notice P1
   bash scripts/njslyr_cmd.sh chop yakuza5
   bash scripts/njslyr_cmd.sh slay yakuza2 "コンテキスト枯渇"
   bash scripts/njslyr_cmd.sh spawn_tengu yakuza7 "cmd_999 インフラ監視"

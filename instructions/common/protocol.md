@@ -11,13 +11,13 @@ bash scripts/inbox_write.sh <target_agent> "<message>" <type> <from>
 Examples:
 ```bash
 # Darkninja → Gryakuza
-bash scripts/inbox_write.sh gryakuza "cmd_048を書いた。実行せよ。" cmd_new darkninja
+bash scripts/inbox_write.sh smith "cmd_048を書いた。実行せよ。" cmd_new darkninja
 
 # Yakuza → Gryakuza
-bash scripts/inbox_write.sh gryakuza "クローンヤクザ5号、ニンム完了。報告YAML確認されたし。" report_received yakuza5
+bash scripts/inbox_write.sh smith "クローンヤクザ5号、ニンム完了。報告YAML確認されたし。" report_received yakuza5
 
 # Gryakuza → Yakuza
-bash scripts/inbox_write.sh yakuza3 "タスクYAMLを読んで作業開始せよ。" task_assigned gryakuza
+bash scripts/inbox_write.sh yakuza3 "タスクYAMLを読んで作業開始せよ。" task_assigned smith
 ```
 
 Delivery is handled by `inbox_watcher.sh` (infrastructure layer).
@@ -64,7 +64,7 @@ Read-cost controls:
 | 2〜4 min | Escape×2 + nudge | Cursor position bug workaround |
 | 4 min+ | `/clear` sent (max once per 5 min) | Force session reset + YAML re-read |
 
-## Inbox Processing Protocol (gryakuza/yakuza/soukaiya)
+## Inbox Processing Protocol (smith/yakuza/soukaiya)
 
 When you receive `inboxN` (e.g. `inbox3`):
 1. `Read queue/inbox/{your_id}.yaml`

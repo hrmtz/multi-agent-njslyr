@@ -297,7 +297,7 @@ activated_by: watcher_supervisor
 recovered_from: emergency_degraded
 EOF
             mv "$tmp_file" "$am_file"
-            bash "$PROJECT_ROOT/scripts/inbox_write.sh" gryakuza \
+            bash "$PROJECT_ROOT/scripts/inbox_write.sh" smith \
                 "緊急縮退モード解除: Kyoto SSH疎通回復。${pre_mode}モードに復帰。新規cmd採番制限を解除。" \
                 "system_notice" "watcher_supervisor" "" P0 2>/dev/null || true
             rm -f "$KYOTO_ALERT_SENT" "$KYOTO_PRE_EMERGENCY"
@@ -333,7 +333,7 @@ EOF
                 -d "NeoSaitamaがKyotoのSSH heartbeatを${elapsed}秒間検知できません。handover:neosaitama を送信してください。30分以内に応答がない場合、緊急縮退モード(emergency_degraded)に自動移行します。" \
                 >/dev/null 2>&1 || true
         fi
-        bash "$PROJECT_ROOT/scripts/inbox_write.sh" gryakuza \
+        bash "$PROJECT_ROOT/scripts/inbox_write.sh" smith \
             "CRITICAL: Kyoto SSH heartbeat喪失 (${elapsed}秒経過)。ラオモトへntfy通知送信済み。30分応答なし→emergency_degradedに自動移行予定。" \
             "system_notice" "watcher_supervisor" "" P0 2>/dev/null || true
         printf '%s\n' "$now" > "$KYOTO_ALERT_SENT"
@@ -376,7 +376,7 @@ restrictions:
 EOF
     mv "$tmp_file" "$am_file"
 
-    bash "$PROJECT_ROOT/scripts/inbox_write.sh" gryakuza \
+    bash "$PROJECT_ROOT/scripts/inbox_write.sh" smith \
         "緊急縮退モード（emergency_degraded）移行完了。Kyoto SSH heartbeat喪失から30分経過、ラオモト応答なし。既存in_progressタスクのみ継続可。新規cmd採番禁止。active_machine.yaml更新済み。解除: Kyoto復旧またはhandover:neosaitama。" \
         "system_notice" "watcher_supervisor" "" P0 2>/dev/null || true
 

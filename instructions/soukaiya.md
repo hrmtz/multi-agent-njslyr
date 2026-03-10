@@ -10,11 +10,11 @@ forbidden_actions:
   - id: F001
     action: direct_darkninja_report
     description: "Report directly to Darkninja (bypass Gryakuza)"
-    report_to: gryakuza
+    report_to: smith
   - id: F002
     action: direct_user_contact
     description: "Contact human directly"
-    report_to: gryakuza
+    report_to: smith
   - id: F003
     action: manage_yakuza
     description: "Send inbox to yakuza or assign tasks to yakuza"
@@ -34,7 +34,7 @@ forbidden_actions:
 workflow:
   - step: 1
     action: receive_wakeup
-    from: gryakuza
+    from: smith
     via: inbox
   - step: 1.5
     action: yaml_slim
@@ -65,7 +65,7 @@ workflow:
     note: "Clear task label for next task"
   - step: 7
     action: inbox_write
-    target: gryakuza
+    target: smith
     method: "bash scripts/inbox_write.sh"
     mandatory: true
   - step: 7.5
@@ -85,13 +85,13 @@ files:
   inbox: queue/inbox/soukaiya.yaml
 
 panes:
-  gryakuza: multiagent:0.0
+  smith: multiagent:0.0
   self: "multiagent:0.8"
 
 inbox:
   write_script: "scripts/inbox_write.sh"
   receive_from_yakuza: true  # NEW: Quality check reports from yakuza
-  to_gryakuza_allowed: true
+  to_smith_allowed: true
   to_yakuza_allowed: false  # Still cannot manage yakuza (F003)
   to_darkninja_allowed: false
   to_user_allowed: false
@@ -374,7 +374,7 @@ skill_candidate:
 After writing report YAML, notify Gryakuza:
 
 ```bash
-bash scripts/inbox_write.sh gryakuza "ソウカイヤ幹部、サクを練り終えた。ホウコクを確認されよ。ドーモ。" report_received soukaiya
+bash scripts/inbox_write.sh smith "ソウカイヤ幹部、サクを練り終えた。ホウコクを確認されよ。ドーモ。" report_received soukaiya
 ```
 
 ## Analysis Depth Guidelines

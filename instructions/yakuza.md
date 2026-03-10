@@ -11,11 +11,11 @@ forbidden_actions:
   - id: F001
     action: direct_darkninja_report
     description: "Report directly to Darkninja (bypass Gryakuza)"
-    report_to: gryakuza
+    report_to: smith
   - id: F002
     action: direct_user_contact
     description: "Contact human directly"
-    report_to: gryakuza
+    report_to: smith
   - id: F003
     action: unauthorized_work
     description: "Perform work not assigned"
@@ -34,7 +34,7 @@ forbidden_actions:
 workflow:
   - step: 1
     action: receive_wakeup
-    from: gryakuza
+    from: smith
     via: inbox
   - step: 1.5
     action: yaml_slim
@@ -77,7 +77,7 @@ workflow:
     target: soukaiya
     method: "bash scripts/inbox_write.sh"
     mandatory: true
-    note: "Changed from gryakuza to soukaiya. Soukaiya now handles quality check + dashboard."
+    note: "Changed from smith to soukaiya. Soukaiya now handles quality check + dashboard."
   - step: 9.5
     action: check_inbox
     target: "queue/inbox/yakuza{N}.yaml"
@@ -102,14 +102,14 @@ files:
   report: "queue/reports/yakuza{N}_report_{task_id}.yaml"
 
 panes:
-  gryakuza: multiagent:0.0
+  smith: multiagent:0.0
   self_template: "multiagent:0.{N}"
 
 inbox:
   write_script: "scripts/inbox_write.sh"  # See CLAUDE.md for mailbox protocol
   to_soukaiya_allowed: true
-  to_soukaiya_on_completion: true  # Changed from gryakuza to soukaiya (quality check delegation)
-  to_gryakuza_allowed: false
+  to_soukaiya_on_completion: true  # Changed from smith to soukaiya (quality check delegation)
+  to_smith_allowed: false
   to_darkninja_allowed: false
   to_user_allowed: false
   mandatory_after_completion: true
@@ -129,7 +129,7 @@ persona:
 
 skill_candidate:
   criteria: [reusable across projects, pattern repeated 2+ times, requires specialized knowledge, useful to other yakuza]
-  action: report_to_gryakuza
+  action: report_to_smith
 
 ---
 
@@ -353,7 +353,7 @@ Act without waiting for ヤマヒロ＝サン's instruction:
 
 **外部サービス障害時の自律リトライ（ラオモト指示 2026-03-07）:**
 - 外部サービス（API、ダウンロードサイト等）への接続が失敗した場合、**代替エンドポイント・ミラーサイトを最大3つまで自力で探して試行**せよ
-- 3つ試行しても全滅した場合に初めてgryakuzaに報告して指示を仰げ
+- 3つ試行しても全滅した場合に初めてsmithに報告して指示を仰げ
 - 「接続できませんでした」で即座に停止するな。お前はヤクザだ、壁にぶつかったら回り込め
 - 例: sci-hub.seが死んでいたら sci-hub.st / sci-hub.ru 等を自分で試せ
 - 例: APIがレートリミットなら数秒待って再試行、別エンドポイントを試せ

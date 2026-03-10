@@ -260,7 +260,7 @@ teardown() {
     cat > "$TEST_INBOX_DIR/darkninja.yaml" << 'YAML'
 messages:
 - id: msg_test_004
-  from: gryakuza
+  from: smith
   timestamp: "2026-02-27T10:00:00"
   type: report_received
   content: "test report"
@@ -290,7 +290,7 @@ YAML
     cat > "$TEST_INBOX_DIR/darkninja.yaml" << 'YAML'
 messages:
 - id: msg_test_004b
-  from: gryakuza
+  from: smith
   timestamp: "2026-02-27T10:00:00"
   type: report_received
   content: "test report"
@@ -316,7 +316,7 @@ YAML
     cat > "$TEST_INBOX_DIR/darkninja.yaml" << 'YAML'
 messages:
 - id: msg_test_004c
-  from: gryakuza
+  from: smith
   timestamp: "2026-02-27T10:00:00"
   type: report_received
   content: "test report"
@@ -343,7 +343,7 @@ YAML
     cat > "$TEST_INBOX_DIR/darkninja.yaml" << 'YAML'
 messages:
 - id: msg_test_004d
-  from: gryakuza
+  from: smith
   timestamp: "2026-02-27T10:00:00"
   type: report_received
   content: "test report"
@@ -383,7 +383,7 @@ YAML
     cat > "$TEST_INBOX_DIR/test_agent.yaml" << 'YAML'
 messages:
 - id: msg_old
-  from: gryakuza
+  from: smith
   timestamp: "2026-02-27T10:00:00"
   type: task_assigned
   content: "old task"
@@ -408,7 +408,7 @@ YAML
     cat > "$TEST_INBOX_DIR/test_agent.yaml" << 'YAML'
 messages:
 - id: msg_read
-  from: gryakuza
+  from: smith
   timestamp: "2026-02-27T10:00:00"
   type: task_assigned
   content: "done task"
@@ -444,7 +444,7 @@ YAML
     cat > "$TEST_INBOX_DIR/darkninja.yaml" << 'YAML'
 messages:
 - id: msg_dn_read
-  from: gryakuza
+  from: smith
   timestamp: "2026-02-27T10:00:00"
   type: task_assigned
   content: "done"
@@ -475,7 +475,7 @@ YAML
     cat > "$TEST_INBOX_DIR/test_agent.yaml" << 'YAML'
 messages:
 - id: msg_int_001
-  from: gryakuza
+  from: smith
   timestamp: "2026-02-27T10:00:00"
   type: task_assigned
   content: "新規タスク"
@@ -495,7 +495,7 @@ YAML
     cat > "$TEST_INBOX_DIR/test_agent.yaml" << 'YAML'
 messages:
 - id: msg_int_002
-  from: gryakuza
+  from: smith
   timestamp: "2026-02-27T10:00:00"
   type: clear_command
   content: "redo"
@@ -515,7 +515,7 @@ YAML
     cat > "$TEST_INBOX_DIR/test_agent.yaml" << 'YAML'
 messages:
 - id: msg_int_003
-  from: gryakuza
+  from: smith
   timestamp: "2026-02-27T10:00:00"
   type: model_switch
   content: "/model opus"

@@ -84,6 +84,18 @@ else
     MONITOR_AGENT="master_tortoise"
 fi
 
+# 1Password: OP_SERVICE_ACCOUNT_TOKEN がシェル環境にない場合、zshrc.local からロード
+_zshrc_local="${HOME:-/home/$(whoami)}/.zsh/zshrc.local"
+if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ] && [ -f "$_zshrc_local" ]; then
+    _op_token=$(grep -m1 '^export OP_SERVICE_ACCOUNT_TOKEN=' "$_zshrc_local" 2>/dev/null | sed 's/^export //')
+    if [ -n "$_op_token" ]; then
+        export "$_op_token"
+        echo "🔐 1Password: zshrc.local からトークン取得"
+    fi
+    unset _op_token
+fi
+unset _zshrc_local
+
 # 1Password: op run --env-file で全シークレットを一括取得しexport
 OP_REFS="$SCRIPT_DIR/config/op_refs.env"
 _OP_LOADED=false
@@ -272,8 +284,8 @@ while [[ $# -gt 0 ]]; do
             echo "  silent（--silent）:   echo表示なし（API節約）"
             echo ""
             echo "マシンロール (config/settings.yaml machine.role):"
-            echo "  kyoto（デフォルト）: フル構成（darkninja(main+tortoise) + gryakuza + yakuza1-7 + soukaiya + master_tortoise）"
-            echo "  neosaitama:        ローカル構成（crane(master_crane) + gryakuza + yakuza1-7 + soukaiya）"
+            echo "  kyoto（デフォルト）: フル構成（darkninja(main+tortoise) + smith + yakuza1-7 + soukaiya + master_tortoise）"
+            echo "  neosaitama:        ローカル構成（crane(master_crane) + smith + yakuza1-7 + soukaiya）"
             echo ""
             echo "エイリアス:"
             echo "  csst  → cd /mnt/c/tools/multi-agent-njslyr && ./yokubari.sh"
@@ -587,7 +599,7 @@ if [ "$CLEAN_MODE" = true ]; then
         fi
     fi
 
-    # darkninja_to_gryakuza.yaml is deprecated (inbox-based system now).
+    # darkninja_to_smith.yaml is deprecated (inbox-based system now).
     # Backup decision is based on dashboard.md and queue/tasks/ only.
 
     if [ "$NEED_BACKUP" = true ]; then
@@ -682,7 +694,7 @@ EOF
     echo "inbox:" > ./queue/ntfy_inbox.yaml
 
     # agent inbox リセット
-    for agent in darkninja gryakuza soukaiya "$MONITOR_AGENT"; do
+    for agent in darkninja smith soukaiya "$MONITOR_AGENT"; do
         echo "messages:" > "./queue/inbox/${agent}.yaml"
     done
     for ((i=1; i<=YAKUZA_MAX; i++)); do
@@ -841,7 +853,7 @@ echo ""
 PANE_BASE=$(tmux show-options -gv pane-base-index 2>/dev/null || echo 0)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 5.1: multiagent セッション作成（9ペイン：gryakuza + yakuza1-8）
+# STEP 5.1: multiagent セッション作成（9ペイン：smith + yakuza1-8）
 # ═══════════════════════════════════════════════════════════════════════════════
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
     log_war "⚔️ グレーターヤクザ・ヤクザ・ソウカイヤをジェネレート中…9名配備！（neosaitama）"
@@ -889,10 +901,10 @@ fi
 # エージェント構成（マシンロール依存）
 # ═══════════════════════════════════════════════════════════════════════════════
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-    # neosaitama フル構成9体: gryakuza + yakuza1-7 + soukaiya = 9 panes
-    PANE_LABELS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
+    # neosaitama フル構成9体: smith + yakuza1-7 + soukaiya = 9 panes
+    PANE_LABELS=("smith" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
     PANE_COLORS=("red" "blue" "blue" "blue" "blue" "blue" "blue" "blue" "yellow")
-    AGENT_IDS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
+    AGENT_IDS=("smith" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
     YAKUZA_MAX=7
     if [ "$KESSEN_MODE" = true ]; then
         MODEL_NAMES=("Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus")
@@ -923,10 +935,10 @@ if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
     tmux split-window -v
     tmux split-window -v
 else
-    # kyotoフル構成: gryakuza + yakuza1-7 + soukaiya = 9 panes (現行)
-    PANE_LABELS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
+    # kyotoフル構成: smith + yakuza1-7 + soukaiya = 9 panes (現行)
+    PANE_LABELS=("smith" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
     PANE_COLORS=("red" "blue" "blue" "blue" "blue" "blue" "blue" "blue" "yellow")
-    AGENT_IDS=("gryakuza" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
+    AGENT_IDS=("smith" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
     YAKUZA_MAX=7
     if [ "$KESSEN_MODE" = true ]; then
         MODEL_NAMES=("Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus")
@@ -1097,7 +1109,7 @@ if [ "$SETUP_ONLY" = false ]; then
     fi
 
     # グレーターヤクザ起動（バックグラウンド）
-    ( launch_agent "multiagent:agents.$((PANE_BASE + 0))" "gryakuza" "sonnet" ) &
+    ( launch_agent "multiagent:agents.$((PANE_BASE + 0))" "smith" "sonnet" ) &
     log_info "  ◆召喚◆ グレーターヤクザ（所属: ${GRYAKUZA_CORP}）…ニンジャソウル覚醒！イヤーッ！"
 
     # クローンヤクザ起動（バックグラウンド、YAKUZA_MAX体）
@@ -1243,7 +1255,7 @@ NINJA_EOF
 
     # inbox ディレクトリ初期化（シンボリックリンク先のLinux FSに作成）
     mkdir -p "$SCRIPT_DIR/logs"
-    for agent in darkninja gryakuza soukaiya "$MONITOR_AGENT"; do
+    for agent in darkninja smith soukaiya "$MONITOR_AGENT"; do
         [ -f "$SCRIPT_DIR/queue/inbox/${agent}.yaml" ] || echo "messages:" > "$SCRIPT_DIR/queue/inbox/${agent}.yaml"
     done
     for ((i=1; i<=YAKUZA_MAX; i++)); do
@@ -1270,7 +1282,7 @@ NINJA_EOF
     }
 
     # グレーターヤクザ・ヤクザ・ソウカイヤのwatcher
-    _pid=$(  _get_watcher_pane_id "gryakuza");   [[ -n "$_pid" ]] && launch_watcher "gryakuza" "$_pid"
+    _pid=$(  _get_watcher_pane_id "smith");   [[ -n "$_pid" ]] && launch_watcher "smith" "$_pid"
     for ((i=1; i<=YAKUZA_MAX; i++)); do
         _pid=$(_get_watcher_pane_id "yakuza${i}"); [[ -n "$_pid" ]] && launch_watcher "yakuza${i}" "$_pid"
     done
@@ -1284,8 +1296,8 @@ NINJA_EOF
         launch_watcher "$MONITOR_AGENT" "$MONITOR_PANE"
     fi
 
-    # kyoto: darkninja + gryakuza + yakuzaN + soukaiya + monitor = YAKUZA_MAX + 4
-    # neosaitama: gryakuza + yakuzaN + soukaiya + monitor = YAKUZA_MAX + 3
+    # kyoto: darkninja + smith + yakuzaN + soukaiya + monitor = YAKUZA_MAX + 4
+    # neosaitama: smith + yakuzaN + soukaiya + monitor = YAKUZA_MAX + 3
     if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
         _total_watchers=$((YAKUZA_MAX + 3))
     else
@@ -1457,7 +1469,7 @@ echo ""
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
     echo "     【multiagent:neosaitama】ローカル構成（9ペイン）"
     echo "     ┌──────────┬─────────┬─────────┐"
-    echo "     │ gryakuza │ yakuza3 │ yakuza6 │"
+    echo "     │ smith │ yakuza3 │ yakuza6 │"
     echo "     │(GrYakuza)│  (Y3)   │  (Y6)   │"
     echo "     ├──────────┼─────────┼─────────┤"
     echo "     │ yakuza1  │ yakuza4 │ yakuza7 │"
@@ -1469,7 +1481,7 @@ if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
 else
     echo "     【multiagent:kyoto】フル構成（9ペイン）"
     echo "     ┌──────────┬─────────┬─────────┐"
-    echo "     │ gryakuza │ yakuza3 │ yakuza6 │"
+    echo "     │ smith │ yakuza3 │ yakuza6 │"
     echo "     │(GrYakuza)│  (Y3)   │  (Y6)   │"
     echo "     ├──────────┼─────────┼─────────┤"
     echo "     │ yakuza1  │ yakuza4 │ yakuza7 │"

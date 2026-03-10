@@ -175,25 +175,25 @@ EOF
 }
 
 @test "T-S02: message未指定でexit 1" {
-    run bash "$TEST_SCRIPT" "gryakuza"
+    run bash "$TEST_SCRIPT" "smith"
     [ "$status" -eq 1 ]
     [[ "$output" =~ "Usage" ]]
 }
 
 @test "T-S03: agent_id不正文字でexit 1" {
-    run bash "$TEST_SCRIPT" "gryakuza;rm -rf /" "test message" "task_assigned" "yakuza3"
+    run bash "$TEST_SCRIPT" "smith;rm -rf /" "test message" "task_assigned" "yakuza3"
     [ "$status" -eq 1 ]
     [[ "$output" =~ "REJECTED" ]]
 }
 
 @test "T-S04: agent_id スペース含みでexit 1" {
-    run bash "$TEST_SCRIPT" "gryakuza neo" "test message" "task_assigned" "yakuza3"
+    run bash "$TEST_SCRIPT" "smith neo" "test message" "task_assigned" "yakuza3"
     [ "$status" -eq 1 ]
     [[ "$output" =~ "REJECTED" ]]
 }
 
 @test "T-S05: NJSLYR_SSH_DEPTH=1 で再帰防止 → exit 1" {
-    run env NJSLYR_SSH_DEPTH=1 bash "$TEST_SCRIPT" "gryakuza" "test" "task_assigned" "yakuza3"
+    run env NJSLYR_SSH_DEPTH=1 bash "$TEST_SCRIPT" "smith" "test" "task_assigned" "yakuza3"
     [ "$status" -eq 1 ]
     [[ "$output" =~ "recursive SSH" ]]
 }
@@ -201,7 +201,7 @@ EOF
 @test "T-S06: SSH疎通OK → inbox_write成功 (mock)" {
     _setup_ssh_ok
     # sleep を無効化（テスト高速化）
-    run bash "$TEST_SCRIPT" "gryakuza" "テストメッセージ" "task_assigned" "yakuza3"
+    run bash "$TEST_SCRIPT" "smith" "テストメッセージ" "task_assigned" "yakuza3"
     [ "$status" -eq 0 ]
     [[ "$output" =~ "inbox_write OK" ]]
 }
@@ -215,7 +215,7 @@ EOF
 exit 0
 EOF
     chmod +x "$mock_bin/sleep"
-    run bash "$TEST_SCRIPT" "gryakuza" "リトライテスト" "task_assigned" "yakuza3"
+    run bash "$TEST_SCRIPT" "smith" "リトライテスト" "task_assigned" "yakuza3"
     [ "$status" -eq 0 ]
     [[ "$output" =~ "sleep recovery" ]]
 }
@@ -232,7 +232,7 @@ EOF
     chmod +x "$mock_bin/sleep"
     # ntfyスクリプトのTEST_TMPDIR参照のため環境変数エクスポート
     export TEST_TMPDIR
-    run bash "$TEST_SCRIPT" "gryakuza" "フォールバックテスト" "task_assigned" "yakuza3"
+    run bash "$TEST_SCRIPT" "smith" "フォールバックテスト" "task_assigned" "yakuza3"
     # SSH失敗 → ntfyフォールバック → exit 1 (SSH失敗扱い)
     [ "$status" -eq 1 ]
     [[ "$output" =~ "ntfy fallback" ]]
@@ -242,7 +242,7 @@ EOF
     _setup_ssh_ok
     local yaml_file="$TEST_TMPDIR/queue/tasks/test_task.yaml"
     echo "task_id: test" > "$yaml_file"
-    run bash "$TEST_SCRIPT" "yakuza3" "タスク割り当て" "task_assigned" "gryakuza" "$yaml_file"
+    run bash "$TEST_SCRIPT" "yakuza3" "タスク割り当て" "task_assigned" "smith" "$yaml_file"
     [ "$status" -eq 0 ]
     [[ "$output" =~ "scp OK" ]]
 }
@@ -254,7 +254,7 @@ machine:
   role: kyoto
   peer_project_root: /Users/hrmtz/project/multi-agent-njslyr
 EOF
-    run bash "$TEST_SCRIPT" "gryakuza" "test" "task_assigned" "yakuza3"
+    run bash "$TEST_SCRIPT" "smith" "test" "task_assigned" "yakuza3"
     [ "$status" -eq 1 ]
     [[ "$output" =~ "peer_host or peer_project_root not configured" ]]
 }
@@ -266,7 +266,7 @@ machine:
   peer_host: test-peer-host
   peer_project_root: /Users/../etc/passwd
 EOF
-    run bash "$TEST_SCRIPT" "gryakuza" "test" "task_assigned" "yakuza3"
+    run bash "$TEST_SCRIPT" "smith" "test" "task_assigned" "yakuza3"
     [ "$status" -eq 1 ]
     [[ "$output" =~ "Invalid PEER_PROJECT" ]]
 }

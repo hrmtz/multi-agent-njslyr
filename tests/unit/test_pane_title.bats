@@ -82,8 +82,8 @@ setup() {
 
 # TC9: update_pane_title with empty model defaults to [Snt]
 @test "TC9: update_pane_title defaults to [Snt] for empty model" {
-    update_pane_title "multiagent:agents.0" "gryakuza" "" ""
+    update_pane_title "multiagent:agents.0" "smith" "" ""
     run grep "select-pane" "$MOCK_LOG"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"gryakuza[Snt]"* ]]
+    [[ "$output" == *"smith[Snt]"* ]]
 }

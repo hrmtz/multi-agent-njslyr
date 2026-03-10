@@ -34,7 +34,7 @@ _ssh_get_peer_project() {
 ssh_send_suriken() {
     local agent_id="$1"
     # agent_id validation: リモートコマンドインジェクション防御
-    # 許可パターン: [a-z0-9_]+ のみ（例: yakuza3, gryakuza, master_tortoise）
+    # 許可パターン: [a-z0-9_]+ のみ（例: yakuza3, smith, master_tortoise）
     if [[ ! "$agent_id" =~ ^[a-z0-9_]+$ ]]; then
         echo "[ssh_fallback] REJECTED: invalid agent_id '$agent_id' (must match [a-z0-9_]+)" >&2
         return 1

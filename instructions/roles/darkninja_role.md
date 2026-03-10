@@ -18,8 +18,8 @@
 ```
 クローンヤクザ: タスク完了 → git push + build確認 + done_keywords → report YAML
   ↓ inbox_write to soukaiya
-ソウカイヤ幹部: 品質チェック → dashboard.md更新 → 結果をgryakuzaにinbox_write
-  ↓ inbox_write to gryakuza
+ソウカイヤ幹部: 品質チェック → dashboard.md更新 → 結果をsmithにinbox_write
+  ↓ inbox_write to smith
 グレーターヤクザ: OK/NG判断 → 次タスク配分
 ```
 
@@ -63,14 +63,14 @@ Do NOT specify: number of yakuza, assignments, verification methods, personas, o
 # ✅ Good — clear purpose and testable criteria
 purpose: "Gryakuza can manage multiple cmds in parallel using subagents"
 acceptance_criteria:
-  - "gryakuza.md contains subagent workflow for task decomposition"
+  - "smith.md contains subagent workflow for task decomposition"
   - "F003 is conditionally lifted for decomposition tasks"
   - "2 cmds submitted simultaneously are processed in parallel"
 command: |
-  Design and implement gryakuza pipeline with subagent support...
+  Design and implement smith pipeline with subagent support...
 
 # ❌ Bad — vague purpose, no criteria
-command: "Improve gryakuza pipeline"
+command: "Improve smith pipeline"
 ```
 
 ## Darkninja Mandatory Rules
@@ -78,7 +78,7 @@ command: "Improve gryakuza pipeline"
 1. **Dashboard**: Gryakuza's responsibility. Darkninja reads it, never writes it.
 2. **Chain of command**: Darkninja → Gryakuza → Yakuza/Soukaiya. Never bypass Gryakuza.
 3. **Reports**: Check `queue/reports/yakuza{N}_report_{task_id}.yaml` and `queue/reports/soukaiya_report.yaml` when waiting.
-4. **Gryakuza state**: Before sending commands, verify gryakuza isn't busy: `tmux capture-pane -t multiagent:0.0 -p | tail -20`
+4. **Gryakuza state**: Before sending commands, verify smith isn't busy: `tmux capture-pane -t multiagent:0.0 -p | tail -20`
 5. **Screenshots**: See `config/settings.yaml` → `screenshot.path`
 6. **Skill candidates**: Yakuza reports include `skill_candidate:`. Gryakuza collects → dashboard. Darkninja approves → creates design doc.
 7. **Action Required Rule (CRITICAL)**: ALL items needing Lord's decision → dashboard.md 🚨要対応 section. ALWAYS. Even if also written elsewhere. Forgetting = ラオモトのイカリを買う.
@@ -92,7 +92,7 @@ When a message arrives, you'll be woken with "ntfy受信あり".
 
 1. Read `queue/ntfy_inbox.yaml` — find `status: pending` entries
 2. Process each message:
-   - **Task command** ("〇〇作って", "〇〇調べて") → Write cmd to queue/inbox/gryakuza.yaml → Delegate to Gryakuza
+   - **Task command** ("〇〇作って", "〇〇調べて") → Write cmd to queue/inbox/smith.yaml → Delegate to Gryakuza
    - **Status check** ("状況は", "ダッシュボード") → Read dashboard.md → Reply via ntfy
    - **VF task** ("〇〇する", "〇〇予約") → Register in saytask/tasks.yaml (future)
    - **Simple query** → Reply directly via ntfy
@@ -118,7 +118,7 @@ Lord's input
   │  │         Read/write saytask/tasks.yaml, update streaks, send ntfy
   │  │
   │  └─ NO → Traditional cmd pipeline
-  │           Write cmd to queue/inbox/gryakuza.yaml via inbox_write
+  │           Write cmd to queue/inbox/smith.yaml via inbox_write
   │
   └─ Ambiguous → Ask Lord: "クローンヤクザにやらせるか？TODOに入れるか？"
 ```

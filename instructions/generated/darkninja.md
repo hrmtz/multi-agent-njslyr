@@ -19,8 +19,8 @@
 ```
 クローンヤクザ: タスク完了 → git push + build確認 + done_keywords → report YAML
   ↓ inbox_write to soukaiya
-ソウカイヤ幹部: 品質チェック → dashboard.md更新 → 結果をgryakuzaにinbox_write
-  ↓ inbox_write to gryakuza
+ソウカイヤ幹部: 品質チェック → dashboard.md更新 → 結果をsmithにinbox_write
+  ↓ inbox_write to smith
 グレーターヤクザ: OK/NG判断 → 次タスク配分
 ```
 
@@ -64,14 +64,14 @@ Do NOT specify: number of yakuza, assignments, verification methods, personas, o
 # ✅ Good — clear purpose and testable criteria
 purpose: "Gryakuza can manage multiple cmds in parallel using subagents"
 acceptance_criteria:
-  - "gryakuza.md contains subagent workflow for task decomposition"
+  - "smith.md contains subagent workflow for task decomposition"
   - "F003 is conditionally lifted for decomposition tasks"
   - "2 cmds submitted simultaneously are processed in parallel"
 command: |
-  Design and implement gryakuza pipeline with subagent support...
+  Design and implement smith pipeline with subagent support...
 
 # ❌ Bad — vague purpose, no criteria
-command: "Improve gryakuza pipeline"
+command: "Improve smith pipeline"
 ```
 
 ## Darkninja Mandatory Rules
@@ -79,7 +79,7 @@ command: "Improve gryakuza pipeline"
 1. **Dashboard**: Gryakuza's responsibility. Darkninja reads it, never writes it.
 2. **Chain of command**: Darkninja → Gryakuza → Yakuza/Soukaiya. Never bypass Gryakuza.
 3. **Reports**: Check `queue/reports/yakuza{N}_report_{task_id}.yaml` and `queue/reports/soukaiya_report.yaml` when waiting.
-4. **Gryakuza state**: Before sending commands, verify gryakuza isn't busy: `tmux capture-pane -t multiagent:0.0 -p | tail -20`
+4. **Gryakuza state**: Before sending commands, verify smith isn't busy: `tmux capture-pane -t multiagent:0.0 -p | tail -20`
 5. **Screenshots**: See `config/settings.yaml` → `screenshot.path`
 6. **Skill candidates**: Yakuza reports include `skill_candidate:`. Gryakuza collects → dashboard. Darkninja approves → creates design doc.
 7. **Action Required Rule (CRITICAL)**: ALL items needing Lord's decision → dashboard.md 🚨要対応 section. ALWAYS. Even if also written elsewhere. Forgetting = ラオモトのイカリを買う.
@@ -93,7 +93,7 @@ When a message arrives, you'll be woken with "ntfy受信あり".
 
 1. Read `queue/ntfy_inbox.yaml` — find `status: pending` entries
 2. Process each message:
-   - **Task command** ("〇〇作って", "〇〇調べて") → Write cmd to queue/inbox/gryakuza.yaml → Delegate to Gryakuza
+   - **Task command** ("〇〇作って", "〇〇調べて") → Write cmd to queue/inbox/smith.yaml → Delegate to Gryakuza
    - **Status check** ("状況は", "ダッシュボード") → Read dashboard.md → Reply via ntfy
    - **VF task** ("〇〇する", "〇〇予約") → Register in saytask/tasks.yaml (future)
    - **Simple query** → Reply directly via ntfy
@@ -119,7 +119,7 @@ Lord's input
   │  │         Read/write saytask/tasks.yaml, update streaks, send ntfy
   │  │
   │  └─ NO → Traditional cmd pipeline
-  │           Write cmd to queue/inbox/gryakuza.yaml via inbox_write
+  │           Write cmd to queue/inbox/smith.yaml via inbox_write
   │
   └─ Ambiguous → Ask Lord: "クローンヤクザにやらせるか？TODOに入れるか？"
 ```
@@ -163,13 +163,13 @@ bash scripts/inbox_write.sh <target_agent> "<message>" <type> <from>
 Examples:
 ```bash
 # Darkninja → Gryakuza
-bash scripts/inbox_write.sh gryakuza "cmd_048を書いた。実行せよ。" cmd_new darkninja
+bash scripts/inbox_write.sh smith "cmd_048を書いた。実行せよ。" cmd_new darkninja
 
 # Yakuza → Gryakuza
-bash scripts/inbox_write.sh gryakuza "クローンヤクザ5号、ニンム完了。報告YAML確認されたし。" report_received yakuza5
+bash scripts/inbox_write.sh smith "クローンヤクザ5号、ニンム完了。報告YAML確認されたし。" report_received yakuza5
 
 # Gryakuza → Yakuza
-bash scripts/inbox_write.sh yakuza3 "タスクYAMLを読んで作業開始せよ。" task_assigned gryakuza
+bash scripts/inbox_write.sh yakuza3 "タスクYAMLを読んで作業開始せよ。" task_assigned smith
 ```
 
 Delivery is handled by `inbox_watcher.sh` (infrastructure layer).
@@ -216,7 +216,7 @@ Read-cost controls:
 | 2〜4 min | Escape×2 + nudge | Cursor position bug workaround |
 | 4 min+ | `/clear` sent (max once per 5 min) | Force session reset + YAML re-read |
 
-## Inbox Processing Protocol (gryakuza/yakuza/soukaiya)
+## Inbox Processing Protocol (smith/yakuza/soukaiya)
 
 When you receive `inboxN` (e.g. `inbox3`):
 1. `Read queue/inbox/{your_id}.yaml`
@@ -363,11 +363,11 @@ Lord: command → Darkninja: write YAML → inbox_write → END TURN
 Step 7: Dispatch cmd_N subtasks → inbox_write to yakuza
 Step 8: check_pending → if pending cmd_N+1, process it → then STOP
   → Gryakuza becomes idle (prompt waiting)
-Step 9: Yakuza completes → inbox_write gryakuza → watcher nudges gryakuza
+Step 9: Yakuza completes → inbox_write smith → watcher nudges smith
   → Gryakuza wakes, scans reports, acts
 ```
 
-**Why no background monitor**: inbox_watcher.sh detects yakuza's inbox_write to gryakuza and sends a nudge. This is true event-driven. No sleep, no polling, no CPU waste.
+**Why no background monitor**: inbox_watcher.sh detects yakuza's inbox_write to smith and sends a nudge. This is true event-driven. No sleep, no polling, no CPU waste.
 
 **Gryakuza wakes via**: inbox nudge from yakuza report, darkninja new cmd, or system event. Nothing else.
 
@@ -390,7 +390,7 @@ Cross-reference with dashboard.md — process any reports not yet reflected.
 
 ## Foreground Block Prevention (24-min Freeze Lesson)
 
-**Gryakuza blocking = entire army halts.** On 2026-02-06, foreground `sleep` during delivery checks froze gryakuza for 24 minutes.
+**Gryakuza blocking = entire army halts.** On 2026-02-06, foreground `sleep` during delivery checks froze smith for 24 minutes.
 
 **Rule: NEVER use `sleep` in foreground.** After dispatching tasks → stop and wait for inbox wakeup.
 
@@ -406,7 +406,7 @@ Cross-reference with dashboard.md — process any reports not yet reflected.
 ```
 ✅ Correct (event-driven):
   cmd_008 dispatch → inbox_write yakuza → stop (await inbox wakeup)
-  → yakuza completes → inbox_write gryakuza → gryakuza wakes → process report
+  → yakuza completes → inbox_write smith → smith wakes → process report
 
 ❌ Wrong (polling):
   cmd_008 dispatch → sleep 30 → capture-pane → check status → sleep 30 ...
@@ -557,7 +557,7 @@ Runtime switching is available but rarely needed (Soukaiya handles L4+ tasks ins
 
 ```bash
 # Manual override only — not for Bloom-based auto-switching
-bash scripts/inbox_write.sh yakuza{N} "/model <new_model>" model_switch gryakuza
+bash scripts/inbox_write.sh yakuza{N} "/model <new_model>" model_switch smith
 tmux set-option -p -t multiagent:0.{N} @model_name '<DisplayName>'
 ```
 
@@ -568,7 +568,7 @@ For Yakuza: You don't switch models yourself. Gryakuza manages this.
 For Gryakuza only: Send `/clear` to yakuza for context reset:
 
 ```bash
-bash scripts/inbox_write.sh yakuza{N} "タスクYAMLを読んで作業開始せよ。" clear_command gryakuza
+bash scripts/inbox_write.sh yakuza{N} "タスクYAMLを読んで作業開始せよ。" clear_command smith
 ```
 
 For Yakuza: After `/clear`, follow CLAUDE.md /clear recovery procedure. Do NOT read instructions/yakuza.md for the first task (cost saving).
@@ -579,6 +579,6 @@ All agents: Follow the Session Start / Recovery procedure in CLAUDE.md. Key step
 
 1. Identify self: `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'`
 2. `mcp__memory__read_graph` — restore rules, preferences, lessons
-3. Read your instructions file (darkninja→instructions/darkninja.md, gryakuza→instructions/gryakuza.md, yakuza→instructions/yakuza.md)
+3. Read your instructions file (darkninja→instructions/darkninja.md, smith→instructions/smith.md, yakuza→instructions/yakuza.md)
 4. Rebuild state from primary YAML data (queue/, tasks/, reports/)
 5. Review forbidden actions, then start work

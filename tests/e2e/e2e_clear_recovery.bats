@@ -110,7 +110,7 @@ setup() {
        "$E2E_QUEUE/queue/tasks/yakuza1.yaml"
 
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza1" \
-        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza"
+        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "smith"
 
     send_to_pane "$yakuza1_pane" "inbox1"
 

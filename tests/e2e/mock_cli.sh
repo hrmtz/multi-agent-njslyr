@@ -8,7 +8,7 @@
 # Environment variables:
 #   MOCK_CLI_TYPE          — claude | codex (default: claude)
 #   MOCK_PROCESSING_DELAY  — seconds to simulate processing (default: 2)
-#   MOCK_AGENT_ID          — agent identifier (e.g., gryakuza, yakuza1)
+#   MOCK_AGENT_ID          — agent identifier (e.g., smith, yakuza1)
 #   MOCK_PROJECT_ROOT      — project root with queue/ directory
 #
 # State machine:
@@ -102,8 +102,8 @@ process_task() {
     fi
     if [ -f "$inbox_write_script" ]; then
         # Determine report target based on role
-        local report_target="gryakuza"
-        if [ "$MOCK_AGENT_ID" = "gryakuza" ]; then
+        local report_target="smith"
+        if [ "$MOCK_AGENT_ID" = "smith" ]; then
             report_target="darkninja"
         fi
         SCRIPT_DIR="$MOCK_PROJECT_ROOT" bash "$inbox_write_script" "$report_target" \
@@ -159,8 +159,8 @@ except:
 
     if echo "$msg_types" | grep -q "cmd_new"; then
         echo "[mock] cmd_new detected"
-        if [ "$MOCK_AGENT_ID" = "gryakuza" ]; then
-            gryakuza_decompose_cmd
+        if [ "$MOCK_AGENT_ID" = "smith" ]; then
+            smith_decompose_cmd
         fi
     fi
 
@@ -186,17 +186,17 @@ handle_clear() {
 }
 
 # ─── Gryakuza-specific: decompose cmd into subtasks ───
-# When gryakuza receives a cmd_new, it reads inbox messages,
+# When smith receives a cmd_new, it reads inbox messages,
 # creates task YAMLs for yakuza, and sends inbox notifications.
-gryakuza_decompose_cmd() {
-    # Deprecated: darkninja_to_gryakuza.yaml no longer used (inbox-based system).
-    # TODO: Rewrite to read from queue/inbox/gryakuza.yaml instead.
-    # local cmd_file="$MOCK_PROJECT_ROOT/queue/darkninja_to_gryakuza.yaml"
+smith_decompose_cmd() {
+    # Deprecated: darkninja_to_smith.yaml no longer used (inbox-based system).
+    # TODO: Rewrite to read from queue/inbox/smith.yaml instead.
+    # local cmd_file="$MOCK_PROJECT_ROOT/queue/darkninja_to_smith.yaml"
     # if [ ! -f "$cmd_file" ]; then
-    #     echo "[mock/gryakuza] No cmd file found"
+    #     echo "[mock/smith] No cmd file found"
     #     return 1
     # fi
-    echo "[mock/gryakuza] DEPRECATED: This function needs rewrite for inbox-based system."
+    echo "[mock/smith] DEPRECATED: This function needs rewrite for inbox-based system."
     return 1
 
     STATE="busy"
@@ -206,7 +206,7 @@ gryakuza_decompose_cmd() {
     cmd_id=$(yaml_read "$cmd_file" "id") || cmd_id=$(yaml_read "$cmd_file" "commands.0.id") || cmd_id="cmd_unknown"
     cmd_description=$(yaml_read "$cmd_file" "description") || cmd_description=$(yaml_read "$cmd_file" "commands.0.description") || cmd_description="Unknown task"
 
-    echo "[mock/gryakuza] Decomposing cmd: $cmd_id"
+    echo "[mock/smith] Decomposing cmd: $cmd_id"
     sleep "$MOCK_PROCESSING_DELAY"
 
     # Create subtask for yakuza1
@@ -218,13 +218,13 @@ task:
   parent_cmd: "$cmd_id"
   type: implementation
   description: |
-    Subtask decomposed from $cmd_id by gryakuza mock.
+    Subtask decomposed from $cmd_id by smith mock.
     Original: $cmd_description
   status: assigned
   timestamp: "$(date '+%Y-%m-%dT%H:%M:%S')"
 EOF
 
-    echo "[mock/gryakuza] Created subtask: $subtask_id for yakuza1"
+    echo "[mock/smith] Created subtask: $subtask_id for yakuza1"
 
     # Send task_assigned to yakuza1 via inbox_write
     local inbox_write_script="$MOCK_PROJECT_ROOT/scripts/inbox_write.sh"
@@ -233,8 +233,8 @@ EOF
     fi
     if [ -f "$inbox_write_script" ]; then
         bash "$inbox_write_script" "yakuza1" \
-            "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza" 2>/dev/null || true
-        echo "[mock/gryakuza] Sent task_assigned to yakuza1"
+            "タスクYAMLを読んで作業開始せよ。" "task_assigned" "smith" 2>/dev/null || true
+        echo "[mock/smith] Sent task_assigned to yakuza1"
     fi
 
     STATE="idle"
@@ -272,8 +272,8 @@ while IFS= read -r input || true; do
             ;;
         cmd_new*)
             # Karo-specific: decompose cmd
-            if [ "$MOCK_AGENT_ID" = "gryakuza" ]; then
-                gryakuza_decompose_cmd
+            if [ "$MOCK_AGENT_ID" = "smith" ]; then
+                smith_decompose_cmd
             fi
             show_prompt "$MOCK_CLI_TYPE"
             ;;

@@ -7,36 +7,35 @@ Reads MAGI results and original articles, sends to Claude for rewriting.
 import json
 import os
 import sys
-import glob
 import time
 import requests
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Load API keys
-env_file = Path(__file__).resolve().parent.parent.parent / "config" / "api_keys.env"
-if env_file.exists():
-    for line in env_file.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, _, val = line.partition("=")
-            os.environ.setdefault(key.strip(), val.strip())
+# Ensure scripts/magi/ is in sys.path for core.* imports
+_MAGI_DIR = Path(__file__).resolve().parent
+if str(_MAGI_DIR) not in sys.path:
+    sys.path.insert(0, str(_MAGI_DIR))
 
-ARTICLES_DIR = os.environ.get("CONTENT_PIPELINE_DIR", "/path/to/content-pipeline") + "/output/articles"
-RESULTS_DIR = Path(__file__).resolve().parent / "results"
+from core.utils import _extract_json, load_env_file  # noqa: E402
+
+# Load API keys
+load_env_file()
+
+_pipeline_dir = os.environ.get("CONTENT_PIPELINE_DIR", "")
+ARTICLES_DIR = Path(_pipeline_dir) / "output" / "articles" if _pipeline_dir else None
+RESULTS_DIR = _MAGI_DIR / "results"
 TIMEOUT = 120
 
 
-def extract_magi_plans(result_file: str) -> str:
+def extract_magi_plans(result_file: "str | Path") -> str:
     """Extract consensus plans from MAGI result file."""
-    content = open(result_file).read()
-    json_start = content.rfind('\n{')
-    if json_start == -1:
-        return ""
+    with open(result_file, encoding="utf-8") as f:
+        content = f.read()
 
     try:
-        data = json.loads(content[json_start:])
-    except json.JSONDecodeError:
+        data = _extract_json(content)
+    except (json.JSONDecodeError, ValueError, KeyError):
         return ""
 
     phase2 = data.get("phase2", {})
@@ -46,11 +45,9 @@ def extract_magi_plans(result_file: str) -> str:
     for unit in ["MELCHIOR", "BALTHASAR", "CASPER"]:
         r = phase2.get(unit, {})
 
-        # Consensus plans
         for item in r.get("consensus_plan", []):
             plans.append(f"P{item.get('priority', '?')}: {item.get('action', '')} (効果: {item.get('expected_impact', '')})")
 
-        # Best rewrites
         best = r.get("best_rewrite", {})
         if best and best.get("improved"):
             rewrites.append(f"[{unit}]\nBefore: {best.get('original', '')}\nAfter: {best.get('improved', '')}")
@@ -65,8 +62,12 @@ def extract_magi_plans(result_file: str) -> str:
 
 def rewrite_article(article_dir: str, magi_plans: str) -> dict:
     """Send article + MAGI plans to Claude for rewriting."""
-    draft_path = os.path.join(ARTICLES_DIR, article_dir, "nlm_draft.json")
-    draft = json.loads(open(draft_path).read())
+    if ARTICLES_DIR is None:
+        return {"error": "CONTENT_PIPELINE_DIR not set"}
+
+    draft_path = ARTICLES_DIR / article_dir / "nlm_draft.json"
+    with open(draft_path, encoding="utf-8") as f:
+        draft = json.load(f)
     original_content = draft.get("content", "")
     title = draft.get("title", "")
 
@@ -133,10 +134,13 @@ Rewrite the article applying these improvements. Output only the HTML content.""
 
 def save_rewrite(result: dict):
     """Save rewritten content back to nlm_draft.json."""
-    draft_path = os.path.join(ARTICLES_DIR, result["article_dir"], "nlm_draft.json")
-    draft = json.loads(open(draft_path).read())
+    if ARTICLES_DIR is None:
+        raise RuntimeError("CONTENT_PIPELINE_DIR not set")
 
-    # Backup original content if not already backed up
+    draft_path = ARTICLES_DIR / result["article_dir"] / "nlm_draft.json"
+    with open(draft_path, encoding="utf-8") as f:
+        draft = json.load(f)
+
     if not draft.get("_pre_magi_content"):
         draft["_pre_magi_content"] = draft["content"]
 
@@ -144,11 +148,19 @@ def save_rewrite(result: dict):
     draft["magi_rewrite_status"] = "rewritten_v2_magi"
     draft["magi_rewrite_date"] = time.strftime("%Y-%m-%d %H:%M")
 
-    with open(draft_path, "w") as f:
+    with open(draft_path, "w", encoding="utf-8") as f:
         json.dump(draft, f, ensure_ascii=False, indent=2)
 
 
 def main():
+    if ARTICLES_DIR is None or not ARTICLES_DIR.exists():
+        print(
+            f"Error: ARTICLES_DIR not found: {ARTICLES_DIR}\n"
+            "Set CONTENT_PIPELINE_DIR environment variable.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     # List your article directory names here
     articles = [
         "article_01_example_topic",
@@ -158,19 +170,18 @@ def main():
 
     print("◆ MAGI REWRITE — Applying consensus plans ◆\n")
 
-    # Process 2 at a time to respect rate limits
     batch_size = 2
     for i in range(0, len(articles), batch_size):
         batch = articles[i:i + batch_size]
         batch_num = i // batch_size + 1
 
-        print(f"── Batch {batch_num}/4 ──")
+        print(f"── Batch {batch_num}/{(len(articles) + batch_size - 1) // batch_size} ──")
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = {}
             for art in batch:
-                result_file = str(RESULTS_DIR / f"{art}.json")
-                if not os.path.exists(result_file):
+                result_file = RESULTS_DIR / f"{art}.json"
+                if not result_file.exists():
                     print(f"  SKIP {art} (no MAGI result)")
                     continue
 

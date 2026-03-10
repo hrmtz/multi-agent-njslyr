@@ -3,11 +3,11 @@
 # E2E-001: Basic Flow Test
 # ═══════════════════════════════════════════════════════════════
 # Validates the core orchestration flow:
-#   1. cmd YAML placed → gryakuza inbox notified
-#   2. gryakuza processes cmd → creates subtask for yakuza1
+#   1. cmd YAML placed → smith inbox notified
+#   2. smith processes cmd → creates subtask for yakuza1
 #   3. yakuza1 receives task_assigned → processes task
 #   4. yakuza1 writes completion report
-#   5. yakuza1 notifies gryakuza → gryakuza receives report_received
+#   5. yakuza1 notifies smith → smith receives report_received
 #
 # Uses mock_cli.sh (no real AI APIs needed).
 # ═══════════════════════════════════════════════════════════════
@@ -56,7 +56,7 @@ setup() {
 
     # 2. Write task_assigned to yakuza1's inbox
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza1" \
-        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza"
+        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "smith"
 
     # 3. Send inbox nudge to yakuza1
     local yakuza1_pane
@@ -85,23 +85,23 @@ setup() {
 # E2E-001-B: Gryakuza decomposes cmd into subtask for yakuza
 # ═══════════════════════════════════════════════════════════════
 
-@test "E2E-001-B: gryakuza receives cmd, decomposes into yakuza subtask" {
-    # 1. Place cmd YAML for gryakuza
-    # TODO: Deprecated - darkninja_to_gryakuza.yaml no longer used (inbox-based system).
+@test "E2E-001-B: smith receives cmd, decomposes into yakuza subtask" {
+    # 1. Place cmd YAML for smith
+    # TODO: Deprecated - darkninja_to_smith.yaml no longer used (inbox-based system).
     # Test should be rewritten to use inbox messages only.
     # cp "$PROJECT_ROOT/tests/e2e/fixtures/cmd_basic.yaml" \
-    #    "$E2E_QUEUE/queue/darkninja_to_gryakuza.yaml"
+    #    "$E2E_QUEUE/queue/darkninja_to_smith.yaml"
 
-    # 2. Write cmd_new to gryakuza's inbox
-    bash "$E2E_QUEUE/scripts/inbox_write.sh" "gryakuza" \
+    # 2. Write cmd_new to smith's inbox
+    bash "$E2E_QUEUE/scripts/inbox_write.sh" "smith" \
         "cmd_test_001を発行した。" "cmd_new" "darkninja"
 
-    # 3. Send nudge to gryakuza — gryakuza reads inbox, sees cmd_new, decomposes
-    local gryakuza_pane
-    gryakuza_pane=$(pane_target 0)
-    send_to_pane "$gryakuza_pane" "inbox1"
+    # 3. Send nudge to smith — smith reads inbox, sees cmd_new, decomposes
+    local smith_pane
+    smith_pane=$(pane_target 0)
+    send_to_pane "$smith_pane" "inbox1"
 
-    # 4. Wait for gryakuza to create subtask for yakuza1
+    # 4. Wait for smith to create subtask for yakuza1
     run wait_for_file "$E2E_QUEUE/queue/tasks/yakuza1.yaml" 20
     assert_success
 
@@ -111,7 +111,7 @@ setup() {
 
     # 6. Wait and verify yakuza1 received task_assigned inbox
     sleep 3
-    run assert_inbox_message_exists "$E2E_QUEUE/queue/inbox/yakuza1.yaml" "gryakuza" "task_assigned"
+    run assert_inbox_message_exists "$E2E_QUEUE/queue/inbox/yakuza1.yaml" "smith" "task_assigned"
     assert_success
 }
 
@@ -121,19 +121,19 @@ setup() {
 
 @test "E2E-001-C: full flow from cmd to completion report" {
     # 1. Place cmd YAML
-    # TODO: Deprecated - darkninja_to_gryakuza.yaml no longer used (inbox-based system).
+    # TODO: Deprecated - darkninja_to_smith.yaml no longer used (inbox-based system).
     # Test should be rewritten to use inbox messages only.
     # cp "$PROJECT_ROOT/tests/e2e/fixtures/cmd_basic.yaml" \
-    #    "$E2E_QUEUE/queue/darkninja_to_gryakuza.yaml"
+    #    "$E2E_QUEUE/queue/darkninja_to_smith.yaml"
 
-    local gryakuza_pane yakuza1_pane
-    gryakuza_pane=$(pane_target 0)
+    local smith_pane yakuza1_pane
+    smith_pane=$(pane_target 0)
     yakuza1_pane=$(pane_target 1)
 
-    # 2. Trigger gryakuza to decompose (inbox1 → process_inbox detects cmd_new → decompose)
-    bash "$E2E_QUEUE/scripts/inbox_write.sh" "gryakuza" \
+    # 2. Trigger smith to decompose (inbox1 → process_inbox detects cmd_new → decompose)
+    bash "$E2E_QUEUE/scripts/inbox_write.sh" "smith" \
         "cmd_test_001を発行した。" "cmd_new" "darkninja"
-    send_to_pane "$gryakuza_pane" "inbox1"
+    send_to_pane "$smith_pane" "inbox1"
 
     # 3. Wait for subtask creation
     run wait_for_file "$E2E_QUEUE/queue/tasks/yakuza1.yaml" 20
@@ -153,8 +153,8 @@ setup() {
     # 7. Verify report fields
     assert_yaml_field "$E2E_QUEUE/queue/reports/yakuza1_report.yaml" "status" "done"
 
-    # 8. Verify gryakuza received report notification
+    # 8. Verify smith received report notification
     sleep 2
-    run assert_inbox_message_exists "$E2E_QUEUE/queue/inbox/gryakuza.yaml" "yakuza1" "report_received"
+    run assert_inbox_message_exists "$E2E_QUEUE/queue/inbox/smith.yaml" "yakuza1" "report_received"
     assert_success
 }

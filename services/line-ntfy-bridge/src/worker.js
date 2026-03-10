@@ -190,7 +190,7 @@ function formatStatusMessage(data) {
 
   // Agent summary
   const abbrev = {
-    darkninja: "dn", gryakuza: "gry", soukaiya: "souk",
+    darkninja: "dn", smith: "smi", soukaiya: "souk",
     master_tortoise: "🐢", master_crane: "🐦",
   };
 

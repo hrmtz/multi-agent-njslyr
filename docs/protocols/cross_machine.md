@@ -33,7 +33,7 @@ Primary (送信)      →  SSH (優先)  →  Secondary受信
 `config/settings.yaml` の `machine.role` が `neosaitama` の場合:
 
 ### 可能な操作
-- ntfy/inbox 経由のサブタスク受信（Kyoto gryakuza から）
+- ntfy/inbox 経由のサブタスク受信（Kyoto smith から）
 - ローカル yakuza1-3 への割り当て
 - ローカル soukaiya への QC 依頼
 - ntfy 経由の完了報告送信（`scripts/ntfy_send_report.sh` 使用）
@@ -51,7 +51,7 @@ Primary (送信)      →  SSH (優先)  →  Secondary受信
 bash scripts/ntfy_send_report.sh <report_yaml_path>
 ```
 
-Kyoto 側 ntfy_listener が受信 → gryakuza inbox に通知 → 正規レポートフローに合流。
+Kyoto 側 ntfy_listener が受信 → smith inbox に通知 → 正規レポートフローに合流。
 
 ---
 
@@ -74,7 +74,7 @@ Kyoto 側 ntfy_listener が受信 → gryakuza inbox に通知 → 正規レポ�
 
 1. ラオモトが LINE で `handover:neosaitama` を送信
 2. ntfy_listener.sh がキーワード検知
-3. NeoSaitama gryakuza（ヤマヒロ）の権限を full authority に昇格
+3. NeoSaitama smith（ヤマヒロ）の権限を full authority に昇格
 4. `queue/active_machine.yaml` の `mode: full_authority` に更新
 5. 未完了タスクの引き継ぎ確認
 

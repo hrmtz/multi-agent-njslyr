@@ -52,7 +52,7 @@
   - (1)は単独では「自己研鑽タスク割り当て」を検討し、粛清は最終手段
 - **除外条件**:
   - darkninja（人間エージェント）は全て除外
-  - gryakuza は monitor_context.sh による自動/clear優先（njslyrは補助）
+  - smith は monitor_context.sh による自動/clear優先（njslyrは補助）
   - エージェントが正当な理由で長時間処理中の場合（次項エッジケースで詳述）
 
 #### 2.2.1 コスト最適化フィルター（ラオモト指定）
@@ -121,7 +121,7 @@ inbox_watcher.shの既存エスカレーション機構をベースとする。
 ### 3.2 安全措置
 
 - **darkninja除外**: inbox_watcher.sh と同様、darkninja（人間エージェント）には一切の粛清処理を行わない
-- **gryakuza特別扱い**: monitor_context.sh による /clear を優先し、njslyrはバックアップ（Stage 1のみ）
+- **smith特別扱い**: monitor_context.sh による /clear を優先し、njslyrはバックアップ（Stage 1のみ）
 - **クールダウン**: Stage 3（kill+再起動）は同一エージェントに対し30分に1回まで
 
 ---
@@ -259,7 +259,7 @@ njslyrは以下の5段階フローで粛清判定を行う:
 | エージェント | 監視対象 | 備考 |
 |---|---|---|
 | **darkninja** | ❌ 除外 | 人間エージェント。粛清処理一切禁止 |
-| **gryakuza** | ⚠️ 制限付き | monitor_context.sh優先。njslyrはStage 1のみ |
+| **smith** | ⚠️ 制限付き | monitor_context.sh優先。njslyrはStage 1のみ |
 | **yakuza1-7** | ✅ 完全監視 | 全Stage適用 |
 | **soukaiya** | ✅ 完全監視 | 全Stage適用 |
 
@@ -460,7 +460,7 @@ njslyr.sh のサイクル終了時に以下を出力:
 1. ✅ 検知条件の詳細設計（3条件＋総合判断＋コスト最適化フィルター）
 2. ✅ 粛清方法の詳細設計（3段階＋待機時間・リトライ）
 3. ✅ 実装方式（スクリプト配置、監視方式、inbox_watcher.sh統合、バックグラウンド実行、**定期実行15分間隔**）
-4. ✅ 監視対象エージェント（darkninja除外、gryakuza制限付き、yakuza/soukaiya完全監視）
+4. ✅ 監視対象エージェント（darkninja除外、smith制限付き、yakuza/soukaiya完全監視）
 5. ✅ ログ・通知（粛清ログ、dashboard更新、inbox通知）
 6. ✅ エッジケース（長時間thinking、タスク割り当て競合、inbox_watcher競合、再起動ループ）
 7. ✅ 演出仕様（起動・粛清・完了演出、技名、ASCII art）

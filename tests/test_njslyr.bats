@@ -16,7 +16,7 @@
 #   TC2: タスクステータス取得（get_task_status関数）
 #   TC3: Stage 1 nudge送信（stage1_suriken関数）
 #   TC4: Stage 2 /clear送信（stage2_chop関数）
-#   TC5: gryakuzaはStage 1のみ（Stage 2/3スキップ）
+#   TC5: smithはStage 1のみ（Stage 2/3スキップ）
 #   TC6: inbox_watcher競合回避（inbox_watcher_recently_cleared関数）
 #   TC7: 再起動ループ検知（check_restart_loop関数）
 #   TC8: 演出確認（startup/completion banner）
@@ -318,19 +318,19 @@ EOF
 }
 
 # =============================================================================
-# TC5: gryakuzaはStage 1のみ（Stage 2/3スキップ）
+# TC5: smithはStage 1のみ（Stage 2/3スキップ）
 # =============================================================================
 
-@test "TC5: gryakuza → limited to Stage 1 only (Stage 2/3 skipped)" {
-    # gryakuza用のinbox YAML作成（未読あり）
-    export TEST_GRYAKUZA_INBOX="$TEST_INBOX_DIR/gryakuza.yaml"
+@test "TC5: smith → limited to Stage 1 only (Stage 2/3 skipped)" {
+    # smith用のinbox YAML作成（未読あり）
+    export TEST_GRYAKUZA_INBOX="$TEST_INBOX_DIR/smith.yaml"
 
     python3 << EOF
 import yaml
 
 messages = [
     {
-        'id': 'msg_gryakuza_001',
+        'id': 'msg_smith_001',
         'from': 'test_sender',
         'timestamp': '2026-02-16T13:00:00',
         'type': 'test_type',
@@ -346,30 +346,30 @@ with open('$TEST_GRYAKUZA_INBOX', 'w') as f:
     yaml.dump(data, f, default_flow_style=False, allow_unicode=True, indent=2)
 EOF
 
-    # gryakuza用のタスクYAML作成
-    cat > "$TEST_TASKS_DIR/gryakuza.yaml" << 'EOF'
+    # smith用のタスクYAML作成
+    cat > "$TEST_TASKS_DIR/smith.yaml" << 'EOF'
 task:
-  task_id: "test_task_gryakuza"
+  task_id: "test_task_smith"
   description: "テストタスク"
   status: assigned
   timestamp: "2026-02-16T13:00:00"
 EOF
 
     # Stage 1タイムスタンプを作成（2分経過を模擬）
-    echo "$(($(date +%s) - 150))" > "$TEST_STATE_DIR/njslyr_gryakuza_stage1_last"
+    echo "$(($(date +%s) - 150))" > "$TEST_STATE_DIR/njslyr_smith_stage1_last"
 
     # njslyr.shの関数をsource
     export PROJECT_ROOT="$TEST_TMPDIR"
     export SCRIPT_DIR="$TEST_SCRIPT_DIR"
     source "$TEST_NJSLYR"
 
-    # check_agent関数でgryakuzaをテスト（Stage 2にエスカレートせずスキップされるはず）
+    # check_agent関数でsmithをテスト（Stage 2にエスカレートせずスキップされるはず）
     # Capture stderr where check_agent logs its decisions
-    run bash -c 'source "'"$TEST_NJSLYR"'"; check_agent "gryakuza" 2>&1'
+    run bash -c 'source "'"$TEST_NJSLYR"'"; check_agent "smith" 2>&1'
     [ "$status" -eq 0 ]  # スキップ（健全扱い）
 
     # ログ出力にStage 1制限メッセージが含まれることを確認
-    echo "$output" | grep -q "limited to Stage 1\|Stage 1 only\|gryakuza.*skip"
+    echo "$output" | grep -q "limited to Stage 1\|Stage 1 only\|smith.*skip"
 }
 
 # =============================================================================

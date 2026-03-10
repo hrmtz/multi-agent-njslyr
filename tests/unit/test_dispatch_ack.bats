@@ -261,9 +261,9 @@ call_with_stderr() {
     # タスクファイル作成確認
     [ -f "$MOCK_PROJECT/queue/tasks/yakuza4_subtask_compat_test.yaml" ]
 
-    # gryakuza inbox通知確認
+    # smith inbox通知確認
     [ -f "$INBOX_WRITE_LOG" ]
-    grep -q "gryakuza" "$INBOX_WRITE_LOG"
+    grep -q "smith" "$INBOX_WRITE_LOG"
 }
 
 # --- T-ACK-009: report: プレフィックス後方互換 ---

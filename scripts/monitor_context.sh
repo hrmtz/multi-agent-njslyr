@@ -143,16 +143,16 @@ update_dashboard_alert() {
     fi
 }
 
-# Trigger auto /clear for gryakuza via inbox
+# Trigger auto /clear for smith via inbox
 # Args: $1 = usage percentage
 trigger_auto_clear() {
     local usage_pct="$1"
     local message="🚨コンテキスト残量${usage_pct}% → 自動/clear発動（monitor_context.sh）"
 
-    # Send clear_command type to gryakuza
-    bash "$SCRIPT_DIR/inbox_write.sh" gryakuza "$message" clear_command monitor_context
+    # Send clear_command type to smith
+    bash "$SCRIPT_DIR/inbox_write.sh" smith "$message" clear_command monitor_context
 
-    echo "[AUTO-CLEAR] Triggered /clear for gryakuza (usage: ${usage_pct}%)" >&2
+    echo "[AUTO-CLEAR] Triggered /clear for smith (usage: ${usage_pct}%)" >&2
 }
 
 # ========================================

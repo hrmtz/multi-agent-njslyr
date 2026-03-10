@@ -118,7 +118,7 @@ Redo 指示受信時:
 2. 修正作業実行
 3. 完了後、再度 4ステップを実行（report YAML は新規ファイル名で作成）
 
-詳細: `docs/gryakuza_redo.md`
+詳細: `docs/smith_redo.md`
 
 ---
 

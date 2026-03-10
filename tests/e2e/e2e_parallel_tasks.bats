@@ -8,7 +8,7 @@
 #   3. Both complete independently
 #   4. Both reports are written
 #
-# Uses 3-pane setup (gryakuza + yakuza1 + yakuza2).
+# Uses 3-pane setup (smith + yakuza1 + yakuza2).
 # ═══════════════════════════════════════════════════════════════
 
 # bats file_tags=e2e
@@ -54,9 +54,9 @@ setup() {
 
     # 2. Send task_assigned to both inboxes
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza1" \
-        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza"
+        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "smith"
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza2" \
-        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza"
+        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "smith"
 
     # 3. Nudge both simultaneously
     local yakuza1_pane yakuza2_pane
@@ -95,9 +95,9 @@ setup() {
        "$E2E_QUEUE/queue/tasks/yakuza2.yaml"
 
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza1" \
-        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza"
+        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "smith"
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza2" \
-        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza"
+        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "smith"
 
     local yakuza1_pane yakuza2_pane
     yakuza1_pane=$(pane_target 1)
@@ -112,7 +112,7 @@ setup() {
     run wait_for_yaml_value "$E2E_QUEUE/queue/tasks/yakuza2.yaml" "task.status" "done" 30
     assert_success
 
-    # 3. Each inbox should have its own messages (task_assigned from gryakuza + no cross-contamination)
+    # 3. Each inbox should have its own messages (task_assigned from smith + no cross-contamination)
     # yakuza1's inbox should NOT have yakuza2's messages
     run python3 -c "
 import yaml

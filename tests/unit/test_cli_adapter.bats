@@ -32,7 +32,7 @@ cli:
     darkninja:
       type: claude
       model: opus
-    gryakuza:
+    smith:
       type: claude
       model: opus
     yakuza1:
@@ -103,7 +103,7 @@ cli:
       type: codex
       model: gpt-5
 models:
-  gryakuza: sonnet
+  smith: sonnet
 YAML
 
     # kimi CLI settings
@@ -244,7 +244,7 @@ load_adapter_with() {
 
 @test "get_cli_type: 不正default → claude フォールバック" {
     load_adapter_with "${TEST_TMP}/settings_invalid_cli.yaml"
-    result=$(get_cli_type "gryakuza")
+    result=$(get_cli_type "smith")
     [ "$result" = "claude" ]
 }
 
@@ -322,10 +322,10 @@ load_adapter_with() {
     [ "$result" = "instructions/darkninja.md" ]
 }
 
-@test "get_instruction_file: gryakuza + claude → instructions/gryakuza.md" {
+@test "get_instruction_file: smith + claude → instructions/smith.md" {
     load_adapter_with "${TEST_TMP}/settings_mixed.yaml"
-    result=$(get_instruction_file "gryakuza")
-    [ "$result" = "instructions/gryakuza.md" ]
+    result=$(get_instruction_file "smith")
+    [ "$result" = "instructions/smith.md" ]
 }
 
 @test "get_instruction_file: yakuza1 + claude → instructions/yakuza.md" {
@@ -366,27 +366,27 @@ load_adapter_with() {
 
 @test "get_instruction_file: cli_type引数で明示指定 (copilot)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
-    result=$(get_instruction_file "gryakuza" "copilot")
-    [ "$result" = ".github/copilot-instructions-gryakuza.md" ]
+    result=$(get_instruction_file "smith" "copilot")
+    [ "$result" = ".github/copilot-instructions-smith.md" ]
 }
 
 @test "get_instruction_file: 全CLI × 全role組み合わせ" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
     # claude
     [ "$(get_instruction_file darkninja claude)" = "instructions/darkninja.md" ]
-    [ "$(get_instruction_file gryakuza claude)" = "instructions/gryakuza.md" ]
+    [ "$(get_instruction_file smith claude)" = "instructions/smith.md" ]
     [ "$(get_instruction_file yakuza1 claude)" = "instructions/yakuza.md" ]
     # codex
     [ "$(get_instruction_file darkninja codex)" = "instructions/codex-darkninja.md" ]
-    [ "$(get_instruction_file gryakuza codex)" = "instructions/codex-gryakuza.md" ]
+    [ "$(get_instruction_file smith codex)" = "instructions/codex-smith.md" ]
     [ "$(get_instruction_file yakuza3 codex)" = "instructions/codex-yakuza.md" ]
     # copilot
     [ "$(get_instruction_file darkninja copilot)" = ".github/copilot-instructions-darkninja.md" ]
-    [ "$(get_instruction_file gryakuza copilot)" = ".github/copilot-instructions-gryakuza.md" ]
+    [ "$(get_instruction_file smith copilot)" = ".github/copilot-instructions-smith.md" ]
     [ "$(get_instruction_file yakuza5 copilot)" = ".github/copilot-instructions-yakuza.md" ]
     # kimi
     [ "$(get_instruction_file darkninja kimi)" = "instructions/generated/kimi-darkninja.md" ]
-    [ "$(get_instruction_file gryakuza kimi)" = "instructions/generated/kimi-gryakuza.md" ]
+    [ "$(get_instruction_file smith kimi)" = "instructions/generated/kimi-smith.md" ]
     [ "$(get_instruction_file yakuza7 kimi)" = "instructions/generated/kimi-yakuza.md" ]
 }
 
@@ -482,9 +482,9 @@ load_adapter_with() {
     [ "$result" = "opus" ]
 }
 
-@test "get_agent_model: cliセクションなし gryakuza → sonnet (デフォルト)" {
+@test "get_agent_model: cliセクションなし smith → sonnet (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_none.yaml"
-    result=$(get_agent_model "gryakuza")
+    result=$(get_agent_model "smith")
     [ "$result" = "sonnet" ]
 }
 
@@ -506,9 +506,9 @@ load_adapter_with() {
     [ "$result" = "haiku" ]
 }
 
-@test "get_agent_model: modelsセクションから取得 gryakuza → sonnet" {
+@test "get_agent_model: modelsセクションから取得 smith → sonnet" {
     load_adapter_with "${TEST_TMP}/settings_with_models.yaml"
-    result=$(get_agent_model "gryakuza")
+    result=$(get_agent_model "smith")
     [ "$result" = "sonnet" ]
 }
 
@@ -542,8 +542,8 @@ load_adapter_with() {
     [ "$result" = "k2.5" ]
 }
 
-@test "get_agent_model: kimi CLI gryakuza → k2.5 (デフォルト)" {
+@test "get_agent_model: kimi CLI smith → k2.5 (デフォルト)" {
     load_adapter_with "${TEST_TMP}/settings_kimi_default.yaml"
-    result=$(get_agent_model "gryakuza")
+    result=$(get_agent_model "smith")
     [ "$result" = "k2.5" ]
 }

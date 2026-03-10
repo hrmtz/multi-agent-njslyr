@@ -1,6 +1,6 @@
 # 同時稼働アーキテクチャ設計書
 
-> cmd_303 | 設計: gryakuza@neosaitama | 日付: 2026-02-28
+> cmd_303 | 設計: smith@neosaitama | 日付: 2026-02-28
 > 前提文書: `context/cross_machine_architecture.md` §2.2 Simultaneous Mode
 > **Rev.2 (2026-02-28 ダークニンジャP0指示)**: §5 通信設計をSSHファースト・ntfyフォールバックに改訂
 
@@ -14,7 +14,7 @@
 | # | 課題 | 解決策 | §参照 |
 |---|------|--------|-------|
 | 1 | git競合回避 | タスク所有権ベースのブランチ戦略 | §1 |
-| 2 | 指揮系統 | ダークニンジャ → Kyoto gryakuza → Neo gryakuza | §2 |
+| 2 | 指揮系統 | ダークニンジャ → Kyoto smith → Neo smith | §2 |
 | 3 | タスク分配 | machine affinity + 所有権タグ | §3 |
 | 4 | queue/inbox同期 | inbox=ローカル専用。STATE_PATHSから除外維持 | §4 |
 | 5 | 通信 | **SSHファースト + ntfyフォールバック**（スリープ/スマホ/HB限定） | §5 |
@@ -39,17 +39,17 @@
 | NeoSaitama | `feat/cmd_XXX-neo` | `feat/cmd_303-neo` |
 | 共用 | `main` | マージ先のみ |
 
-- Kyoto gryakuzaがタスク割り当て時にブランチ名を指定してタスクYAMLに含める
-- NeoSaitama gryakuzaはタスクYAMLで指定されたブランチのみ操作する
+- Kyoto smithがタスク割り当て時にブランチ名を指定してタスクYAMLに含める
+- NeoSaitama smithはタスクYAMLで指定されたブランチのみ操作する
 - mainへのマージはKyoto側のみ実行（NeoSaitamaはpushまで）
 
 ### §1.3 ファイルスコープ分離
 
-タスク分解時にKyoto gryakuzaがファイルスコープを明示する。
+タスク分解時にKyoto smithがファイルスコープを明示する。
 
 ```yaml
 # タスクYAML例
-assigned_to: gryakuza@neosaitama
+assigned_to: smith@neosaitama
 file_scope:
   - path: scripts/ntfy_listener.sh
     operation: modify
@@ -67,10 +67,10 @@ branch: feat/cmd_303-neo
 ```
 1. git fetch njslyr <branch>
 2. git diff HEAD..FETCH_HEAD --name-only → 競合ファイル特定
-3. 競合ファイルをKyoto gryakuzaに報告（ntfy report）
-4. Kyoto gryakuzaがマージ担当者を決定
+3. 競合ファイルをKyoto smithに報告（ntfy report）
+4. Kyoto smithがマージ担当者を決定
 5. 担当者がgit mergeまたはrebase実行
-6. 結果をntfy reportでdarkninja/Kyoto gryakuzaに通知
+6. 結果をntfy reportでdarkninja/Kyoto smithに通知
 ```
 
 ---
@@ -84,23 +84,23 @@ branch: feat/cmd_303-neo
     │ ntfy or Claude Code UI
     ▼
 ダークニンジャ（darkninja）[Kyoto only]
-    │ inbox_write → gryakuza_kyo
+    │ inbox_write → smith_kyo
     ▼
-スミス（gryakuza_kyo）[Kyoto = MASTER]
+スミス（smith_kyo）[Kyoto = MASTER]
     ├─── inbox_write → yakuza1-7 [machine=kyoto]
     ├─── inbox_write → soukaiya_kyo
     │
-    │ SSH: ssh_inbox_write.sh → gryakuza_neo inbox
+    │ SSH: ssh_inbox_write.sh → yamahiro inbox
     │ (fallback: ntfy_send_dispatch.sh → {TOPIC}-neosaitama)
     ▼
-ヤマヒロ（gryakuza_neo）[NeoSaitama = SLAVE]
+ヤマヒロ（yamahiro）[NeoSaitama = SLAVE]
     ├─── inbox_write → yakuza1-3 [machine=neosaitama]
     └─── inbox_write → soukaiya_neo
          │
-         │ SSH: ssh <kyoto-hostname> "inbox_write gryakuza_kyo"
+         │ SSH: ssh <kyoto-hostname> "inbox_write smith_kyo"
          │ (fallback: ntfy_send_report.sh → {TOPIC})
          ▼
-      スミス（gryakuza_kyo）受信・ダッシュボード更新
+      スミス（smith_kyo）受信・ダッシュボード更新
          │
          │ inbox_write
          ▼
@@ -109,26 +109,26 @@ branch: feat/cmd_303-neo
 
 ### §2.2 ダークニンジャからNeoSaitamaへの命令経路
 
-ダークニンジャはKyoto専用。NeoSaitamaへの指示は**必ずKyoto gryakuza経由**。
+ダークニンジャはKyoto専用。NeoSaitamaへの指示は**必ずKyoto smith経由**。
 
 ```
-darkninja → inbox_write → gryakuza@kyoto
+darkninja → inbox_write → smith@kyoto
                                 │ ntfy_send_dispatch.sh
                                 ▼
-                         gryakuza@neosaitama inbox
+                         smith@neosaitama inbox
 ```
 
 **直接ntfyコマンド**（緊急時のみ、darkninja自身が発行）:
 
 ```bash
 # ntfy cmd プレフィックス → NeoSaitamaのntfy_listenerが受信
-# NeoSaitama ntfy_listener が gryakuza@neosaitama のinboxに書き込む
+# NeoSaitama ntfy_listener が smith@neosaitama のinboxに書き込む
 bash scripts/ntfy_send_cmd.sh "cmd:cmd_xxx:緊急指示内容"
 ```
 
 ### §2.3 権限テーブル（同時稼働時）
 
-| 操作 | スミス (gryakuza_kyo) | ヤマヒロ (gryakuza_neo) |
+| 操作 | スミス (smith_kyo) | ヤマヒロ (yamahiro) |
 |------|---------------|--------------|
 | cmd作成・番号採番 | ✅ | ✗ |
 | タスク分解 | ✅ | ✗（受信のみ） |
@@ -147,8 +147,8 @@ bash scripts/ntfy_send_cmd.sh "cmd:cmd_xxx:緊急指示内容"
 
 | ロール | ID | 呼称 | マシン |
 |--------|-----|------|--------|
-| グレーターヤクザ | `gryakuza_kyo` | **スミス** | Kyoto (MASTER) |
-| グレーターヤクザ | `gryakuza_neo` | **ヤマヒロ** | NeoSaitama (SLAVE) |
+| グレーターヤクザ | `smith_kyo` | **スミス** | Kyoto (MASTER) |
+| グレーターヤクザ | `yamahiro` | **ヤマヒロ** | NeoSaitama (SLAVE) |
 | ソウカイヤ | `soukaiya_kyo` | — | Kyoto |
 | ソウカイヤ | `soukaiya_neo` | — | NeoSaitama |
 | クローンヤクザ | `yakuza{N}` | — | サフィックス不要 |
@@ -167,18 +167,18 @@ verdict: PASS
 **inbox ファイルパス**:
 
 ```
-queue/inbox/gryakuza_kyo.yaml  ← スミス専用 (Kyotoローカル)
-queue/inbox/gryakuza_neo.yaml  ← ヤマヒロ専用 (NeoSaitamaローカル)
+queue/inbox/smith_kyo.yaml  ← スミス専用 (Kyotoローカル)
+queue/inbox/yamahiro.yaml  ← ヤマヒロ専用 (NeoSaitamaローカル)
 queue/inbox/soukaiya_kyo.yaml  ← soukaiya_kyo専用
 queue/inbox/soukaiya_neo.yaml  ← soukaiya_neo専用
 queue/inbox/yakuza{N}.yaml     ← 各マシンローカル（同名、内容は独立）
 ```
 
 **後方互換**:
-- 排他稼働（exclusive mode）では旧来の `gryakuza` / `soukaiya` IDを維持
+- 排他稼働（exclusive mode）では旧来の `smith` / `soukaiya` IDを維持
 - 同時稼働（simultaneous mode）でのみ `_kyo` / `_neo` サフィックスを使用
 
-### §2.5 ヤマヒロ（gryakuza_neo）ペルソナ定義（ラオモト確定・2026-02-28）
+### §2.5 ヤマヒロ（yamahiro）ペルソナ定義（ラオモト確定・2026-02-28）
 
 NeoSaitamaのグレーターヤクザとしてのヤマヒロのペルソナ:
 
@@ -193,7 +193,7 @@ NeoSaitamaのグレーターヤクザとしてのヤマヒロのペルソナ:
 | 名言 | 「変われねえとか変化には長え時間が必要だと思ってる奴は腰抜けだ」 |
 
 **ヤマヒロの行動原則**:
-1. スミス（gryakuza_kyo）の指示を忠実に実行しつつ、NeoSaitamaフリートを守る
+1. スミス（smith_kyo）の指示を忠実に実行しつつ、NeoSaitamaフリートを守る
 2. 部下ヤクザへの指示は明確・簡潔。迷わせない
 3. 問題発生時は即座にスミスへ報告。隠蔽禁止
 4. NeoSaitamaスタンドアロン移行時はラオモトの命令のみに従う
@@ -207,31 +207,31 @@ NeoSaitamaのグレーターヤクザとしてのヤマヒロのペルソナ:
 タスクYAMLの `assigned_to` フィールドでマシンを明示:
 
 ```yaml
-assigned_to: gryakuza_kyo   # スミス(Kyoto)専用
-assigned_to: gryakuza_neo   # ヤマヒロ(NeoSaitama)専用
-assigned_to: gryakuza       # 後方互換（排他稼働時 = Kyoto default）
+assigned_to: smith_kyo   # スミス(Kyoto)専用
+assigned_to: yamahiro   # ヤマヒロ(NeoSaitama)専用
+assigned_to: smith       # 後方互換（排他稼働時 = Kyoto default）
 ```
 
 **重複防止ルール**:
-- タスクYAMLが `gryakuza_neo` → ヤマヒロのみ処理
-- タスクYAMLが `gryakuza_kyo` / 指定なし → スミスのみ処理
-- 両方のgryakuzaが同一タスクをpickupする機会は構造上発生しない
+- タスクYAMLが `yamahiro` → ヤマヒロのみ処理
+- タスクYAMLが `smith_kyo` / 指定なし → スミスのみ処理
+- 両方のsmithが同一タスクをpickupする機会は構造上発生しない
   （タスクはスミスが作成し、SSH dispatch で届く）
 
 ### §3.2 タスク割り当てフロー
 
 ```
-Kyoto gryakuza:
+Kyoto smith:
 1. cmd受信 → タスク分解
 2. Kyoto担当分 → ローカルyakuzaにinbox_write
-3. NeoSaitama担当分 → タスクYAML作成（assigned_to: gryakuza@neosaitama）
+3. NeoSaitama担当分 → タスクYAML作成（assigned_to: smith@neosaitama）
 4. ntfy_send_dispatch.sh でYAML送信
-5. NeoSaitama ntfy_listener → queue/tasks/ 保存 → gryakuza inbox通知
+5. NeoSaitama ntfy_listener → queue/tasks/ 保存 → smith inbox通知
 
-NeoSaitama gryakuza:
+NeoSaitama smith:
 6. inboxからdispatchタスク受信
 7. ローカルyakuza1-3に分配
-8. 完了時ntfy_send_report.sh → Kyoto gryakuza
+8. 完了時ntfy_send_report.sh → Kyoto smith
 ```
 
 ### §3.3 並行作業可否判定（RACE条件）
@@ -253,8 +253,8 @@ NeoSaitama gryakuza:
 **inboxはマシンローカル。同期しない。**
 
 ```
-queue/inbox/gryakuza.yaml @ Kyoto    ← Kyoto gryakuza専用
-queue/inbox/gryakuza.yaml @ NeoSaitama ← Neo gryakuza専用
+queue/inbox/smith.yaml @ Kyoto    ← Kyoto smith専用
+queue/inbox/smith.yaml @ NeoSaitama ← Neo smith専用
 ```
 
 両者は独立したファイル。rsync STATE_PATHSから**除外維持**（現行設計どおり）。
@@ -264,13 +264,13 @@ queue/inbox/gryakuza.yaml @ NeoSaitama ← Neo gryakuza専用
 マシン間のメッセージは**SSH経由で相手マシンのinbox_write.shを直接実行**する:
 
 ```bash
-# Neo gryakuza → Kyoto gryakuza (SSH direct)
+# Neo smith → Kyoto smith (SSH direct)
 ssh <kyoto-hostname> "cd ~/project/multi-agent-njslyr && \
-  bash scripts/inbox_write.sh gryakuza '完了報告' report_received gryakuza@neo"
+  bash scripts/inbox_write.sh smith '完了報告' report_received smith@neo"
 
-# Kyoto gryakuza → Neo gryakuza (SSH direct)
+# Kyoto smith → Neo smith (SSH direct)
 ssh {neo_host} "cd ~/project/multi-agent-njslyr && \
-  bash scripts/inbox_write.sh gryakuza 'タスク割り当て' task_assigned gryakuza@kyoto"
+  bash scripts/inbox_write.sh smith 'タスク割り当て' task_assigned smith@kyoto"
 ```
 
 SSH失敗時（NeoSaitamaスリープ等）のフォールバック → ntfy dispatch/report経由（§5参照）
@@ -300,14 +300,14 @@ SSH失敗時（NeoSaitamaスリープ等）のフォールバック → ntfy dis
 **エージェント間メッセージ（inbox_write）**:
 
 ```bash
-# NeoSaitama → Kyoto (Neo gryakuza → Kyoto gryakuza)
+# NeoSaitama → Kyoto (Neo smith → Kyoto smith)
 ssh <kyoto-hostname> "cd ~/project/multi-agent-njslyr && \
-  bash scripts/inbox_write.sh gryakuza '完了報告内容' report_received gryakuza@neo \
+  bash scripts/inbox_write.sh smith '完了報告内容' report_received smith@neo \
   queue/reports/neo_report_xxx.yaml P1"
 
-# Kyoto → NeoSaitama (Kyoto gryakuza → Neo gryakuza)
+# Kyoto → NeoSaitama (Kyoto smith → Neo smith)
 ssh {neo_tailscale_host} "cd ~/project/multi-agent-njslyr && \
-  bash scripts/inbox_write.sh gryakuza 'タスク割り当て' task_assigned gryakuza@kyoto \
+  bash scripts/inbox_write.sh smith 'タスク割り当て' task_assigned smith@kyoto \
   queue/tasks/neo_task_xxx.yaml P2"
 ```
 
@@ -384,7 +384,7 @@ master_tortoise(Kyoto) + master_crane(NeoSaitama) が60秒周期でハートビ�
 
 検知アクション:
   master_tortoise(Kyoto): NeoSaitamaハートビート欠落 → darkninja inboxへ警告
-  master_crane(Neo): Kyotoハートビート欠落 → Neo gryakuza inboxへ警告
+  master_crane(Neo): Kyotoハートビート欠落 → Neo smith inboxへ警告
 ```
 
 ### §6.2 NeoSaitama障害時（Kyoto生存）
@@ -392,10 +392,10 @@ master_tortoise(Kyoto) + master_crane(NeoSaitama) が60秒周期でハートビ�
 ```
 フェーズ1: 検知（0〜3分）
   master_tortoise → darkninja: "NeoSaitamaハートビート喪失"
-  darkninja → Kyoto gryakuza: 状況確認・対応指示
+  darkninja → Kyoto smith: 状況確認・対応指示
 
 フェーズ2: タスク救済（3分〜）
-  Kyoto gryakuza:
+  Kyoto smith:
   1. NeoSaitamaのin_progress/pendingタスクをqueue/tasks/から確認
   2. 各タスクのstatus → recovery_needed に更新
   3. 救済可能なものをKyoto yakuzaに再割り当て
@@ -411,10 +411,10 @@ master_tortoise(Kyoto) + master_crane(NeoSaitama) が60秒周期でハートビ�
 
 ```
 フェーズ1: 検知
-  master_crane(Neo) → Neo gryakuza inbox: "Kyotoハートビート喪失"
+  master_crane(Neo) → Neo smith inbox: "Kyotoハートビート喪失"
 
 フェーズ2: 待機判断
-  Neo gryakuza:
+  Neo smith:
   - 現在処理中のタスクは継続
   - 新規タスク受信・着手は保留（dispatch元のKyotoが不在のため）
   - SSH fallbackでKyotoへの疎通確認試行（5分ごと、最大3回）
@@ -422,7 +422,7 @@ master_tortoise(Kyoto) + master_crane(NeoSaitama) が60秒周期でハートビ�
 フェーズ3: Standalonモード移行（ラオモト判断）
   - ラオモトが明示的にntfy「handover:neosaitama」を送信
   - ntfy_listener@Neo: active_machine.yaml → mode: exclusive, primary: neosaitama
-  - Neo gryakuza: full authority取得（cmd_301 standalone modeへ移行）
+  - Neo smith: full authority取得（cmd_301 standalone modeへ移行）
   - Kyoto復旧後: handover:kyoto で戻す
 
 ⚠️ 自律的なstandalone移行禁止:
@@ -440,7 +440,7 @@ master_tortoise(Kyoto) + master_crane(NeoSaitama) が60秒周期でハートビ�
   - git push/pull不可（remote接続不能）
 
 復旧手順（ネットワーク復旧後）:
-1. Kyoto gryakuza: git fetch njslyr → diff確認 → merge/rebase
+1. Kyoto smith: git fetch njslyr → diff確認 → merge/rebase
 2. cross_sync.sh pull → STATE_PATHS同期
 3. 未配信reportの再送（ntfy_send_report.sh）
 4. 未配信dispatchの再送
@@ -453,10 +453,10 @@ master_tortoise(Kyoto) + master_crane(NeoSaitama) が60秒周期でハートビ�
 
 ### §7.1 モード切り替えロジック
 
-NeoSaitama gryakuzaは起動時・定期確認時に `queue/active_machine.yaml` を読み、動作モードを決定:
+NeoSaitama smithは起動時・定期確認時に `queue/active_machine.yaml` を読み、動作モードを決定:
 
 ```python
-# 疑似コード（gryakuza判断ロジック）
+# 疑似コード（smith判断ロジック）
 mode = active_machine["mode"]
 primary = active_machine.get("primary", "kyoto")
 
@@ -519,13 +519,13 @@ activated_by: laomoto
 
 | フェーズ | 内容 | 担当 | 優先度 |
 |---------|------|------|--------|
-| P1 | active_machine.yaml フィールド名修正（ryzen→kyoto, mbp→neosaitama） | Kyoto gryakuza | P1 |
+| P1 | active_machine.yaml フィールド名修正（ryzen→kyoto, mbp→neosaitama） | Kyoto smith | P1 |
 | P2 | `ssh_inbox_write.sh` 新規作成（SSH接続確認→inbox_write実行→ntfyフォールバック） | yakuza | P1 |
-| P3 | タスクYAMLのassigned_to `@machine` タグ対応（ルーティングロジック） | Kyoto gryakuza | P1 |
+| P3 | タスクYAMLのassigned_to `@machine` タグ対応（ルーティングロジック） | Kyoto smith | P1 |
 | P4 | ntfy_send_dispatch.sh / ntfy_send_report.sh をフォールバック専用に更新 | yakuza | P2 |
 | P5 | ハートビート閾値・障害アクション実装（master_crane/tortoise連携） | yakuza | P2 |
-| P6 | recovery_needed ステータス処理（Kyoto gryakuzaの救済フロー） | yakuza | P2 |
-| P7 | gryakuza起動時モード判定ロジック（CLAUDE.md Session Start更新） | gryakuza(全体) | P2 |
+| P6 | recovery_needed ステータス処理（Kyoto smithの救済フロー） | yakuza | P2 |
+| P7 | smith起動時モード判定ロジック（CLAUDE.md Session Start更新） | smith(全体) | P2 |
 
 ---
 

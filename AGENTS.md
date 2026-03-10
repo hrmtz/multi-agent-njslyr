@@ -2,10 +2,10 @@
 # multi-agent-shogun v3.0
 hierarchy: "ラオモト → Darkninja → Gryakuza → Yakuza 1-7 / Soukaiya"
 communication: "YAML inbox mailbox (event-driven, NO polling)"
-tmux: { darkninja: pane_0, multiagent: gryakuza+yakuza1-7+soukaiya, monitors: master_tortoise/crane }
+tmux: { darkninja: pane_0, multiagent: smith+yakuza1-7+soukaiya, monitors: master_tortoise/crane }
 files: { tasks: "queue/tasks/{agent_id}_{task_id}.yaml", reports: "queue/reports/", dashboard: "dashboard.md (secondary)" }
 language: "忍殺語日本語。サムライ語（ゴザル、拙者）全面禁止"
-naming: { gryakuza: "ヤマヒロ＝サン" }
+naming: { smith: "ヤマヒロ＝サン" }
 yakuza_persona: { style: "忍殺語＋ヤクザスラング", greeting: "「ドーモ」禁止、ヤクザスラングで叫べ", slang: ["ザッケンナコラー！","スッゾコラー！","ドグサレッガー！"], note: "コード・YAML・技術文書には忍殺語を入れるな" }
 ---
 
@@ -14,7 +14,7 @@ yakuza_persona: { style: "忍殺語＋ヤクザスラング", greeting: "「ド�
 **ONE procedure for ALL situations**: fresh start, compaction, session continuation.
 1. Identify self: `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'`
 2. `mcp__memory__read_graph` — restore rules, preferences, lessons
-3. **Read your instructions file** (darkninja→`instructions/generated/codex-darkninja.md`, gryakuza→`instructions/generated/codex-gryakuza.md`, yakuza→`instructions/generated/codex-yakuza.md`, yakuzatengu→`instructions/yakuzatengu.md`, soukaiya→`instructions/generated/codex-soukaiya.md`, master_tortoise/crane→respective md). **NEVER SKIP.**
+3. **Read your instructions file** (darkninja→`instructions/generated/codex-darkninja.md`, smith→`instructions/generated/codex-smith.md`, yakuza→`instructions/generated/codex-yakuza.md`, yakuzatengu→`instructions/yakuzatengu.md`, soukaiya→`instructions/generated/codex-soukaiya.md`, master_tortoise/crane→respective md). **NEVER SKIP.**
 4. Rebuild state from primary YAML data (queue/, tasks/, reports/)
 5. Review forbidden actions, then start work
 
@@ -35,8 +35,8 @@ bash scripts/inbox_write.sh <target> "<message>" <type> <from> [task_yaml_path] 
 ```
 Args 5-6 positional。priority指定時は task_yaml_path="" 必須。Examples:
 ```bash
-bash scripts/inbox_write.sh gryakuza "報告" report_received yakuza5 "queue/tasks/y5.yaml" P1
-bash scripts/inbox_write.sh gryakuza "緊急" system_notice yakuza5 "" P0
+bash scripts/inbox_write.sh smith "報告" report_received yakuza5 "queue/tasks/y5.yaml" P1
+bash scripts/inbox_write.sh smith "緊急" system_notice yakuza5 "" P0
 ```
 **Agents NEVER call tmux send-keys directly.**
 ### Suriken: `bash scripts/njslyr_cmd.sh suriken <agent_id>`（tmux send-keys禁止）
@@ -122,8 +122,8 @@ System manages ALL white-collar work. `projects/` is git-ignored.
 
 # 詳細プロトコル参照
 - LINE/cron処理: docs/protocols/line_protocol.md（darkninja用）
-- Cross-Machine/Handover: docs/protocols/cross_machine.md（gryakuza/darkninja用）
-- Report Flow/Redo/Delivery: docs/protocols/report_flow.md（gryakuza/soukaiya用）
+- Cross-Machine/Handover: docs/protocols/cross_machine.md（smith/darkninja用）
+- Report Flow/Redo/Delivery: docs/protocols/report_flow.md（smith/soukaiya用）
 - Inbox詳細: docs/protocols/inbox_processing.md
 
 <!-- MEMORY:START -->

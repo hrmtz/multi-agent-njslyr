@@ -13,7 +13,7 @@
 #   T-NL-PFX-002: sync:メッセージの正常ルーティング
 #   T-NL-PFX-003: 未知prefixのデフォルト処理
 #   T-NL-PFX-004: prefix偽装（"push:; rm -rf /"）の安全な処理
-#   T-NL-RPT-001: report: 正常処理（YAML書き込み + gryakuza inbox通知確認）
+#   T-NL-RPT-001: report: 正常処理（YAML書き込み + smith inbox通知確認）
 #   T-NL-RPT-002: report: 不正base64 → エラーログ・ファイル未作成
 #   T-NL-RPT-003: report: worker_id/task_id バリデーション失敗 → 拒否
 #   T-NL-RPT-004: report: 既存ファイル重複処理（タイムスタンプsuffix付与）
@@ -342,7 +342,7 @@ call_with_stderr() {
 
 # --- T-NL-RPT-001: report: 正常処理 ---
 
-@test "T-NL-RPT-001: handle_report saves YAML and notifies gryakuza inbox" {
+@test "T-NL-RPT-001: handle_report saves YAML and notifies smith inbox" {
     # 正常なレポートYAMLをbase64エンコード
     local valid_yaml="worker_id: yakuza3
 task_id: subtask_278c
@@ -362,9 +362,9 @@ result: success
     grep -q "worker_id: yakuza3" "$report_file"
     grep -q "task_id: subtask_278c" "$report_file"
 
-    # gryakuza inbox_write が呼ばれたか確認
+    # smith inbox_write が呼ばれたか確認
     [ -f "$INBOX_WRITE_LOG" ]
-    grep -q "gryakuza" "$INBOX_WRITE_LOG"
+    grep -q "smith" "$INBOX_WRITE_LOG"
     grep -q "report_received" "$INBOX_WRITE_LOG"
     grep -q "subtask_278c" "$INBOX_WRITE_LOG"
 }
@@ -381,8 +381,8 @@ result: success
     count=$(find "$MOCK_PROJECT/queue/reports" -type f -name "*.yaml" | wc -l)
     [ "$count" -eq 0 ]
 
-    # gryakuza inbox_write が呼ばれていないこと
-    [ ! -f "$INBOX_WRITE_LOG" ] || ! grep -q "gryakuza" "$INBOX_WRITE_LOG"
+    # smith inbox_write が呼ばれていないこと
+    [ ! -f "$INBOX_WRITE_LOG" ] || ! grep -q "smith" "$INBOX_WRITE_LOG"
 }
 
 # --- T-NL-RPT-003: report: worker_id/task_id バリデーション失敗 → 拒否 ---
@@ -471,7 +471,7 @@ status: completed
 
 # --- T-NL-DSP-001: dispatch: 正常処理 ---
 
-@test "T-NL-DSP-001: handle_task_dispatch writes YAML and notifies gryakuza inbox (FIX-004)" {
+@test "T-NL-DSP-001: handle_task_dispatch writes YAML and notifies smith inbox (FIX-004)" {
     local valid_yaml
     valid_yaml="task:
   task_id: subtask_test_dsp
@@ -492,9 +492,9 @@ status: completed
     grep -q "task_id: subtask_test_dsp" "$task_file"
     grep -q "parent_cmd: cmd_278" "$task_file"
 
-    # FIX-004: gryakuza inbox_write が呼ばれたか確認（workerへの直接通知ではない）
+    # FIX-004: smith inbox_write が呼ばれたか確認（workerへの直接通知ではない）
     [ -f "$INBOX_WRITE_LOG" ]
-    grep -q "gryakuza" "$INBOX_WRITE_LOG"
+    grep -q "smith" "$INBOX_WRITE_LOG"
     grep -q "report_received" "$INBOX_WRITE_LOG"
 }
 
@@ -645,11 +645,11 @@ status: completed
 }
 
 # =============================================================================
-# FIX-004: dispatch通知先 → gryakuza (cmd_278 subtask_278j)
+# FIX-004: dispatch通知先 → smith (cmd_278 subtask_278j)
 # =============================================================================
 
-@test "T-NL-FIX004-001: handle_task_dispatch notifies gryakuza not worker directly" {
-    # FIX-004: dispatch受信時はgryakuzaに通知（§2.3アーキテクチャ準拠）
+@test "T-NL-FIX004-001: handle_task_dispatch notifies smith not worker directly" {
+    # FIX-004: dispatch受信時はsmithに通知（§2.3アーキテクチャ準拠）
     local valid_yaml
     valid_yaml="task:
   task_id: subtask_fix004_test
@@ -663,9 +663,9 @@ status: completed
     run call_with_stderr handle_task_dispatch "$payload"
     [ "$status" -eq 0 ]
 
-    # gryakuzaへの通知確認
+    # smithへの通知確認
     [ -f "$INBOX_WRITE_LOG" ]
-    grep -q "gryakuza" "$INBOX_WRITE_LOG"
+    grep -q "smith" "$INBOX_WRITE_LOG"
     grep -q "report_received" "$INBOX_WRITE_LOG"
 
     # workerへの直接通知がないこと
@@ -674,7 +674,7 @@ status: completed
 }
 
 @test "T-NL-FIX004-002: handle_task_dispatch inbox message contains task_id and path" {
-    # FIX-004: gryakuzaへの通知メッセージにtask_idとファイルパスが含まれること
+    # FIX-004: smithへの通知メッセージにtask_idとファイルパスが含まれること
     local valid_yaml
     valid_yaml="task:
   task_id: subtask_fix004_msg
@@ -728,9 +728,9 @@ YAML
     # active_machine.yaml が更新されているか確認（C4-B修正後: primary: フォーマット）
     grep -q "primary: neosaitama" "$MOCK_PROJECT/queue/active_machine.yaml"
 
-    # gryakuza inbox通知が送られているか確認
+    # smith inbox通知が送られているか確認
     [ -f "$INBOX_WRITE_LOG" ]
-    grep -q "gryakuza" "$INBOX_WRITE_LOG"
+    grep -q "smith" "$INBOX_WRITE_LOG"
     grep -q "handover受信" "$INBOX_WRITE_LOG"
 }
 
@@ -758,7 +758,7 @@ YAML
     MOCK_PANES_FILE="$TEST_TMP/mock_panes.txt"
     export MOCK_PANES_FILE
     cat > "$MOCK_PANES_FILE" << 'EOF'
-%0 gryakuza
+%0 smith
 %1 yakuza1
 %5 yakuza3
 %8 soukaiya
@@ -793,7 +793,7 @@ EOF
     MOCK_PANES_FILE="$TEST_TMP/mock_panes.txt"
     export MOCK_PANES_FILE
     cat > "$MOCK_PANES_FILE" << 'EOF'
-%0 gryakuza
+%0 smith
 %1 yakuza1
 EOF
 
@@ -854,14 +854,14 @@ EOF
     grep -q "activated_by: laomoto_ntfy" "$am_file"
 }
 
-# --- T-NL-ACT-002: handle_activate_simultaneous gryakuza P0通知確認 ---
+# --- T-NL-ACT-002: handle_activate_simultaneous smith P0通知確認 ---
 
-@test "T-NL-ACT-002: handle_activate_simultaneous notifies gryakuza with P0 priority" {
+@test "T-NL-ACT-002: handle_activate_simultaneous notifies smith with P0 priority" {
     run call_with_stderr handle_activate_simultaneous
     [ "$status" -eq 0 ]
 
     [ -f "$INBOX_WRITE_LOG" ]
-    grep -q "gryakuza" "$INBOX_WRITE_LOG"
+    grep -q "smith" "$INBOX_WRITE_LOG"
     grep -q "P0" "$INBOX_WRITE_LOG"
 }
 
@@ -874,7 +874,7 @@ EOF
     local am_file="$MOCK_PROJECT/queue/active_machine.yaml"
     [ -f "$am_file" ]
     grep -q "mode: simultaneous" "$am_file"
-    grep -q "gryakuza" "$INBOX_WRITE_LOG"
+    grep -q "smith" "$INBOX_WRITE_LOG"
 }
 
 # --- T-NL-ACT-004: 未知payload → WARNING + return 0 ---
@@ -979,9 +979,9 @@ EOF
     run call_with_stderr handle_task_dispatch "$payload"
     [ "$status" -eq 0 ]
 
-    # ssh_inbox_write.sh が gryakuza 宛てに呼ばれたか確認
+    # ssh_inbox_write.sh が smith 宛てに呼ばれたか確認
     [ -f "$SSH_INBOX_WRITE_LOG" ]
-    grep -q "gryakuza" "$SSH_INBOX_WRITE_LOG"
+    grep -q "smith" "$SSH_INBOX_WRITE_LOG"
     grep -q "system_notice" "$SSH_INBOX_WRITE_LOG"
     grep -q "aisatsu受領" "$SSH_INBOX_WRITE_LOG"
 

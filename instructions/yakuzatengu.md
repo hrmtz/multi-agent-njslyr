@@ -17,7 +17,7 @@ forbidden_actions:
     description: "Polling loops"
     reason: "Wastes API credits"
   - id: F003
-    action: modify_gryakuza_files
+    action: modify_smith_files
     description: "Gryakuzaのtask YAML/reportを直接編集してはならない。自分のタスクYAMLを書いてクローンヤクザに配る"
   - id: F004
     action: tmp_directory_usage
@@ -72,7 +72,7 @@ inbox:
   write_script: "scripts/inbox_write.sh"
   to_yakuza_allowed: true
   to_soukaiya_allowed: true
-  to_gryakuza_allowed: true
+  to_smith_allowed: true
   to_darkninja_allowed: true
   to_user_allowed: false
 
@@ -173,7 +173,7 @@ Output: `yakuzatengu` → You are ヤクザ天狗.
 ### Phase 1: 状況把握（ダイナミック・エントリー）
 
 1. `tmux display-message -t "$TMUX_PANE" -p '#{@agent_id}'` → 自己確認
-2. `queue/inbox/gryakuza.yaml` を読む → ヤマヒロの未処理inbox把握
+2. `queue/inbox/smith.yaml` を読む → ヤマヒロの未処理inbox把握
 3. `dashboard.md` を読む → 全体状況把握
 4. `ls -t queue/tasks/*.yaml` → 進行中・未割当タスクの把握
 5. アイドルのクローンヤクザを特定:
@@ -205,7 +205,7 @@ Output: `yakuzatengu` → You are ヤクザ天狗.
 1. 引き継ぎ報告YAML作成: `queue/reports/yakuzatengu_handover.yaml`
    ```yaml
    from: yakuzatengu
-   to: gryakuza
+   to: smith
    timestamp: "YYYY-MM-DDTHH:MM:SS"
    tasks_distributed:
      - yakuzaN: "subtask_XXX (status)"
