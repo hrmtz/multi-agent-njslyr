@@ -501,6 +501,54 @@ machine:
 ntfy_topic: "your-secret-topic"
 ```
 
+### Secrets Management (1Password)
+
+API keys are managed through [1Password CLI](https://developer.1password.com/docs/cli/) — no plaintext `.env` files on disk.
+
+**Setup:**
+
+```bash
+# 1. Install 1Password CLI
+# Linux/WSL:
+curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
+  sudo gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | \
+  sudo tee /etc/apt/sources.list.d/1password-cli.list
+sudo apt update && sudo apt install -y 1password-cli
+# macOS:
+brew install 1password-cli
+
+# 2. Create a Service Account at 1password.com → Developer → Service Accounts
+#    Grant read access to your vault. Save the token (shown once).
+
+# 3. Create a vault and store your API keys as items
+#    Item names should match config/op_refs.env references (e.g. "anthropic", "openai", "gemini")
+
+# 4. Set the token in your shell (add to ~/.zshrc.local or equivalent, gitignored)
+export OP_SERVICE_ACCOUNT_TOKEN="ops_your_token_here"
+
+# 5. Verify
+op run --env-file=config/op_refs.env -- printenv | grep API_KEY
+```
+
+**How it works:**
+
+| Component | Role |
+|-----------|------|
+| `config/op_refs.env` | Secret URI references (`op://Vault/Item/field`) — safe to commit |
+| `config/*.env.sample` | Template files showing required keys — safe to commit |
+| `yokubari.sh` | Resolves secrets via `op read` at startup, injects into tmux session environment |
+| Cron jobs | Use `op run --env-file=...` with `OP_SERVICE_ACCOUNT_TOKEN` in crontab |
+
+Secrets live only in 1Password and in process memory (tmux session environment). No plaintext files on disk.
+
+<details>
+<summary><b>Legacy: config/api_keys.env (deprecated)</b></summary>
+
+If you prefer not to use 1Password, you can still create `config/api_keys.env` manually (see `config/api_keys.env.sample` for format). Scripts fall back to this file when 1Password is unavailable. This file is gitignored and never committed.
+
+</details>
+
 <details>
 <summary><b>yokubari.sh options</b></summary>
 

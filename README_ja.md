@@ -500,6 +500,48 @@ machine:
 ntfy_topic: "your-secret-topic"
 ```
 
+### シークレット管理（1Password）
+
+APIキーは [1Password CLI](https://developer.1password.com/docs/cli/) で管理 — ディスク上に平文の `.env` ファイルを置かない。
+
+**セットアップ:**
+
+```bash
+# 1. 1Password CLIインストール
+# Linux/WSL: apt install 1password-cli
+# macOS:     brew install 1password-cli
+
+# 2. 1password.com → Developer → Service Accounts でサービスアカウント作成
+#    Vaultへのread権限を付与。トークン（1回だけ表示）を保存。
+
+# 3. Vaultにアイテムとしてキーを登録
+#    アイテム名は config/op_refs.env の参照と一致させる（例: "anthropic", "openai", "gemini"）
+
+# 4. トークンをシェル設定に追加（~/.zshrc.local 等、gitignored）
+export OP_SERVICE_ACCOUNT_TOKEN="ops_your_token_here"
+
+# 5. 動作確認
+op run --env-file=config/op_refs.env -- printenv | grep API_KEY
+```
+
+**仕組み:**
+
+| コンポーネント | 役割 |
+|---------------|------|
+| `config/op_refs.env` | シークレットURI参照（`op://Vault/Item/field`）— コミットOK |
+| `config/*.env.sample` | 必要なキーを示すテンプレート — コミットOK |
+| `yokubari.sh` | 起動時に `op read` で取得、tmuxセッション環境変数に注入 |
+| cronジョブ | crontabの `OP_SERVICE_ACCOUNT_TOKEN` + `op run --env-file=...` |
+
+シークレットは1Passwordとプロセスメモリ（tmuxセッション環境変数）にのみ存在。ディスク上に平文ファイルなし。
+
+<details>
+<summary><b>レガシー: config/api_keys.env（非推奨）</b></summary>
+
+1Passwordを使わない場合は `config/api_keys.env` を手動作成可能（`config/api_keys.env.sample` 参照）。スクリプトは1Password未使用時にこのファイルにフォールバックする。このファイルはgitignored。
+
+</details>
+
 <details>
 <summary><b>yokubari.shオプション</b></summary>
 
