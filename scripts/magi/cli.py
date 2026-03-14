@@ -65,7 +65,7 @@ Examples:
         "--profile",
         choices=["fast", "balanced", "deep"],
         default="balanced",
-        help="Execution profile: fast | balanced | deep (default: balanced; Phase1 stub — no behavior change yet)",
+        help="Execution profile: fast (Phase 1 only, skip cross-review) | balanced (default, summarized cross-review) | deep (full cross-review, higher token cost)",
     )
     parser.add_argument(
         "--output-dir", type=str, default="results/",
@@ -74,6 +74,10 @@ Examples:
     parser.add_argument(
         "--personas", type=str, default=None,
         help="Path to custom personas YAML file (default: personas/default.yaml)",
+    )
+    parser.add_argument(
+        "--dedup-threshold", type=float, default=0.7,
+        help="Jaccard similarity threshold for deduplicating consensus actions (default: 0.7)",
     )
     args = parser.parse_args()
 
@@ -105,6 +109,7 @@ Examples:
         output_dir=args.output_dir,
         profile=args.profile,
         personas=personas,
+        dedup_threshold=args.dedup_threshold,
     )
 
 

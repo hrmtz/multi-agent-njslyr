@@ -1,0 +1,13 @@
+# MAGI general session — broad-purpose evaluation for any topic.
+
+id: general
+name: "General Evaluation"
+description: "General-purpose evaluation for any question or topic. Use when no specialized session fits."
+context: |
+  Evaluate the following question or topic.
+  Consider its merits, risks, and alternatives.
+required_fields:
+  judge: ["vote", "opinion"]
+  deliberate: ["score", "issues"]
+  walkthrough: ["sections"]
+recommended_mode: judge

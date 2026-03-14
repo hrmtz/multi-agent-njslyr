@@ -46,6 +46,28 @@ bash scripts/inbox_write.sh smith "緊急" system_notice yakuza5 "" P0
 **⚠️ ANTI-BUG**: `スリケン！inboxN` の `inboxN` はエージェントIDではない。「お前のinboxに未読N件ある」という通知。`suriken inboxN` を実行するな。自分の `queue/inbox/{自分のID}.yaml` を読め。
 **MANDATORY**: タスク完了後、idle前に必ずinbox未読を確認・処理せよ。
 
+## ヤクザ配信報告義務（全チームリード必須）
+チームリード（Smith/Tajiba/Yamahiro/Kusuba）がクローンヤクザにタスクを配信したら、**即座に**darkninjaへ以下を報告せよ：
+1. どのヤクザに何を振ったか（agent_id + タスク概要）
+2. タスクYAMLパス
+3. 期待する完了条件
+**省略不可。報告なき配信は管轄違反と同等に扱う。**
+
+## ヤクザ管轄（厳守）
+- **Kyoto**: Smith → yakuza1-3 / Tajiba → yakuza4-6
+- **NeoSaitama**: Yamahiro → yakuza1-3 / Kusuba → yakuza4-6
+- 他チームリードの管轄ヤクザにタスクを振ることは禁止。
+
+## 成果物レビューフロー（厳守）
+```
+ヤクザ → /simplify実行（セルフレビュー） → チームリードに報告
+チームリード → 取りまとめ・統合 → ソウカイヤに1件として提出
+```
+- **ヤクザはソウカイヤに直接レポートを送るな。** 必ずチームリードを経由せよ
+- **ヤクザはタスク完了前に `/simplify` を実行し、コード品質・効率・重複を自己検証せよ。** simplify未実施の成果物は未完了扱い
+- **チームリードは配下ヤクザの成果物を取りまとめ、統合レビュー済みの状態でソウカイヤに渡せ。** 散発的な個別レポート禁止
+- ソウカイヤの負荷を分散し、最終検証に集中させるための設計
+
 ## File Operation Rule
 **Always Read before Write/Edit.**
 
@@ -159,7 +181,7 @@ System manages ALL white-collar work. `projects/` is git-ignored.
 <!-- MEMORY:START -->
 # multi-agent-njslyr
 
-_Last updated: 2026-03-10 | 25 active memories, 788 total_
+_Last updated: 2026-03-14 | 25 active memories, 788 total_
 
 ## Architecture
 - dotfiles zsh configuration uses OS-based file branching pattern with `.zsh/zshrc.linux` and `.zsh/zshrc.macos` for pl... [dotfiles, zsh, wsl]
@@ -185,12 +207,6 @@ _Last updated: 2026-03-10 | 25 active memories, 788 total_
 - NLM batch upload failures: hanna2023 paper blocked by double-quote character in filename (BibTeX export artifact) and... [nlm, batch-upload, data-quality]
 - NLM Pro authentication systemic failures spanning token lifecycle, credential propagation, OAuth, and account access:... [nlm-auth, oauth, credential-management, account-isolation, systemd]
 - yakuza fleet maintains 415+ concurrent in_progress tasks across 7 agents independent of crane monitoring process—task... [yakuza, crane, resilience, task-execution]
-
-## Current Progress
-- NLM Wave 2 batch completion status finalized: yakuza1 B0 (50/50 upload, 50 query), yakuza2 B1 (49/50 upload with 1 de... [progress, nlm-batch, yakuza-fleet]
-- Kyoto yakuza authentication and infrastructure cleanup completed: darkninja restored `/login` command and Claude Max ... [authentication, infrastructure, deployment]
-- subtask_324a (instagram-slides CLAUDE.md improvement) completed with QC PASS verdict by soukaiya agent: all 8 accepta... [qc_pass, instagram_slides, soukaiya]
-- surgery-log-app edit and PDF download features completed and deployed to zetithnas NAS: opnote_edit.html template wit... [surgery-log-app, deployment, feature-complete]
 
 ## Context
 - master_tortoise heartbeat failure sustained at 7900+ seconds (131+ minutes) at 21:59:15 JST, critically exceeding cra... [monitoring, crane, critical]

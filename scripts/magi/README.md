@@ -142,12 +142,55 @@ scripts/magi/
 
 ## Environment
 
-Required env vars (loaded from `config/api_keys.env`):
-- `ANTHROPIC_API_KEY` — for MELCHIOR (Claude)
-- `OPENAI_API_KEY` — for BALTHASAR (GPT)
-- `GEMINI_API_KEY` — for CASPER (Gemini)
+### API Keys (1Password経由)
 
-Use `--skip` to run with fewer than 3 keys available.
+BALTHASAR/CASPERのAPIキーは1Password CLIで注入する。直接環境変数やファイルにキーを置かない。
+
+```bash
+# config/op_refs.env（git tracked, プレースホルダのみ）
+OPENAI_API_KEY=op://Private/openai-api-key/credential
+GEMINI_API_KEY=op://Private/gemini-api-key/credential
+```
+
+```bash
+# 実行時: op runがop://参照を実際のキー値に置換して渡す
+op run --env-file config/op_refs.env -- python3 scripts/magi/magi.py --skip MELCHIOR \
+  --mode deliberate --session strategy --file proposal.md
+```
+
+### MELCHIOR (Claude) — サブエージェント実行
+
+**ANTHROPIC_API_KEYとClaude Max Planは同居不能。** Max Plan環境ではMELCHIORをmagi.py経由で実行できない。代わりにClaude CodeのAgent toolでサブエージェントとして起動する。
+
+実行パターン:
+1. `op run ... -- python3 magi.py --skip MELCHIOR ...` でBALTHASAR+CASPERを実行
+2. 結果JSONを読み取り、MELCHIORのプロンプトをAgent toolで実行
+3. 3ユニットの結果を統合
+
+```
+# MELCHIORサブエージェントに渡すプロンプト例:
+あなたはMAGI System MELCHIOR-1です。
+ペルソナ: 科学者（論理・正確性・エビデンス重視）
+[Phase 1分析指示 + 入力データ]
+[BALTHASAR/CASPERの結果をPhase 2クロスレビュー用に添付]
+JSON形式で出力してください。
+```
+
+### 3ユニット完全実行の手順
+
+```bash
+# Step 1: BALTHASAR + CASPER を実行
+op run --env-file config/op_refs.env -- python3 scripts/magi/magi.py \
+  --skip MELCHIOR --mode deliberate --session strategy --file input.md
+
+# Step 2: 結果JSONを確認
+cat scripts/magi/results/strategy_deliberate_*.json
+
+# Step 3: Claude Code Agent toolでMELCHIOR実行（会話内で手動）
+# → 結果を統合して最終判断
+```
+
+`config/op_refs.env` の `ANTHROPIC_API_KEY` は意図的にコメントアウト状態を維持すること。
 
 ## Monju Adapter
 

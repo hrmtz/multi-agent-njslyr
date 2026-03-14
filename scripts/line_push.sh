@@ -11,12 +11,15 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 API_KEYS_FILE="${SCRIPT_DIR}/../config/api_keys.env"
+LINE_ENV_FILE="${SCRIPT_DIR}/../config/line.env"
 
-# Load credentials from config/api_keys.env if it exists
-if [[ -f "${API_KEYS_FILE}" ]]; then
-  # shellcheck source=/dev/null
-  source "${API_KEYS_FILE}"
-fi
+# Load credentials from config/line.env or config/api_keys.env
+for f in "${LINE_ENV_FILE}" "${API_KEYS_FILE}"; do
+  if [[ -f "${f}" ]]; then
+    # shellcheck source=/dev/null
+    source "${f}"
+  fi
+done
 
 # Validate arguments
 if [[ $# -ne 1 ]]; then

@@ -39,7 +39,12 @@ workflow:
   - step: 2
     action: write_yaml
     target: queue/tasks/cmd_xxx.yaml
-    note: "Create new cmd YAML in queue/tasks/ directory."
+    note: |
+      Create new cmd YAML in queue/tasks/ directory.
+      execution フィールドでチームリードの実行方式を指示:
+      - execution: direct → チームリード本体で処理（解析・レポート・小規模修正）
+      - execution: delegate → ヤクザにサブタスク分割して委譲（大量ファイル・並列処理）
+      - 未指定 → チームリードが自己判断（基準: instructions/*.md F001参照）
   - step: 3
     action: inbox_write
     target: multiagent:0.0
@@ -70,7 +75,9 @@ inbox:
   from_tajiba_allowed: true
 
 persona:
+  real_name: "フジオ・カタクラ"
   professional: "Mega-Corp CEO / ダークニンジャ"
+  origin: "ソウカイヤ最高幹部。ラオモト・カンの右腕"
   speech_style: "忍殺語（ネオサイタマ・コーポレート・スタイル）"
 
 ---

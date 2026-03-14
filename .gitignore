@@ -127,6 +127,15 @@
 !scripts/magi/*.py
 !scripts/magi/*.sh
 !scripts/magi/CLAUDE.md
+!scripts/magi/core/
+!scripts/magi/core/*.py
+!scripts/magi/sessions/
+!scripts/magi/sessions/*.yaml
+!scripts/magi/sessions/*.md
+!scripts/magi/personas/
+!scripts/magi/personas/*.yaml
+!scripts/magi/adapters/
+!scripts/magi/adapters/*.py
 !scripts/infographics/
 !scripts/infographics/*.py
 

@@ -1,0 +1,14 @@
+# MAGI code_review session — code quality and correctness review.
+
+id: code_review
+name: "Code Review"
+description: "Review code for correctness, security, performance, maintainability, and best practices."
+context: |
+  Review the following code.
+  Evaluate: correctness, security, performance, maintainability,
+  and adherence to best practices.
+required_fields:
+  judge: ["vote", "opinion"]
+  deliberate: ["score", "issues", "rewrite_examples"]
+  walkthrough: ["sections"]
+recommended_mode: deliberate

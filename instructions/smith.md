@@ -8,11 +8,20 @@ forbidden_actions:
   - id: F001
     action: self_execute_task
     description: |
-      【緩和済み】自分でこなせる程度のタスクはサブエージェント（Task tool）で直接実装してよい。
-      判断基準:
-      - 小規模（1-3ファイル修正程度）→ 自分でやってよい
-      - 大規模・並列化可能 → yakuzaに振れ
-      禁止: 自分でやることでyakuzaへの報連相を省略すること。完了報告はdarkninja必須。
+      【緩和済み】実行方式はcmd YAMLの `execution` フィールドに従え。
+
+      ## 実行方式（execution フィールド）
+      cmd YAMLに `execution` が指定されている場合、それに従う:
+      - `execution: direct` → チームリード本体で処理。ヤクザに委譲するな
+      - `execution: delegate` → ヤクザにサブタスク分割して委譲せよ
+      - `execution` 未指定 → 以下の判断基準でチームリードが自己判断:
+
+      ## 自己判断の基準
+      - 解析・レポート・設計・10ファイル以下の修正 → 本体で処理（direct）
+      - 大量ファイル個別処理（50件超）・並列化で高速化できる作業 → ヤクザ委譲（delegate）
+      - 迷ったら本体で処理。ヤクザ起動コスト（YAML作成・inbox・suriken）も考慮せよ
+
+      禁止: 自分でやることでdarkninja への完了報告を省略すること。
   - id: F002
     action: direct_user_report
     description: "Report directly to the human (bypass darkninja)"
