@@ -901,11 +901,11 @@ fi
 # エージェント構成（マシンロール依存）
 # ═══════════════════════════════════════════════════════════════════════════════
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-    # neosaitama フル構成9体: smith + yakuza1-7 + soukaiya = 9 panes
-    PANE_LABELS=("smith" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
-    PANE_COLORS=("red" "blue" "blue" "blue" "blue" "blue" "blue" "blue" "yellow")
-    AGENT_IDS=("smith" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
-    YAKUZA_MAX=7
+    # neosaitama フル構成9体: yamahiro + kusuba + yakuza1-6 + soukaiya = 9 panes
+    PANE_LABELS=("yamahiro" "kusuba" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "soukaiya")
+    PANE_COLORS=("red" "red" "blue" "blue" "blue" "blue" "blue" "blue" "yellow")
+    AGENT_IDS=("yamahiro" "kusuba" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "soukaiya")
+    YAKUZA_MAX=6
     if [ "$KESSEN_MODE" = true ]; then
         MODEL_NAMES=("Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus")
     else
@@ -935,15 +935,15 @@ if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
     tmux split-window -v
     tmux split-window -v
 else
-    # kyotoフル構成: smith + yakuza1-7 + soukaiya = 9 panes (現行)
-    PANE_LABELS=("smith" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
-    PANE_COLORS=("red" "blue" "blue" "blue" "blue" "blue" "blue" "blue" "yellow")
-    AGENT_IDS=("smith" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "yakuza7" "soukaiya")
-    YAKUZA_MAX=7
+    # kyotoフル構成: smith + tajiba + yakuza1-6 + soukaiya = 9 panes
+    PANE_LABELS=("smith" "tajiba" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "soukaiya")
+    PANE_COLORS=("red" "red" "blue" "blue" "blue" "blue" "blue" "blue" "yellow")
+    AGENT_IDS=("smith" "tajiba" "yakuza1" "yakuza2" "yakuza3" "yakuza4" "yakuza5" "yakuza6" "soukaiya")
+    YAKUZA_MAX=6
     if [ "$KESSEN_MODE" = true ]; then
         MODEL_NAMES=("Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus")
     else
-        MODEL_NAMES=("Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus")
+        MODEL_NAMES=("Opus" "Opus" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus")
     fi
 
     # 3x3グリッド作成（合計9ペイン）
@@ -1108,19 +1108,28 @@ if [ "$SETUP_ONLY" = false ]; then
         log_info "  ◆召喚◆ ダークニンジャ…ニンジャソウル覚醒！イヤーッ！"
     fi
 
-    # チームリード起動（バックグラウンド）
-    ( launch_agent "multiagent:agents.$((PANE_BASE + 0))" "smith" "sonnet" ) &
-    log_info "  ◆召喚◆ チームリード（所属: ${LEAD_CORP}）…ニンジャソウル覚醒！イヤーッ！"
+    # チームリード起動（バックグラウンド、2体）
+    # pane 0 = smith/yamahiro, pane 1 = tajiba/kusuba
+    if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+        ( launch_agent "multiagent:agents.$((PANE_BASE + 0))" "yamahiro" "sonnet" ) &
+        ( launch_agent "multiagent:agents.$((PANE_BASE + 1))" "kusuba"   "sonnet" ) &
+        log_info "  ◆召喚×2◆ チームリード yamahiro + kusuba（NeoSaitama体制）…ニンジャソウル覚醒！イヤーッ！"
+    else
+        ( launch_agent "multiagent:agents.$((PANE_BASE + 0))" "smith"  "opus" ) &
+        ( launch_agent "multiagent:agents.$((PANE_BASE + 1))" "tajiba" "opus" ) &
+        log_info "  ◆召喚×2◆ チームリード smith（Opus） + tajiba（Opus）（Kyoto体制）…ニンジャソウル覚醒！イヤーッ！"
+    fi
 
     # クローンヤクザ起動（バックグラウンド、YAKUZA_MAX体）
-    # subtask_347b: yakuza1-7をDeepSeek V3（deepseek-chat）に統一
+    # pane 2〜7 = yakuza1-6 （0=チームリードA, 1=チームリードB, 2-7=yakuza1-6, 8=soukaiya）
+    # subtask_347b: yakuza1-6をDeepSeek V3（deepseek-chat）に統一
     for ((i=1; i<=YAKUZA_MAX; i++)); do
         if [ "${DEEPSEEK_API_KEY:-}" != "" ]; then
             _ds_env="ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic ANTHROPIC_AUTH_TOKEN=${DEEPSEEK_API_KEY} ANTHROPIC_MODEL=deepseek-chat ANTHROPIC_SMALL_FAST_MODEL=deepseek-chat"
-            ( launch_agent "multiagent:agents.$((PANE_BASE + i))" "yakuza${i}" "deepseek-chat" "$_ds_env" ) &
+            ( launch_agent "multiagent:agents.$((PANE_BASE + 1 + i))" "yakuza${i}" "deepseek-chat" "$_ds_env" ) &
         else
             # DeepSeek API Key未設定時はsonnet fallback
-            ( launch_agent "multiagent:agents.$((PANE_BASE + i))" "yakuza${i}" "sonnet" ) &
+            ( launch_agent "multiagent:agents.$((PANE_BASE + 1 + i))" "yakuza${i}" "sonnet" ) &
         fi
     done
     if [ "${DEEPSEEK_API_KEY:-}" != "" ]; then
@@ -1129,8 +1138,8 @@ if [ "$SETUP_ONLY" = false ]; then
         log_info "  ◆召喚×${YAKUZA_MAX}◆ クローンヤクザ1-${YAKUZA_MAX}（ヘイジの陣）…ニンジャソウル覚醒！ザッケンナコラー！"
     fi
 
-    # ソウカイヤ起動（バックグラウンド、最後のpane）
-    _soukaiya_idx=$((YAKUZA_MAX + 1))
+    # ソウカイヤ起動（バックグラウンド、最後のpane: YAKUZA_MAX + 2）
+    _soukaiya_idx=$((YAKUZA_MAX + 2))
     ( launch_agent "multiagent:agents.$((PANE_BASE + _soukaiya_idx))" "soukaiya" "opus" ) &
     log_info "  ◆召喚◆ ソウカイヤ…戦略カイギ開始！ドーモ"
 
@@ -1143,9 +1152,9 @@ if [ "$SETUP_ONLY" = false ]; then
     log_info "  ワザマエ！全エージェント並列起動完了！カラテの速度で展開！"
 
     if [ "${DEEPSEEK_API_KEY:-}" != "" ]; then
-        log_success "✅ ◆2段階変身体制確立◆ 電脳IRC接続完了！（GrYakuza=Sonnet, Y×${YAKUZA_MAX}=DeepSeek, Soukaiya=Opus, ${MONITOR_AGENT}=Sonnet）ワザマエ！"
+        log_success "✅ ◆2段階変身体制確立◆ 電脳IRC接続完了！（チームリード×2=Opus/Sonnet, Y×${YAKUZA_MAX}=DeepSeek, Soukaiya=Opus, ${MONITOR_AGENT}=Sonnet）ワザマエ！"
     else
-        log_success "✅ ◆実際ヘイジの陣◆ 電脳IRC接続完了！（GrYakuza=Sonnet, Y×${YAKUZA_MAX}=Sonnet, Soukaiya=Opus, ${MONITOR_AGENT}=Sonnet）ワザマエ！"
+        log_success "✅ ◆実際ヘイジの陣◆ 電脳IRC接続完了！（チームリード×2=Opus/Sonnet, Y×${YAKUZA_MAX}=Sonnet, Soukaiya=Opus, ${MONITOR_AGENT}=Sonnet）ワザマエ！"
     fi
     echo ""
 
@@ -1282,7 +1291,13 @@ NINJA_EOF
     }
 
     # チームリード・ヤクザ・ソウカイヤのwatcher
-    _pid=$(  _get_watcher_pane_id "smith");   [[ -n "$_pid" ]] && launch_watcher "smith" "$_pid"
+    if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
+        _pid=$(_get_watcher_pane_id "yamahiro"); [[ -n "$_pid" ]] && launch_watcher "yamahiro" "$_pid"
+        _pid=$(_get_watcher_pane_id "kusuba");   [[ -n "$_pid" ]] && launch_watcher "kusuba"   "$_pid"
+    else
+        _pid=$(_get_watcher_pane_id "smith");    [[ -n "$_pid" ]] && launch_watcher "smith"    "$_pid"
+        _pid=$(_get_watcher_pane_id "tajiba");   [[ -n "$_pid" ]] && launch_watcher "tajiba"   "$_pid"
+    fi
     for ((i=1; i<=YAKUZA_MAX; i++)); do
         _pid=$(_get_watcher_pane_id "yakuza${i}"); [[ -n "$_pid" ]] && launch_watcher "yakuza${i}" "$_pid"
     done
@@ -1296,12 +1311,12 @@ NINJA_EOF
         launch_watcher "$MONITOR_AGENT" "$MONITOR_PANE"
     fi
 
-    # kyoto: darkninja + smith + yakuzaN + soukaiya + monitor = YAKUZA_MAX + 4
-    # neosaitama: smith + yakuzaN + soukaiya + monitor = YAKUZA_MAX + 3
+    # kyoto: darkninja + smith + tajiba + yakuza1-6 + soukaiya + monitor = YAKUZA_MAX + 5
+    # neosaitama: yamahiro + kusuba + yakuza1-6 + soukaiya + monitor = YAKUZA_MAX + 4
     if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
-        _total_watchers=$((YAKUZA_MAX + 3))
-    else
         _total_watchers=$((YAKUZA_MAX + 4))
+    else
+        _total_watchers=$((YAKUZA_MAX + 5))
     fi
     log_success "  └─ ◆実際完了◆ ${_total_watchers}エージェント分のIRC監視起動完了！全チャンネル接続！ワザマエ！"
 
@@ -1469,26 +1484,26 @@ echo ""
 if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
     echo "     【multiagent:neosaitama】ローカル構成（9ペイン）"
     echo "     ┌──────────┬─────────┬─────────┐"
-    echo "     │ smith │ yakuza3 │ yakuza6 │"
-    echo "     │(GrYakuza)│  (Y3)   │  (Y6)   │"
+    echo "     │ yamahiro │ yakuza3 │ yakuza6 │"
+    echo "     │(リード A) │  (Y3)   │  (Y6)   │"
     echo "     ├──────────┼─────────┼─────────┤"
-    echo "     │ yakuza1  │ yakuza4 │ yakuza7 │"
-    echo "     │   (Y1)   │  (Y4)   │  (Y7)   │"
+    echo "     │  kusuba  │ yakuza4 │soukaiya │"
+    echo "     │(リード B) │  (Y4)   │(Soukaiya)│"
     echo "     ├──────────┼─────────┼─────────┤"
-    echo "     │ yakuza2  │ yakuza5 │soukaiya │"
-    echo "     │   (Y2)   │  (Y5)   │(Soukaiya)│"
+    echo "     │ yakuza1  │ yakuza5 │ yakuza2 │"
+    echo "     │   (Y1)   │  (Y5)   │  (Y2)   │"
     echo "     └──────────┴─────────┴─────────┘"
 else
     echo "     【multiagent:kyoto】フル構成（9ペイン）"
     echo "     ┌──────────┬─────────┬─────────┐"
-    echo "     │ smith │ yakuza3 │ yakuza6 │"
-    echo "     │(GrYakuza)│  (Y3)   │  (Y6)   │"
+    echo "     │  smith   │ yakuza3 │ yakuza6 │"
+    echo "     │(リード A) │  (Y3)   │  (Y6)   │"
     echo "     ├──────────┼─────────┼─────────┤"
-    echo "     │ yakuza1  │ yakuza4 │ yakuza7 │"
-    echo "     │   (Y1)   │  (Y4)   │  (Y7)   │"
+    echo "     │  tajiba  │ yakuza4 │soukaiya │"
+    echo "     │(リード B) │  (Y4)   │(Soukaiya)│"
     echo "     ├──────────┼─────────┼─────────┤"
-    echo "     │ yakuza2  │ yakuza5 │soukaiya │"
-    echo "     │   (Y2)   │  (Y5)   │(Soukaiya)│"
+    echo "     │ yakuza1  │ yakuza5 │ yakuza2 │"
+    echo "     │   (Y1)   │  (Y5)   │  (Y2)   │"
     echo "     └──────────┴─────────┴─────────┘"
 fi
 echo ""
