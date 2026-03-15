@@ -181,38 +181,7 @@ System manages ALL white-collar work. `projects/` is git-ignored.
 <!-- MEMORY:START -->
 # multi-agent-njslyr
 
-_Last updated: 2026-03-14 | 25 active memories, 788 total_
-
-## Architecture
-- dotfiles zsh configuration uses OS-based file branching pattern with `.zsh/zshrc.linux` and `.zsh/zshrc.macos` for pl... [dotfiles, zsh, wsl]
-- instagram-slides/CLAUDE.md serves as operational reference document with structured sections including Kyoto Quick St... [instagram-slides, documentation, runbook]
-- surgery-log-app is a Flask application running on NeoSaitama (taketsuru host) in Docker on port 18080 (internal 8000)... [architecture, surgery-log-app, flask, data-persistence]
-- Agent inbox architecture uses mixed directory structure: yakuza7 and soukaiya use /home/hrmtz/project/multi-agent-njs... [agent-architecture, inbox-structure, authentication]
-
-## Key Decisions
-- Role separation and identity verification enforcement: darkninja refrains from direct NAS deployment, surgery-log-app... [role-separation, identity-verification, escalation-hierarchy]
-- NLM MCP tool unavailability recovery: use ToolSearch rediscovery pattern ('select:mcp__notebooklm__source_add') inste... [nlm, mcp-recovery, authentication, resilience]
-- surgery-log-app backup mechanism implemented: pre-save logic now copies source .md file to .md.bak before write_text(... [surgery-log-app, backup, deployment]
-- Agent environment management and credential distribution: after identifying and removing tmux global ANTHROPIC_API_KE... [agent-management, tmux, credentials, authentication]
-
-## Patterns & Conventions
-- master_tortoise watchdog liveness cycle uses tmux list-panes capture loop checking pane_current_command field != 'cla... [watchdog, agent-notification, task-handoff, inbox, authentication, environment-management, remote-agents]
-- NLM batch processing architecture: Pro account supports 300 sources per notebook theoretically, but operational stabi... [nlm_batch, architecture, query_execution, rate_limiting]
-- master_tortoise monitoring status output format uses emoji suffix indicators for heartbeat health: 🐢 OK (heartbeat h... [master_tortoise, monitoring, heartbeat, status_output]
-- yakuza fleet task execution demonstrates operational resilience: sustained 415+ concurrent in_progress tasks across 7... [yakuza_resilience, concurrent_tasks, crane_independence, batch_operations]
-
-## Gotchas & Pitfalls
-- master_tortoise 'スリケン！inbox0' message spam (30+ occurrences) is NOT anomalous — caused by crontab `* * * * *` suriken... [gotcha, cron, false-alarm]
-- darkninja agent pane auto-recovery mechanism functions correctly — master_tortoise detected pane_current_command=zsh ... [watchdog, auto-recovery, darkninja]
-- NLM batch upload failures: hanna2023 paper blocked by double-quote character in filename (BibTeX export artifact) and... [nlm, batch-upload, data-quality]
-- NLM Pro authentication systemic failures spanning token lifecycle, credential propagation, OAuth, and account access:... [nlm-auth, oauth, credential-management, account-isolation, systemd]
-- yakuza fleet maintains 415+ concurrent in_progress tasks across 7 agents independent of crane monitoring process—task... [yakuza, crane, resilience, task-execution]
-
-## Context
-- master_tortoise heartbeat failure sustained at 7900+ seconds (131+ minutes) at 21:59:15 JST, critically exceeding cra... [monitoring, crane, critical]
-- NotebookLM source_add (batch upload) operations do not trigger rate-limiting even at scale (50 PDFs uploaded successf... [nlm, rate-limiting, batch-processing]
-- surgery-log-app web interface accessible at http://100.75.235.119:18080 (zetithnas NAS Tailscale IP + port 18080 mapp... [deployment, surgery_log_app, network]
-- Zotero User ID is 14204346, displayed on https://www.zotero.org/settings/keys page as 'Your userID for use in API cal... [zotero, api, configuration]
+_Last updated: 2026-03-15 | 0 active memories, 0 total_
 
 _For deeper context, use memory_search, memory_related, or memory_ask tools._
 <!-- MEMORY:END -->
