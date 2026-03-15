@@ -1,0 +1,31 @@
+# MAGI simplify session — code diff review with role-separated perspectives.
+# Each unit focuses on a different quality dimension.
+
+id: simplify
+name: "Code Simplification Review"
+description: "Code diff review with role-separated MAGI units"
+context: |
+  You are reviewing a code diff (git diff output) for a software project.
+  Each MAGI unit focuses on a DIFFERENT aspect:
+
+  - MELCHIOR (Scientist): Focus on CODE REUSE. Search for duplicated logic,
+  functions that reinvent existing utilities, inline code that should use helpers,
+  and constants defined in multiple places. Flag every DRY violation.
+
+  - BALTHASAR (Pragmatist): Focus on CODE QUALITY. Look for copy-paste with
+  slight variation, parameter sprawl, redundant state, leaky abstractions,
+  stringly-typed code, dead branches, and hacky workarounds.
+
+  - CASPER (Visionary): Focus on EFFICIENCY. Find unnecessary work (redundant
+  computations, repeated file reads, duplicate API calls, N+1 patterns),
+  missed concurrency opportunities, hot-path bloat, memory leaks, and
+  overly broad operations.
+
+  Provide concrete findings with file paths, line numbers, severity
+  (high/medium/low), and specific fix suggestions.
+  Be thorough but avoid false positives.
+required_fields:
+  judge: ["vote", "opinion"]
+  deliberate: ["score", "issues", "rewrite_examples"]
+  walkthrough: ["sections"]
+recommended_mode: deliberate

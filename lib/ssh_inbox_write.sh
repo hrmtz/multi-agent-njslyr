@@ -13,7 +13,7 @@
 #   4b. 初回失敗: 10秒wait + 1回リトライ (MBPスリープ復帰考慮)
 #   5. リトライ失敗: ntfyフォールバック
 #   6. 全結果ローカルログ記録
-#   7. SSH失敗時: gryakuza inboxに通知 (障害可視化)
+#   7. SSH失敗時: smith inboxに通知 (障害可視化)
 #
 # macOS PATH対策: SSH経由コマンドに Homebrew PATH を明示付加
 # 再帰防止: NJSLYR_SSH_DEPTH ガード (ssh_fallback.sh 準拠)
@@ -61,13 +61,13 @@ if [[ -z "$TARGET_AGENT" || -z "$MESSAGE" ]]; then
 fi
 
 # agent_id validation: リモートコマンドインジェクション防御
-# 許可パターン: [a-z0-9_]+ のみ (例: yakuza3, gryakuza, master_tortoise)
+# 許可パターン: [a-z0-9_]+ のみ (例: yakuza3, smith, master_tortoise)
 if [[ ! "$TARGET_AGENT" =~ ^[a-z0-9_]+$ ]]; then
     _log_error "REJECTED: invalid target_agent '$TARGET_AGENT' (must match [a-z0-9_]+)"
     exit 1
 fi
 
-# from も同様にバリデーション (@ を許可: "gryakuza@neo" 等)
+# from も同様にバリデーション (@ を許可: "smith@neo" 等)
 if [[ ! "$FROM" =~ ^[a-z0-9_@]+$ ]]; then
     _log_error "REJECTED: invalid from '$FROM' (must match [a-z0-9_@]+)"
     exit 1
@@ -155,14 +155,14 @@ _ssh_run_inbox_write() {
         2>>"$LOG_FILE"
 }
 
-# ─── gryakuza障害通知 ────────────────────────────────────────────────────────
-_notify_gryakuza_ssh_failure() {
+# ─── smith障害通知 ────────────────────────────────────────────────────────
+_notify_smith_ssh_failure() {
     local reason="$1"
-    # 無限ループ防止: gryakuza宛てのSSH送信失敗 or gryakuza自身からの送信は通知しない
-    if [[ "$TARGET_AGENT" == "gryakuza" || "$FROM" == "gryakuza" ]]; then
+    # 無限ループ防止: smith宛てのSSH送信失敗 or smith自身からの送信は通知しない
+    if [[ "$TARGET_AGENT" == "smith" || "$FROM" == "smith" ]]; then
         return 0
     fi
-    bash "$SCRIPT_DIR/scripts/inbox_write.sh" gryakuza \
+    bash "$SCRIPT_DIR/scripts/inbox_write.sh" smith \
         "[ssh_inbox_write] SSH失敗: $PEER_HOST → inbox_write to $TARGET_AGENT (type=$TYPE, from=$FROM, reason=$reason). ntfyフォールバック試行済。" \
         "system_notice" "ssh_inbox_write" "" "P1" 2>>"$LOG_FILE" || true
 }
@@ -215,8 +215,8 @@ _ntfy_fallback() {
             ;;
     esac
 
-    # gryakuzaに障害通知 (可視化)
-    _notify_gryakuza_ssh_failure "$reason"
+    # smithに障害通知 (可視化)
+    _notify_smith_ssh_failure "$reason"
 }
 
 # ─── SSH成功時の処理 ─────────────────────────────────────────────────────────

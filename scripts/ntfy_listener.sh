@@ -8,8 +8,8 @@
 # Prefix system:
 #   push:cmd_xxx:branch        → auto git pull + darkninja notify
 #   sync:project_name:done     → auto rsync pull (cross_sync.sh) + darkninja notify
-#   cmd:cmd_xxx:内容           → forward to darkninja + gryakuza inbox
-#   handover:kyoto|neosaitama (or ryzen|mbp for compat) → active_machine.yaml update + gryakuza P0 notify
+#   cmd:cmd_xxx:内容           → forward to darkninja + smith inbox
+#   handover:kyoto|neosaitama (or ryzen|mbp for compat) → active_machine.yaml update + smith P0 notify
 #   hb:host:epoch:agents:load:ctx → heartbeat (heartbeat topic only)
 #   ping:source:epoch:message      → ping: heartbeat YAML update (no ntfy_inbox recording)
 #   report:{base64_yaml}       → MBP→Ryzen レポート返送受信・queue/reports/保存
@@ -246,7 +246,7 @@ handle_sync() {
     fi
 }
 
-# cmd:cmd_xxx:内容 → forward to darkninja + gryakuza inbox
+# cmd:cmd_xxx:内容 → forward to darkninja + smith inbox
 handle_cmd() {
     local payload="$1"
     local cmd_id content
@@ -256,12 +256,12 @@ handle_cmd() {
     bash "$SCRIPT_DIR/scripts/inbox_write.sh" darkninja \
         "ntfy cmd受信: $cmd_id: $content" \
         ntfy_received ntfy_listener
-    bash "$SCRIPT_DIR/scripts/inbox_write.sh" gryakuza \
+    bash "$SCRIPT_DIR/scripts/inbox_write.sh" smith \
         "ntfy cmd受信: $cmd_id: $content" \
         ntfy_received ntfy_listener
 }
 
-# handover:ryzen|mbp → active_machine.yaml update + gryakuza P0 notify
+# handover:ryzen|mbp → active_machine.yaml update + smith P0 notify
 handle_handover() {
     local target="$1"
     echo "[$(date)] [ntfy_listener] handover: target=$target" >&2
@@ -294,7 +294,7 @@ standby_mode: minimal        # minimal | full_stop
 EOF
     mv -f "$tmp_file" "$am_file"
     echo "[$(date)] [ntfy_listener] active_machine.yaml updated → $target" >&2
-    bash "$SCRIPT_DIR/scripts/inbox_write.sh" gryakuza \
+    bash "$SCRIPT_DIR/scripts/inbox_write.sh" smith \
         "handover受信: active_machine → $target に切り替え。即時handoverプロセスを開始せよ。" \
         system_notice ntfy_listener "" P0
 }
@@ -479,8 +479,8 @@ except Exception:
     echo "[$(date)] [ntfy_listener] report: saved → $report_path" >&2
     echo "[$(date)] [ntfy_listener] report: saved → $report_path" >> "$log_file"
 
-    # gryakuza inbox通知
-    bash "$SCRIPT_DIR/scripts/inbox_write.sh" gryakuza \
+    # smith inbox通知
+    bash "$SCRIPT_DIR/scripts/inbox_write.sh" smith \
         "MBP report受信: ${task_id}" \
         report_received ntfy_listener "$report_path"
 }
@@ -577,27 +577,27 @@ except Exception:
 
     echo "[$(date)] [ntfy_listener] dispatch: task_id=$task_id worker=$worker_id → $task_file" >&2
 
-    # FIX-004: gryakuzaに通知（dispatch受信を報告 → gryakuzaがworkerに割り当て）
-    bash "$SCRIPT_DIR/scripts/inbox_write.sh" gryakuza \
+    # FIX-004: smithに通知（dispatch受信を報告 → smithがworkerに割り当て）
+    bash "$SCRIPT_DIR/scripts/inbox_write.sh" smith \
         "ntfy dispatch受信: $task_id → $task_file 保存済み。確認して割り当てよ。" \
         report_received ntfy_listener "$task_file"
 
-    # cmd_330: アイサツ返送 — SSH経由 Kyoto gryakuza inbox書き込み（ntfyフォールバック付き）
+    # cmd_330: アイサツ返送 — SSH経由 Kyoto smith inbox書き込み（ntfyフォールバック付き）
     local _aisatsu_sent=false
     if [[ "$MACHINE_ROLE" == "kyoto" || "$MACHINE_ROLE" == "ryzen" ]]; then
         # Kyoto上での実行: ローカルinbox_write（loopback防止）
-        if bash "$SCRIPT_DIR/scripts/inbox_write.sh" gryakuza \
+        if bash "$SCRIPT_DIR/scripts/inbox_write.sh" smith \
             "aisatsu受領: ${task_id} → NeoSaitama受領済み。ドーモ。" \
             system_notice ntfy_listener "" P2 2>/dev/null; then
-            echo "[$(date)] [ntfy_listener] dispatch: アイサツ(ローカル) → gryakuza inbox (task_id=${task_id})" >&2
+            echo "[$(date)] [ntfy_listener] dispatch: アイサツ(ローカル) → smith inbox (task_id=${task_id})" >&2
             _aisatsu_sent=true
         fi
     else
-        # NeoSaitama上での実行: SSH経由でKyoto gryakuza inboxに書き込み
-        if bash "$SCRIPT_DIR/lib/ssh_inbox_write.sh" gryakuza \
+        # NeoSaitama上での実行: SSH経由でKyoto smith inboxに書き込み
+        if bash "$SCRIPT_DIR/lib/ssh_inbox_write.sh" smith \
             "aisatsu受領: ${task_id} → NeoSaitama受領済み。ドーモ。" \
             system_notice ntfy_listener "" P2 2>/dev/null; then
-            echo "[$(date)] [ntfy_listener] dispatch: アイサツ(SSH) → Kyoto gryakuza inbox (task_id=${task_id})" >&2
+            echo "[$(date)] [ntfy_listener] dispatch: アイサツ(SSH) → Kyoto smith inbox (task_id=${task_id})" >&2
             _aisatsu_sent=true
         fi
     fi
@@ -669,7 +669,7 @@ handle_suriken() {
 }
 
 # aisatsu:{task_id}:{status} → dispatch アイサツ受信（ntfyフォールバック受信用）(cmd_328/cmd_330)
-# cmd_330以降: メインパスはSSH経由でKyoto gryakuza inboxに直接書き込み。
+# cmd_330以降: メインパスはSSH経由でKyoto smith inboxに直接書き込み。
 # このハンドラはSSH失敗時のntfy経由フォールバック確認用として維持。
 handle_aisatsu() {
     local payload="$1"
@@ -715,7 +715,7 @@ activated_by: laomoto_ntfy
 EOF
     mv -f "$tmp_file" "$am_file"
     echo "[$(date)] [ntfy_listener] active_machine.yaml updated → simultaneous" >&2
-    bash "$SCRIPT_DIR/scripts/inbox_write.sh" gryakuza \
+    bash "$SCRIPT_DIR/scripts/inbox_write.sh" smith \
         "activate:simultaneous 受信。active_machine.yaml をsimultaneousモードに更新した。同時稼働準備を開始せよ。" \
         ntfy_received ntfy_listener "" P0
 }

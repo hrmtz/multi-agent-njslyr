@@ -1,0 +1,17 @@
+# MAGI article_review session — blog article quality evaluation for beauty clinic.
+
+id: article_review
+name: "Article Review"
+description: "Review blog articles for SEO, medical accuracy, reader engagement, tone, and overall quality."
+context: |
+  Review the following blog article for a beauty clinic website.
+  Evaluate: SEO effectiveness, medical accuracy of claims,
+  reader engagement (psychological hooks, lead structure),
+  tone appropriateness, and overall quality.
+  Judge the article based on its own target audience —
+  infer the intended reader from the content itself.
+required_fields:
+  judge: ["vote", "opinion"]
+  deliberate: ["score", "issues", "rewrite_examples"]
+  walkthrough: ["sections", "final_dropout_point"]
+recommended_mode: deliberate

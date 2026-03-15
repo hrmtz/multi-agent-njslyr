@@ -5,10 +5,10 @@
 # Validates task dependency ordering:
 #   1. Task A (yakuza1) has no dependencies → executes immediately
 #   2. Task B (yakuza2) has blocked_by: [task_A] → waits
-#   3. After task A completes, gryakuza unblocks task B
+#   3. After task A completes, smith unblocks task B
 #   4. Task B executes and completes
 #
-# Simulates gryakuza's dependency resolution logic.
+# Simulates smith's dependency resolution logic.
 # ═══════════════════════════════════════════════════════════════
 
 # bats file_tags=e2e
@@ -60,7 +60,7 @@ setup() {
 
     # 3. Only send task_assigned to yakuza1 (yakuza2 is blocked)
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza1" \
-        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza"
+        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "smith"
     send_to_pane "$yakuza1_pane" "inbox1"
 
     # 4. Verify task B is still blocked (not started)
@@ -71,7 +71,7 @@ setup() {
     run wait_for_yaml_value "$E2E_QUEUE/queue/tasks/yakuza1.yaml" "task.status" "done" 30
     assert_success
 
-    # 6. Simulate gryakuza unblocking task B: change status from blocked → assigned
+    # 6. Simulate smith unblocking task B: change status from blocked → assigned
     python3 -c "
 import yaml, os, tempfile
 with open('$E2E_QUEUE/queue/tasks/yakuza2.yaml') as f:
@@ -85,7 +85,7 @@ os.replace(tmp_path, '$E2E_QUEUE/queue/tasks/yakuza2.yaml')
 
     # 7. Send task_assigned to yakuza2
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza2" \
-        "タスクYAMLを読んで作業開始せよ。ブロック解除。" "task_assigned" "gryakuza"
+        "タスクYAMLを読んで作業開始せよ。ブロック解除。" "task_assigned" "smith"
     send_to_pane "$yakuza2_pane" "inbox1"
 
     # 8. Wait for task B to complete
@@ -113,7 +113,7 @@ os.replace(tmp_path, '$E2E_QUEUE/queue/tasks/yakuza2.yaml')
 
     # 2. Send task_assigned and nudge (even though task is blocked)
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza2" \
-        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza"
+        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "smith"
     send_to_pane "$yakuza2_pane" "inbox1"
 
     # 3. Wait a reasonable time

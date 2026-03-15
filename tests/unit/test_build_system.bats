@@ -63,8 +63,8 @@ setup() {
     [ -f "$OUTPUT_DIR/darkninja.md" ]
 }
 
-@test "claude: gryakuza.md generated" {
-    [ -f "$OUTPUT_DIR/gryakuza.md" ]
+@test "claude: smith.md generated" {
+    [ -f "$OUTPUT_DIR/smith.md" ]
 }
 
 @test "claude: yakuza.md generated" {
@@ -79,8 +79,8 @@ setup() {
     [ -f "$OUTPUT_DIR/codex-darkninja.md" ]
 }
 
-@test "codex: codex-gryakuza.md generated" {
-    [ -f "$OUTPUT_DIR/codex-gryakuza.md" ]
+@test "codex: codex-smith.md generated" {
+    [ -f "$OUTPUT_DIR/codex-smith.md" ]
 }
 
 @test "codex: codex-yakuza.md generated" {
@@ -95,8 +95,8 @@ setup() {
     [ -f "$OUTPUT_DIR/copilot-darkninja.md" ]
 }
 
-@test "copilot: copilot-gryakuza.md generated [Phase 2+3]" {
-    [ -f "$OUTPUT_DIR/copilot-gryakuza.md" ]
+@test "copilot: copilot-smith.md generated [Phase 2+3]" {
+    [ -f "$OUTPUT_DIR/copilot-smith.md" ]
 }
 
 @test "copilot: copilot-yakuza.md generated [Phase 2+3]" {
@@ -111,8 +111,8 @@ setup() {
     [ -s "$OUTPUT_DIR/darkninja.md" ]
 }
 
-@test "content: gryakuza.md is not empty" {
-    [ -s "$OUTPUT_DIR/gryakuza.md" ]
+@test "content: smith.md is not empty" {
+    [ -s "$OUTPUT_DIR/smith.md" ]
 }
 
 @test "content: yakuza.md is not empty" {
@@ -123,8 +123,8 @@ setup() {
     [ -s "$OUTPUT_DIR/codex-darkninja.md" ]
 }
 
-@test "content: codex-gryakuza.md is not empty" {
-    [ -s "$OUTPUT_DIR/codex-gryakuza.md" ]
+@test "content: codex-smith.md is not empty" {
+    [ -s "$OUTPUT_DIR/codex-smith.md" ]
 }
 
 @test "content: codex-yakuza.md is not empty" {
@@ -139,8 +139,8 @@ setup() {
     grep -qi "darkninja\|ダークニンジャ" "$OUTPUT_DIR/darkninja.md"
 }
 
-@test "content: gryakuza.md contains gryakuza role reference" {
-    grep -qi "gryakuza\|グレーターヤクザ" "$OUTPUT_DIR/gryakuza.md"
+@test "content: smith.md contains smith role reference" {
+    grep -qi "smith\|チームリード" "$OUTPUT_DIR/smith.md"
 }
 
 @test "content: yakuza.md contains yakuza role reference" {
@@ -151,8 +151,8 @@ setup() {
     grep -qi "darkninja\|ダークニンジャ" "$OUTPUT_DIR/codex-darkninja.md"
 }
 
-@test "content: codex-gryakuza.md contains gryakuza role reference" {
-    grep -qi "gryakuza\|グレーターヤクザ" "$OUTPUT_DIR/codex-gryakuza.md"
+@test "content: codex-smith.md contains smith role reference" {
+    grep -qi "smith\|チームリード" "$OUTPUT_DIR/codex-smith.md"
 }
 
 @test "content: codex-yakuza.md contains yakuza role reference" {

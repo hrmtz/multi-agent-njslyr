@@ -1,5 +1,5 @@
 # cmd_basic.yaml — Test command for E2E basic flow
-# Simulates a cmd from darkninja to gryakuza
+# Simulates a cmd from darkninja to smith
 id: cmd_test_001
 description: "E2E test: create a test file"
 status: pending

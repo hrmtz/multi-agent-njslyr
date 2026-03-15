@@ -98,7 +98,7 @@ EOF
 
 @test "T-SSH-IW-006: NJSLYR_SSH_DEPTH=1 blocks recursive SSH (depth guard)" {
     run env NJSLYR_SSH_DEPTH=1 bash "$TEST_SCRIPT" \
-        gryakuza "test message" task_assigned yakuza3
+        smith "test message" task_assigned yakuza3
     [ "$status" -eq 1 ]
     [[ "$output" =~ "recursive SSH" ]]
 }
@@ -112,7 +112,7 @@ machine:
   role: neosaitama
   peer_project_root: /Users/hrmtz/project/multi-agent-njslyr
 EOF
-    run bash "$TEST_SCRIPT" gryakuza "test" task_assigned yakuza3
+    run bash "$TEST_SCRIPT" smith "test" task_assigned yakuza3
     [ "$status" -eq 1 ]
     [[ "$output" =~ "peer_host or peer_project_root not configured" ]]
 }
@@ -137,22 +137,22 @@ EOF
 # target_agent validation, not FROM validation).
 
 @test "T-SSH-IW-009: FROM with space fails validation (exit 1)" {
-    run bash "$TEST_SCRIPT" gryakuza "test message" task_assigned "foo bar"
+    run bash "$TEST_SCRIPT" smith "test message" task_assigned "foo bar"
     [ "$status" -eq 1 ]
     [[ "$output" =~ "REJECTED" ]]
     [[ "$output" =~ "invalid from" ]]
 }
 
 @test "T-SSH-IW-009b: FROM with semicolon injection fails validation" {
-    run bash "$TEST_SCRIPT" gryakuza "test message" task_assigned "bad;agent"
+    run bash "$TEST_SCRIPT" smith "test message" task_assigned "bad;agent"
     [ "$status" -eq 1 ]
     [[ "$output" =~ "REJECTED" ]]
 }
 
-@test "T-SSH-IW-009c: FROM with @ sign is accepted (gryakuza@neo pattern)" {
+@test "T-SSH-IW-009c: FROM with @ sign is accepted (smith@neo pattern)" {
     _inject_ssh_ok
-    # ^[a-z0-9_@]+$ allows @ — gryakuza@neo is valid
-    run bash "$TEST_SCRIPT" yakuza3 "test message" task_assigned "gryakuza@neo"
+    # ^[a-z0-9_@]+$ allows @ — smith@neo is valid
+    run bash "$TEST_SCRIPT" yakuza3 "test message" task_assigned "smith@neo"
     # Must NOT fail at FROM validation
     [[ "$output" != *"invalid from"* ]]
 }
@@ -163,7 +163,7 @@ EOF
     _inject_ssh_ok
     local yaml_file="$TEST_TMPDIR/queue/tasks/test_iw010.yaml"
     echo "task_id: test_iw010" > "$yaml_file"
-    run bash "$TEST_SCRIPT" gryakuza "task assignment" task_assigned yakuza3 "$yaml_file"
+    run bash "$TEST_SCRIPT" smith "task assignment" task_assigned yakuza3 "$yaml_file"
     [ "$status" -eq 0 ]
     [[ "$output" =~ "scp OK" ]]
     [[ "$output" =~ "inbox_write OK" ]]

@@ -1,0 +1,13 @@
+# MAGI strategy session — strategic decision evaluation.
+
+id: strategy
+name: "Strategy Evaluation"
+description: "Evaluate strategic decisions with pros/cons analysis, risk assessment, and alternative identification."
+context: |
+  Evaluate the following strategic decision.
+  Consider pros/cons, risks, opportunity costs, and alternatives.
+required_fields:
+  judge: ["vote", "opinion"]
+  deliberate: ["score", "issues"]
+  walkthrough: ["sections"]
+recommended_mode: judge

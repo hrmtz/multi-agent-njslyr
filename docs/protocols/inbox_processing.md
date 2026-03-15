@@ -121,7 +121,7 @@ queue/inbox/{agent_id}.yaml
 
 エージェント別:
 - `queue/inbox/darkninja.yaml`
-- `queue/inbox/gryakuza.yaml`
+- `queue/inbox/smith.yaml`
 - `queue/inbox/soukaiya.yaml`
 - `queue/inbox/yakuza1.yaml` ～ `queue/inbox/yakuza8.yaml`
 

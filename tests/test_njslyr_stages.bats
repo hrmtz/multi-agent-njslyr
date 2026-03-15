@@ -447,7 +447,7 @@ EOF
 @test "TC-S10: get_pane_target resolves pane target from tmux" {
     # tmuxモックのlist-panes出力を設定
     cat > "$TEST_TMPDIR/mock_panes.txt" << 'EOF'
-0 gryakuza
+0 smith
 1 yakuza1
 2 yakuza2
 3 yakuza3
@@ -465,8 +465,8 @@ EOF
     result=$(get_pane_target "yakuza3")
     [ "$result" = "multiagent:kyoto.3" ]
 
-    # gryakuzaのペインターゲット取得
-    result=$(get_pane_target "gryakuza")
+    # smithのペインターゲット取得
+    result=$(get_pane_target "smith")
     [ "$result" = "multiagent:kyoto.0" ]
 
     # soukaiyaのペインターゲット取得
@@ -947,7 +947,7 @@ EOF
 @test "TC-S15: get_pane_target returns multiagent:kyoto.N format" {
     # Mock panes with various agents
     cat > "$TEST_TMPDIR/mock_panes.txt" << 'EOF'
-0 gryakuza
+0 smith
 1 yakuza1
 5 yakuza5
 8 soukaiya
@@ -963,7 +963,7 @@ EOF
     result=$(get_pane_target "yakuza5")
     [ "$result" = "multiagent:kyoto.5" ]
 
-    result=$(get_pane_target "gryakuza")
+    result=$(get_pane_target "smith")
     [ "$result" = "multiagent:kyoto.0" ]
 
     result=$(get_pane_target "soukaiya")
@@ -1061,8 +1061,8 @@ EOF
     # yakuzatengu不活性
     rm -f "$TEST_STATE_DIR/yakuzatengu_active"
 
-    # gryakuza inbox: 5件未読（本番形式: 行頭アンカー付きread: false）
-    cat > "$TEST_INBOX_DIR/gryakuza.yaml" << 'EOF'
+    # smith inbox: 5件未読（本番形式: 行頭アンカー付きread: false）
+    cat > "$TEST_INBOX_DIR/smith.yaml" << 'EOF'
 messages:
 - id: m1
   read: false
@@ -1102,7 +1102,7 @@ EOF
     # BUG-B2対応: get_monitored_agentsをoverride（yakuza1を返す）
     get_monitored_agents() { printf 'yakuza1\n'; }
 
-    should_spawn_yakuzatengu "gryakuza"
+    should_spawn_yakuzatengu "smith"
     [ $? -eq 0 ]
 }
 
@@ -1114,8 +1114,8 @@ EOF
     # yakuzatengu不活性
     rm -f "$TEST_STATE_DIR/yakuzatengu_active"
 
-    # gryakuza inbox: 未読なし（条件2のみで判定）
-    echo "messages: []" > "$TEST_INBOX_DIR/gryakuza.yaml"
+    # smith inbox: 未読なし（条件2のみで判定）
+    echo "messages: []" > "$TEST_INBOX_DIR/smith.yaml"
 
     # get_monitored_agentsをoverride（yakuza1/2/3を返す）
     get_monitored_agents() { printf 'yakuza1\nyakuza2\nyakuza3\n'; }
@@ -1126,7 +1126,7 @@ EOF
         echo "$old_ts" > "$TEST_STATE_DIR/njslyr_${yid}_idle_start"
     done
 
-    should_spawn_yakuzatengu "gryakuza"
+    should_spawn_yakuzatengu "smith"
     [ $? -eq 0 ]
 }
 
@@ -1138,8 +1138,8 @@ EOF
     # yakuzatengu既にactive
     touch "$TEST_STATE_DIR/yakuzatengu_active"
 
-    # gryakuza inbox: 5件未読（条件は満たす）
-    cat > "$TEST_INBOX_DIR/gryakuza.yaml" << 'EOF'
+    # smith inbox: 5件未読（条件は満たす）
+    cat > "$TEST_INBOX_DIR/smith.yaml" << 'EOF'
 messages:
 - {id: m1, read: false, content: msg1, from: a, type: t, timestamp: t1}
 - {id: m2, read: false, content: msg2, from: a, type: t, timestamp: t2}
@@ -1149,7 +1149,7 @@ messages:
 EOF
 
     # 二重spawn防止 → return 1 (run使用でset -eを回避)
-    run should_spawn_yakuzatengu "gryakuza"
+    run should_spawn_yakuzatengu "smith"
     [ "$status" -ne 0 ]
 }
 
@@ -1161,8 +1161,8 @@ EOF
     # yakuzatengu不活性
     rm -f "$TEST_STATE_DIR/yakuzatengu_active"
 
-    # gryakuza inbox: 未読なし
-    echo "messages: []" > "$TEST_INBOX_DIR/gryakuza.yaml"
+    # smith inbox: 未読なし
+    echo "messages: []" > "$TEST_INBOX_DIR/smith.yaml"
 
     # get_monitored_agentsをoverride（idle yakuzaなし）
     get_monitored_agents() { printf 'yakuza1\nyakuza2\n'; }
@@ -1172,7 +1172,7 @@ EOF
     rm -f "$TEST_STATE_DIR/njslyr_yakuza2_idle_start"
 
     # 条件未達 → return 1 (run使用でset -eを回避)
-    run should_spawn_yakuzatengu "gryakuza"
+    run should_spawn_yakuzatengu "smith"
     [ "$status" -ne 0 ]
 }
 
@@ -1183,11 +1183,11 @@ EOF
 @test "TC-05: should_despawn_yakuzatengu: 2-cycle confirmation for despawn" {
     export PATH="$MOCK_TMUX_DIR:$PATH"
 
-    # gryakuza pane設定
-    echo "0 gryakuza" > "$TEST_TMPDIR/mock_panes.txt"
+    # smith pane設定
+    echo "0 smith" > "$TEST_TMPDIR/mock_panes.txt"
 
-    # gryakuza inbox: 未読なし（復帰条件満足）
-    echo "messages: []" > "$TEST_INBOX_DIR/gryakuza.yaml"
+    # smith inbox: 未読なし（復帰条件満足）
+    echo "messages: []" > "$TEST_INBOX_DIR/smith.yaml"
 
     # spawn_time: 600秒前（Guard時間超過）
     echo "$(($(date +%s) - 600))" > "$TEST_STATE_DIR/yakuzatengu_spawn_time"
@@ -1266,8 +1266,8 @@ EOF
     # 自己despawnシグナル: yakuzatengu_done作成
     touch "$TEST_STATE_DIR/yakuzatengu_done"
 
-    # gryakuza inbox: 未読多い（復帰条件を満たさない状態でもdoneシグナルで即座despawn）
-    cat > "$TEST_INBOX_DIR/gryakuza.yaml" << 'EOF'
+    # smith inbox: 未読多い（復帰条件を満たさない状態でもdoneシグナルで即座despawn）
+    cat > "$TEST_INBOX_DIR/smith.yaml" << 'EOF'
 messages:
 - {id: m1, read: false, content: msg1, from: a, type: t, timestamp: t1}
 - {id: m2, read: false, content: msg2, from: a, type: t, timestamp: t2}
@@ -1294,8 +1294,8 @@ EOF
     # spawn_time: 600秒前（Guard時間超過）
     echo "$(($(date +%s) - 600))" > "$TEST_STATE_DIR/yakuzatengu_spawn_time"
 
-    # gryakuza inbox: 未読多い（復帰条件未満・BUG-B3/B4対応: multi-line形式）
-    cat > "$TEST_INBOX_DIR/gryakuza.yaml" << 'EOF'
+    # smith inbox: 未読多い（復帰条件未満・BUG-B3/B4対応: multi-line形式）
+    cat > "$TEST_INBOX_DIR/smith.yaml" << 'EOF'
 messages:
 - id: m1
   read: false
@@ -1376,8 +1376,8 @@ ALWAYSFAIL_MOCK
     echo "3 yakuza3" > "$TEST_TMPDIR/mock_panes.txt"
     echo "$(($(date +%s) - 400))" > "$TEST_STATE_DIR/njslyr_yakuza3_idle_start"
 
-    # gryakuza inbox（spawn判定用）
-    echo "messages: []" > "$TEST_INBOX_DIR/gryakuza.yaml"
+    # smith inbox（spawn判定用）
+    echo "messages: []" > "$TEST_INBOX_DIR/smith.yaml"
 
     # yakuzatengu不活性
     rm -f "$TEST_STATE_DIR/yakuzatengu_active"
@@ -1390,7 +1390,7 @@ ALWAYSFAIL_MOCK
     get_monitored_agents() { printf 'yakuza3\n'; }
 
     # spawn実行 → respawn失敗 → ロールバック
-    spawn_yakuzatengu "gryakuza" || true
+    spawn_yakuzatengu "smith" || true
 
     # STATEファイルがロールバックされているはず
     [ ! -f "$TEST_STATE_DIR/yakuzatengu_active" ]
@@ -1461,8 +1461,8 @@ task:
   status: assigned
 EOF
 
-    # gryakuza inbox
-    echo "messages: []" > "$TEST_INBOX_DIR/gryakuza.yaml"
+    # smith inbox
+    echo "messages: []" > "$TEST_INBOX_DIR/smith.yaml"
 
     # yakuzatengu inbox初期化
     echo "messages: []" > "$TEST_INBOX_DIR/yakuzatengu.yaml"
@@ -1476,7 +1476,7 @@ EOF
     > "$TEST_TMPDIR/tmux_calls.log"
 
     # === spawn実行 ===
-    spawn_yakuzatengu "gryakuza"
+    spawn_yakuzatengu "smith"
     [ $? -eq 0 ]
 
     # STATEファイルが作成されているはず
@@ -1577,7 +1577,7 @@ EOF
     cat > "$TEST_INBOX_DIR/test_agent.yaml" << 'EOF'
 messages:
 - content: test message
-  from: gryakuza
+  from: smith
   id: msg_test_001
   priority: P2
   read: false

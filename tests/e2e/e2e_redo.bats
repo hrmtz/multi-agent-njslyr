@@ -58,7 +58,7 @@ setup() {
        "$E2E_QUEUE/queue/tasks/yakuza1.yaml"
 
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza1" \
-        "初回タスク開始。" "task_assigned" "gryakuza"
+        "初回タスク開始。" "task_assigned" "smith"
     send_to_pane "$yakuza1_pane" "inbox1"
 
     # 2. Wait for initial task to complete
@@ -113,7 +113,7 @@ EOF
        "$E2E_QUEUE/queue/tasks/yakuza1.yaml"
 
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza1" \
-        "初回タスク開始。" "task_assigned" "gryakuza"
+        "初回タスク開始。" "task_assigned" "smith"
     send_to_pane "$yakuza1_pane" "inbox1"
 
     run wait_for_yaml_value "$E2E_QUEUE/queue/tasks/yakuza1.yaml" "task.status" "done" 30

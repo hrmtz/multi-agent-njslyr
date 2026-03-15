@@ -215,12 +215,12 @@ Created via CreateSubagent tool:
 | Aspect | Darkninja System | Kimi Agent Swarm |
 |--------|--------------|-----------------|
 | Execution model | tmux panes (separate processes) | In-process (single Python process) |
-| Agent count | 10 (darkninja + gryakuza + 8 yakuza) | Up to 100 (claimed) |
+| Agent count | 10 (darkninja + smith + 8 yakuza) | Up to 100 (claimed) |
 | Communication | File-based inbox (YAML + inotifywait) | In-memory LaborMarket registry |
 | Isolation | Full OS-level (separate tmux panes) | Python-level (separate KimiSoul instances) |
 | Recovery | /clear + CLAUDE.md auto-load | Checkpoint/DenwaRenji (time travel) |
 | CLI independence | Each agent runs own CLI instance | Single CLI, multiple internal agents |
-| Orchestration | Gryakuza (manager agent) | Main agent auto-delegates |
+| Orchestration | Team Lead (manager agent) | Main agent auto-delegates |
 
 **Key insight**: Kimi's Agent Swarm is complementary, not competing. It could run *inside* a single yakuza's tmux pane, providing sub-delegation within that agent.
 

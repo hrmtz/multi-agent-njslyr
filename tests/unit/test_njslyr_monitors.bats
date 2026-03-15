@@ -179,7 +179,7 @@ load_njslyr_functions() {
     create_tmux_mock
     load_njslyr_functions
 
-    export MOCK_TMUX_AGENTS_OUTPUT="gryakuza
+    export MOCK_TMUX_AGENTS_OUTPUT="smith
 yakuza1
 yakuza2
 yakuza3
@@ -188,7 +188,7 @@ soukaiya"
 
     run get_monitored_agents
     [ "$status" -eq 0 ]
-    [[ "$output" == *"gryakuza"* ]]
+    [[ "$output" == *"smith"* ]]
     [[ "$output" == *"yakuza1"* ]]
     [[ "$output" == *"soukaiya"* ]]
     # darkninjaは除外
@@ -202,7 +202,7 @@ soukaiya"
     create_tmux_mock
     load_njslyr_functions
 
-    export MOCK_TMUX_AGENTS_OUTPUT="gryakuza
+    export MOCK_TMUX_AGENTS_OUTPUT="smith
 yakuza1
 yakuza2
 yakuza3
@@ -211,7 +211,7 @@ soukaiya"
 
     PATH="${MOCK_BIN}:$PATH" run get_monitored_agents
     [ "$status" -eq 0 ]
-    [[ "$output" == *"gryakuza"* ]]
+    [[ "$output" == *"smith"* ]]
     [[ "$output" == *"master_tortoise"* ]]
 }
 
@@ -219,7 +219,7 @@ soukaiya"
     create_tmux_mock
     load_njslyr_functions
 
-    export MOCK_TMUX_AGENTS_OUTPUT="gryakuza
+    export MOCK_TMUX_AGENTS_OUTPUT="smith
 yakuza1
 yakuza2
 yakuza3
@@ -229,7 +229,7 @@ soukaiya"
     PATH="${MOCK_BIN}:$PATH" run get_monitored_agents
     [ "$status" -eq 0 ]
     [[ "$output" == *"master_crane"* ]]
-    [[ "$output" == *"gryakuza"* ]]
+    [[ "$output" == *"smith"* ]]
 }
 
 @test 'T-NJ-MON-001d: darkninja in agents window is excluded' { # darkninja が agents window にいても除外される
@@ -237,14 +237,14 @@ soukaiya"
     load_njslyr_functions
 
     export MOCK_TMUX_AGENTS_OUTPUT="darkninja
-gryakuza
+smith
 yakuza1"
     export MOCK_TMUX_MONITORS_OUTPUT=""
 
     PATH="${MOCK_BIN}:$PATH" run get_monitored_agents
     [ "$status" -eq 0 ]
     [[ "$output" != *"darkninja"* ]]
-    [[ "$output" == *"gryakuza"* ]]
+    [[ "$output" == *"smith"* ]]
     [[ "$output" == *"yakuza1"* ]]
 }
 
@@ -268,14 +268,14 @@ yakuza1"
     create_tmux_mock
     load_njslyr_functions
 
-    export MOCK_TMUX_AGENTS_OUTPUT="gryakuza
+    export MOCK_TMUX_AGENTS_OUTPUT="smith
 yakuza1
 soukaiya"
     unset MOCK_TMUX_MONITORS_OUTPUT
 
     PATH="${MOCK_BIN}:$PATH" run get_monitored_agents
     [ "$status" -eq 0 ]
-    [[ "$output" == *"gryakuza"* ]]
+    [[ "$output" == *"smith"* ]]
     [[ "$output" != *"master_tortoise"* ]]
 }
 
@@ -288,7 +288,7 @@ soukaiya"
     load_njslyr_functions
 
     export MOCK_TMUX_WINDOW_NAME="kyoto"
-    export MOCK_TMUX_AGENTS_OUTPUT="0 gryakuza
+    export MOCK_TMUX_AGENTS_OUTPUT="0 smith
 1 yakuza1
 2 yakuza2"
     export MOCK_TMUX_MONITORS_OUTPUT=""
@@ -302,7 +302,7 @@ soukaiya"
     create_tmux_mock
     load_njslyr_functions
 
-    export MOCK_TMUX_AGENTS_OUTPUT="0 gryakuza
+    export MOCK_TMUX_AGENTS_OUTPUT="0 smith
 1 yakuza1"
     export MOCK_TMUX_MONITORS_OUTPUT="0 master_tortoise"
 
@@ -315,7 +315,7 @@ soukaiya"
     create_tmux_mock
     load_njslyr_functions
 
-    export MOCK_TMUX_AGENTS_OUTPUT="0 gryakuza
+    export MOCK_TMUX_AGENTS_OUTPUT="0 smith
 1 yakuza1
 2 yakuza2
 3 yakuza3
@@ -331,7 +331,7 @@ soukaiya"
     create_tmux_mock
     load_njslyr_functions
 
-    export MOCK_TMUX_AGENTS_OUTPUT="0 gryakuza
+    export MOCK_TMUX_AGENTS_OUTPUT="0 smith
 1 yakuza1"
     export MOCK_TMUX_MONITORS_OUTPUT="0 master_tortoise"
 
@@ -348,7 +348,7 @@ soukaiya"
     create_tmux_mock
     load_njslyr_functions
 
-    export MOCK_TMUX_AGENTS_OUTPUT="0 gryakuza
+    export MOCK_TMUX_AGENTS_OUTPUT="0 smith
 1 yakuza1
 2 yakuza2
 3 soukaiya"
@@ -362,7 +362,7 @@ soukaiya"
     create_tmux_mock
     load_njslyr_functions
 
-    export MOCK_TMUX_AGENTS_OUTPUT="0 gryakuza
+    export MOCK_TMUX_AGENTS_OUTPUT="0 smith
 1 darkninja
 2 yakuza2"
     export MOCK_TMUX_MONITORS_OUTPUT="monitors:0 master_tortoise"
@@ -376,7 +376,7 @@ soukaiya"
     create_tmux_mock
     load_njslyr_functions
 
-    export MOCK_TMUX_AGENTS_OUTPUT="0 gryakuza
+    export MOCK_TMUX_AGENTS_OUTPUT="0 smith
 1 yakuza1"
     export MOCK_TMUX_MONITORS_OUTPUT="monitors:0 darkninja"
 
@@ -389,7 +389,7 @@ soukaiya"
     create_tmux_mock
     load_njslyr_functions
 
-    export MOCK_TMUX_AGENTS_OUTPUT="0 gryakuza
+    export MOCK_TMUX_AGENTS_OUTPUT="0 smith
 1 yakuza1
 2 yakuza2
 3 yakuza3

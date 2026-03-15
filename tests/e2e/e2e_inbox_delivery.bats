@@ -49,14 +49,14 @@ setup() {
 @test "E2E-002-A: inbox_write.sh creates message with correct fields" {
     # 1. Write a message to yakuza1's inbox
     run bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza1" \
-        "テスト配信メッセージ" "task_assigned" "gryakuza"
+        "テスト配信メッセージ" "task_assigned" "smith"
     assert_success
 
     # 2. Verify YAML file exists and has correct structure
     [ -f "$E2E_QUEUE/queue/inbox/yakuza1.yaml" ]
 
     # 3. Verify message fields
-    run assert_inbox_message_exists "$E2E_QUEUE/queue/inbox/yakuza1.yaml" "gryakuza" "task_assigned"
+    run assert_inbox_message_exists "$E2E_QUEUE/queue/inbox/yakuza1.yaml" "smith" "task_assigned"
     assert_success
 
     # 4. Verify message is unread
@@ -75,7 +75,7 @@ setup() {
 
     # 2. Write task_assigned to inbox
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza1" \
-        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza"
+        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "smith"
 
     # 3. Verify 1 unread message
     run assert_inbox_unread_count "$E2E_QUEUE/queue/inbox/yakuza1.yaml" 1
@@ -130,14 +130,14 @@ setup() {
 # ═══════════════════════════════════════════════════════════════
 
 @test "E2E-002-D: messages to different agents stay in separate inboxes" {
-    # 1. Write to gryakuza and yakuza1
-    bash "$E2E_QUEUE/scripts/inbox_write.sh" "gryakuza" \
-        "グレーターヤクザ向けメッセージ" "cmd_new" "darkninja"
+    # 1. Write to smith and yakuza1
+    bash "$E2E_QUEUE/scripts/inbox_write.sh" "smith" \
+        "チームリード向けメッセージ" "cmd_new" "darkninja"
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza1" \
-        "ヤクザ1向けメッセージ" "task_assigned" "gryakuza"
+        "ヤクザ1向けメッセージ" "task_assigned" "smith"
 
     # 2. Each inbox should have exactly 1 unread
-    run assert_inbox_unread_count "$E2E_QUEUE/queue/inbox/gryakuza.yaml" 1
+    run assert_inbox_unread_count "$E2E_QUEUE/queue/inbox/smith.yaml" 1
     assert_success
     run assert_inbox_unread_count "$E2E_QUEUE/queue/inbox/yakuza1.yaml" 1
     assert_success
@@ -151,14 +151,14 @@ setup() {
 # E2E-002-E: Report notification flows back via inbox
 # ═══════════════════════════════════════════════════════════════
 
-@test "E2E-002-E: yakuza1 completion sends report_received to gryakuza inbox" {
+@test "E2E-002-E: yakuza1 completion sends report_received to smith inbox" {
     # 1. Place task for yakuza1
     cp "$PROJECT_ROOT/tests/e2e/fixtures/task_yakuza1_basic.yaml" \
        "$E2E_QUEUE/queue/tasks/yakuza1.yaml"
 
     # 2. Trigger processing
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza1" \
-        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza"
+        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "smith"
 
     local yakuza1_pane
     yakuza1_pane=$(pane_target 1)
@@ -171,7 +171,7 @@ setup() {
     # 4. Wait a moment for inbox_write to complete
     sleep 2
 
-    # 5. Verify gryakuza received report_received notification
-    run assert_inbox_message_exists "$E2E_QUEUE/queue/inbox/gryakuza.yaml" "yakuza1" "report_received"
+    # 5. Verify smith received report_received notification
+    run assert_inbox_message_exists "$E2E_QUEUE/queue/inbox/smith.yaml" "yakuza1" "report_received"
     assert_success
 }

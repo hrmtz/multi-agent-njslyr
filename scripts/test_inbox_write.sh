@@ -111,7 +111,7 @@ echo "--- TC-02: task_yaml_path省略時（空文字） ---"
 setup
 
 exit_code=0
-bash "$INBOX_WRITE" "$TEST_AGENT" "YAMLパスなしメッセージ" "task_assigned" "gryakuza" "" "P2" >/dev/null 2>&1 || exit_code=$?
+bash "$INBOX_WRITE" "$TEST_AGENT" "YAMLパスなしメッセージ" "task_assigned" "smith" "" "P2" >/dev/null 2>&1 || exit_code=$?
 
 assert_exit_ok "TC-02-01: exit code = 0（空文字でもエラーなし）" "$exit_code"
 assert_yaml_contains "TC-02-02: メッセージが書き込まれた" "YAMLパスなしメッセージ"
@@ -125,7 +125,7 @@ echo "--- TC-03: priority省略時（type別デフォルト） ---"
 
 # TC-03-01: task_assigned → P2
 setup
-bash "$INBOX_WRITE" "$TEST_AGENT" "P2デフォルトテスト" "task_assigned" "gryakuza" "" >/dev/null 2>&1 || true
+bash "$INBOX_WRITE" "$TEST_AGENT" "P2デフォルトテスト" "task_assigned" "smith" "" >/dev/null 2>&1 || true
 assert_yaml_contains "TC-03-01: task_assigned → priority P2（デフォルト）" "priority: P2"
 
 # TC-03-02: cmd_new → P0
@@ -145,7 +145,7 @@ assert_yaml_contains "TC-03-04: report_received（BLOCKING含む）→ priority 
 
 # TC-03-05: 未知のtype → P3
 setup
-bash "$INBOX_WRITE" "$TEST_AGENT" "P3デフォルトテスト" "system_notice" "gryakuza" "" >/dev/null 2>&1 || true
+bash "$INBOX_WRITE" "$TEST_AGENT" "P3デフォルトテスト" "system_notice" "smith" "" >/dev/null 2>&1 || true
 assert_yaml_contains "TC-03-05: 未知のtype → priority P3（デフォルト）" "priority: P3"
 
 # ────────────────────────────────────────────────────────────
@@ -166,12 +166,12 @@ assert_exit_fail "TC-04-02: contentなし → 非ゼロ終了" "$exit_code"
 
 # TC-04-03: 不正なpriority → エラー
 exit_code=0
-bash "$INBOX_WRITE" "$TEST_AGENT" "テスト" "task_assigned" "gryakuza" "" "INVALID" >/dev/null 2>&1 || exit_code=$?
+bash "$INBOX_WRITE" "$TEST_AGENT" "テスト" "task_assigned" "smith" "" "INVALID" >/dev/null 2>&1 || exit_code=$?
 assert_exit_fail "TC-04-03: 不正なpriority（INVALID）→ 非ゼロ終了" "$exit_code"
 
 # TC-04-04: 不正なpriority（P5）→ エラー
 exit_code=0
-bash "$INBOX_WRITE" "$TEST_AGENT" "テスト" "task_assigned" "gryakuza" "" "P5" >/dev/null 2>&1 || exit_code=$?
+bash "$INBOX_WRITE" "$TEST_AGENT" "テスト" "task_assigned" "smith" "" "P5" >/dev/null 2>&1 || exit_code=$?
 assert_exit_fail "TC-04-04: 不正なpriority（P5）→ 非ゼロ終了" "$exit_code"
 
 # ────────────────────────────────────────────────────────────
@@ -186,7 +186,7 @@ set +eu
 
 # 10件を並行して書き込む
 for i in $(seq 1 10); do
-    bash "$INBOX_WRITE" "$TEST_AGENT" "並行メッセージ $i" "task_assigned" "gryakuza" "" "P2" >/dev/null 2>&1 &
+    bash "$INBOX_WRITE" "$TEST_AGENT" "並行メッセージ $i" "task_assigned" "smith" "" "P2" >/dev/null 2>&1 &
 done
 wait  # 全バックグラウンドジョブ完了を待つ
 
@@ -240,7 +240,7 @@ echo "--- TC-06: inboxファイル自動初期化 ---"
 rm -f "$TEST_INBOX"
 
 exit_code=0
-bash "$INBOX_WRITE" "$TEST_AGENT" "初期化テスト" "task_assigned" "gryakuza" "" >/dev/null 2>&1 || exit_code=$?
+bash "$INBOX_WRITE" "$TEST_AGENT" "初期化テスト" "task_assigned" "smith" "" >/dev/null 2>&1 || exit_code=$?
 
 assert_exit_ok "TC-06-01: inboxなしでもexitcode=0" "$exit_code"
 if [ -f "$TEST_INBOX" ]; then

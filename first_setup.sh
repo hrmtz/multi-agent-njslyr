@@ -694,7 +694,7 @@ if [ -f "$BASHRC_FILE" ]; then
     # csm 関数
     if ! grep -q "^csm()" "$BASHRC_FILE" 2>/dev/null; then
         echo "$CSM_FUNC" >> "$BASHRC_FILE"
-        log_info "csm 関数を追加しました（グレーターヤクザ・ヤクザウィンドウ — 自動掃除付き）"
+        log_info "csm 関数を追加しました（チームリード・ヤクザウィンドウ — 自動掃除付き）"
         ALIAS_ADDED=true
     else
         sedi '/^csm()/d' "$BASHRC_FILE"

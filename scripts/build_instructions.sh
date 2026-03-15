@@ -78,25 +78,25 @@ EOFYAML
 
 # Build Claude Code instruction files
 build_instruction_file "claude" "darkninja" "darkninja.md"
-build_instruction_file "claude" "gryakuza" "gryakuza.md"
+build_instruction_file "claude" "smith" "smith.md"
 build_instruction_file "claude" "yakuza" "yakuza.md"
 build_instruction_file "claude" "soukaiya" "soukaiya.md"
 
 # Build Codex instruction files
 build_instruction_file "codex" "darkninja" "codex-darkninja.md"
-build_instruction_file "codex" "gryakuza" "codex-gryakuza.md"
+build_instruction_file "codex" "smith" "codex-smith.md"
 build_instruction_file "codex" "yakuza" "codex-yakuza.md"
 build_instruction_file "codex" "soukaiya" "codex-soukaiya.md"
 
 # Build Copilot instruction files
 build_instruction_file "copilot" "darkninja" "copilot-darkninja.md"
-build_instruction_file "copilot" "gryakuza" "copilot-gryakuza.md"
+build_instruction_file "copilot" "smith" "copilot-smith.md"
 build_instruction_file "copilot" "yakuza" "copilot-yakuza.md"
 build_instruction_file "copilot" "soukaiya" "copilot-soukaiya.md"
 
 # Build Kimi K2 instruction files
 build_instruction_file "kimi" "darkninja" "kimi-darkninja.md"
-build_instruction_file "kimi" "gryakuza" "kimi-gryakuza.md"
+build_instruction_file "kimi" "smith" "kimi-smith.md"
 build_instruction_file "kimi" "yakuza" "kimi-yakuza.md"
 build_instruction_file "kimi" "soukaiya" "kimi-soukaiya.md"
 
@@ -121,7 +121,7 @@ generate_agents_md() {
         -e 's|CLAUDE\.md|AGENTS.md|g' \
         -e 's|CLAUDE\.local\.md|AGENTS.override.md|g' \
         -e 's|instructions/darkninja\.md|instructions/generated/codex-darkninja.md|g' \
-        -e 's|instructions/gryakuza\.md|instructions/generated/codex-gryakuza.md|g' \
+        -e 's|instructions/smith\.md|instructions/generated/codex-smith.md|g' \
         -e 's|instructions/yakuza\.md|instructions/generated/codex-yakuza.md|g' \
         -e 's|instructions/soukaiya\.md|instructions/generated/codex-soukaiya.md|g' \
         -e 's|~/.claude/|~/.codex/|g' \
@@ -157,7 +157,7 @@ generate_copilot_instructions() {
         -e 's|CLAUDE\.md|copilot-instructions.md|g' \
         -e 's|CLAUDE\.local\.md|copilot-instructions.local.md|g' \
         -e 's|instructions/darkninja\.md|instructions/generated/copilot-darkninja.md|g' \
-        -e 's|instructions/gryakuza\.md|instructions/generated/copilot-gryakuza.md|g' \
+        -e 's|instructions/smith\.md|instructions/generated/copilot-smith.md|g' \
         -e 's|instructions/yakuza\.md|instructions/generated/copilot-yakuza.md|g' \
         -e 's|instructions/soukaiya\.md|instructions/generated/copilot-soukaiya.md|g' \
         -e 's|~/.claude/|~/.copilot/|g' \
@@ -195,7 +195,7 @@ generate_kimi_instructions() {
         -e 's|CLAUDE\.md|agents/default/system.md|g' \
         -e 's|CLAUDE\.local\.md|agents/default/system.local.md|g' \
         -e 's|instructions/darkninja\.md|instructions/generated/kimi-darkninja.md|g' \
-        -e 's|instructions/gryakuza\.md|instructions/generated/kimi-gryakuza.md|g' \
+        -e 's|instructions/smith\.md|instructions/generated/kimi-smith.md|g' \
         -e 's|instructions/yakuza\.md|instructions/generated/kimi-yakuza.md|g' \
         -e 's|instructions/soukaiya\.md|instructions/generated/kimi-soukaiya.md|g' \
         -e 's|~/.claude/|~/.kimi/|g' \

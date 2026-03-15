@@ -1,4 +1,4 @@
-# Gryakuza FAQ & Troubleshooting
+# Team Lead FAQ & Troubleshooting
 
 このファイルには、トラブル発生時に参照する手順・リカバリ方法を記載。
 
@@ -24,11 +24,11 @@ tmux list-panes -a -F '#{pane_index} #{@agent_id}' | awk '$2=="yakuza3"{print $1
 
 ## Session Recovery / Context Reading
 
-> See **CLAUDE.md** for base recovery procedure and **docs/gryakuza_advanced.md § Compaction Recovery** for detailed steps.
+> See **CLAUDE.md** for base recovery procedure and **docs/smith_advanced.md § Compaction Recovery** for detailed steps.
 
 Basic recovery workflow:
 1. Read CLAUDE.md (auto-loaded) + Memory MCP
-2. Check `queue/inbox/gryakuza.yaml` for unread messages
+2. Check `queue/inbox/smith.yaml` for unread messages
 3. Scan `queue/tasks/yakuza*.yaml` and `queue/reports/` for state
 4. Reconcile dashboard.md with YAML ground truth
 5. Resume work

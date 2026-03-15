@@ -11,7 +11,6 @@ Usage:
 """
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
@@ -21,16 +20,11 @@ if str(_MAGI_DIR) not in sys.path:
     sys.path.insert(0, str(_MAGI_DIR))
 
 # Load API keys before imports that might need them
-_env_file = _MAGI_DIR.parent.parent / "config" / "api_keys.env"
-if _env_file.exists():
-    for line in _env_file.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, _, val = line.partition("=")
-            os.environ.setdefault(key.strip(), val.strip())
+from core.utils import load_env_file
+load_env_file()
 
 from core.orchestrator import run_magi
-from core.prompts import SESSION_TYPES
+from core.prompts import SESSION_TYPES, load_personas
 
 
 def main():
@@ -71,11 +65,19 @@ Examples:
         "--profile",
         choices=["fast", "balanced", "deep"],
         default="balanced",
-        help="Execution profile: fast | balanced | deep (default: balanced; Phase1 stub — no behavior change yet)",
+        help="Execution profile: fast (Phase 1 only, skip cross-review) | balanced (default, summarized cross-review) | deep (full cross-review, higher token cost)",
     )
     parser.add_argument(
         "--output-dir", type=str, default="results/",
         help="Directory to save result JSON files (default: results/)",
+    )
+    parser.add_argument(
+        "--personas", type=str, default=None,
+        help="Path to custom personas YAML file (default: personas/default.yaml)",
+    )
+    parser.add_argument(
+        "--dedup-threshold", type=float, default=0.7,
+        help="Jaccard similarity threshold for deduplicating consensus actions (default: 0.7)",
     )
     args = parser.parse_args()
 
@@ -93,6 +95,10 @@ Examples:
 
     skip = [s.strip().upper() for s in args.skip.split(",")] if args.skip else []
 
+    personas = None
+    if args.personas:
+        personas = load_personas(args.personas)
+
     run_magi(
         question,
         session=args.session,
@@ -102,6 +108,8 @@ Examples:
         context=args.context,
         output_dir=args.output_dir,
         profile=args.profile,
+        personas=personas,
+        dedup_threshold=args.dedup_threshold,
     )
 
 

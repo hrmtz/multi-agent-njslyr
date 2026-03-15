@@ -135,15 +135,15 @@ teardown() {
     topic=$(_get_ntfy_topic)
     [[ -n "$topic" ]] || skip "ntfy_topic not configured"
 
-    # gryakuza のローカルpaneが存在しないことを確認（kyotoエージェント）
+    # smith のローカルpaneが存在しないことを確認（kyotoエージェント）
     local pane_found
-    pane_found=$(tmux list-panes -a -F '#{@agent_id}' 2>/dev/null | grep -c "^gryakuza$" || echo "0")
+    pane_found=$(tmux list-panes -a -F '#{@agent_id}' 2>/dev/null | grep -c "^smith$" || echo "0")
     if [[ "$pane_found" -gt 0 ]]; then
-        skip "gryakuza pane found locally — ntfy fallback would not trigger"
+        skip "smith pane found locally — ntfy fallback would not trigger"
     fi
 
     # suriken 実行 → ntfy tier1 fallback が発動するはず
-    run bash "$PROJECT_ROOT/scripts/njslyr_cmd.sh" suriken gryakuza
+    run bash "$PROJECT_ROOT/scripts/njslyr_cmd.sh" suriken smith
     assert_success
     [[ "$output" == *"ntfy fallback"* || "$output" == *"SSH tier2"* ]] || \
         fail "Expected ntfy fallback or SSH tier2 in output, got: $output"
@@ -187,7 +187,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$PROJECT_ROOT/lib/ssh_fallback.sh"
 # SSH tier2 を直接呼び出し（ntfy fallback をバイパス）
-agent_id="${1:-gryakuza}"
+agent_id="${1:-smith}"
 if ssh_send_suriken "$agent_id"; then
     echo "[T-CM-003] SSH tier2 success"
     exit 0
@@ -197,7 +197,7 @@ else
 fi
 MOCK_EOF
 
-    run bash "$mock_script" gryakuza
+    run bash "$mock_script" smith
     rm -f "$mock_script"
     assert_success
     assert_output --partial "[T-CM-003] SSH tier2 success"

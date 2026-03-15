@@ -747,8 +747,8 @@ SLAY_EOF
 
     # Step 3: Determine agent type for restart command
     local agent_type
-    if [[ "$agent_id" == "gryakuza" ]]; then
-        agent_type="gryakuza"
+    if [[ "$agent_id" == "smith" ]]; then
+        agent_type="smith"
     elif [[ "$agent_id" == "soukaiya" ]]; then
         agent_type="soukaiya"
     elif [[ "$agent_id" =~ ^yakuza[0-9]+$ ]]; then
@@ -861,10 +861,10 @@ cleanup_yakuzatengu_state() {
 }
 
 # ─── Yakuza Tengu: spawn判定（M-4） ───
-# トリガー条件1: gryakuza inbox未読 >= 5
+# トリガー条件1: smith inbox未読 >= 5
 # トリガー条件2: アイドルyakuza >= 3体 × 300秒
 should_spawn_yakuzatengu() {
-    local agent_id="$1"  # gryakuza
+    local agent_id="$1"  # smith
 
     # 二重spawn防止（M-1）
     is_yakuzatengu_active && return 1
@@ -910,7 +910,7 @@ should_spawn_yakuzatengu() {
 # ─── Yakuza Tengu: spawn実行（M-6: ロールバック付き・M-8: idle/thinking削除・M-9: #3a0025） ───
 # instructions/yakuzatengu.md spawn_banner参照（バナーAA表示: respawn→banner→sleep→respawn→Opus）
 spawn_yakuzatengu() {
-    local _gryakuza_id="$1"  # unused: spawn selects idle yakuza independently
+    local _smith_id="$1"  # unused: spawn selects idle yakuza independently
 
     # 二重spawn防止（M-1）
     is_yakuzatengu_active && { log "SKIP: yakuzatengu already active"; return 0; }
@@ -1011,7 +1011,7 @@ spawn_yakuzatengu() {
         2>/dev/null || true
     sleep 3
 
-    # M-6: Sonnet起動（失敗時はSTATEロールバック）（仕様変更: Opus→Sonnet by gryakuza 2026-02-25）
+    # M-6: Sonnet起動（失敗時はSTATEロールバック）（仕様変更: Opus→Sonnet by smith 2026-02-25）
     if ! tmux respawn-pane -k -t "$pane_target" \
         "claude --model claude-sonnet-4-6 --dangerously-skip-permissions" 2>/dev/null; then
         log "ERROR: spawn_yakuzatengu respawn-pane失敗。ロールバック。"
@@ -1070,17 +1070,17 @@ should_despawn_yakuzatengu() {
     fi
 
     # ヤマヒロ復帰判定
-    local gryakuza_unread
-    gryakuza_unread=$(get_inbox_unread_count "gryakuza")
-    local gryakuza_thinking=false
+    local smith_unread
+    smith_unread=$(get_inbox_unread_count "smith")
+    local smith_thinking=false
     local pane
-    pane=$(get_pane_target "gryakuza")
+    pane=$(get_pane_target "smith")
     if [[ -n "$pane" ]] && agent_is_thinking "$pane"; then
-        gryakuza_thinking=true
+        smith_thinking=true
     fi
 
     # 復帰条件: inbox未読<3 AND thinking解消
-    if [[ $gryakuza_unread -lt 3 && "$gryakuza_thinking" == "false" ]]; then
+    if [[ $smith_unread -lt 3 && "$smith_thinking" == "false" ]]; then
         # 2サイクル確認（M-2）
         if [[ -f "$STATE_DIR/yakuzatengu_despawn_pending" ]]; then
             log "yakuzatengu despawn: 2サイクル目確認OK。despawn実行。"
@@ -1311,9 +1311,9 @@ check_agent() {
     # ─── Detection logic ───
 
     # (0) Yakuza Tengu spawn check (BUG-SPAWN-1 fix: must run BEFORE thinking detection)
-    # Reason: gryakuza is most likely thinking when inbox piles up (= when tengu is needed).
+    # Reason: smith is most likely thinking when inbox piles up (= when tengu is needed).
     # Previously at L1126, blocked by thinking early return. Moved here to ensure evaluation.
-    if [[ "$agent_id" == "gryakuza" ]]; then
+    if [[ "$agent_id" == "smith" ]]; then
         if ! is_yakuzatengu_active; then
             if should_spawn_yakuzatengu "$agent_id"; then
                 spawn_yakuzatengu "$agent_id"
@@ -1349,8 +1349,8 @@ check_agent() {
             log "[KARATE] ${agent_id} がThinking${thinking_elapsed}秒！THINKING_TIMEOUT(${THINKING_TIMEOUT}秒)超過！"
             rm -f "$thinking_state_file"
 
-            # gryakuza / yakuzatengu are limited to Stage 1 only (m2 fix + S-5)
-            if [[ "$agent_id" == "gryakuza" ]] || [[ "$agent_id" == "yakuzatengu" ]]; then
+            # team leads / yakuzatengu are limited to Stage 1 only (m2 fix + S-5)
+            if [[ "$agent_id" == "smith" ]] || [[ "$agent_id" == "tajiba" ]] || [[ "$agent_id" == "yakuzatengu" ]]; then
                 stage1_suriken "$agent_id" "thinking超過（${thinking_elapsed}秒）"
                 update_cooldown "$agent_id" "stage1"
                 return 0
@@ -1383,10 +1383,10 @@ check_agent() {
         return 0
     fi
 
-    # m2 fix: gryakuza is limited to Stage 1 only (monitor_context.sh has priority)
-    local gryakuza_stage1_only=false
-    if [[ "$agent_id" == "gryakuza" ]]; then
-        gryakuza_stage1_only=true
+    # m2 fix: team leads are limited to Stage 1 only (monitor_context.sh has priority)
+    local lead_stage1_only=false
+    if [[ "$agent_id" == "smith" ]] || [[ "$agent_id" == "tajiba" ]]; then
+        lead_stage1_only=true
         # NOTE: spawn判定は(0)に移動済み（BUG-SPAWN-1 fix）。ここでは不要。
     fi
 
@@ -1402,8 +1402,8 @@ check_agent() {
 
         # Check if inbox is still unread after 2 minutes
         if [[ $elapsed -ge $NUDGE_NO_RESPONSE ]] && [[ "$has_unread" == "true" ]]; then
-            # m2 fix: Skip Stage 2 for gryakuza (spawn already handled above)
-            if [[ "$gryakuza_stage1_only" == "true" ]]; then
+            # m2 fix: Skip Stage 2 for smith (spawn already handled above)
+            if [[ "$lead_stage1_only" == "true" ]]; then
                 log "SKIP: ${agent_id} is limited to Stage 1 (monitor_context.sh priority)"
                 return 0
             fi
@@ -1438,8 +1438,8 @@ check_agent() {
 
         # Check if inbox is still unread after 2 minutes AND /clear had no effect
         if [[ $elapsed -ge $NUDGE_NO_RESPONSE ]] && [[ "$has_unread" == "true" ]]; then
-            # m2 fix: Skip Stage 3 for gryakuza / S-5: yakuzatengu Stage 1 only
-            if [[ "$gryakuza_stage1_only" == "true" ]] || [[ "$agent_id" == "yakuzatengu" ]]; then
+            # m2 fix: Skip Stage 3 for smith / S-5: yakuzatengu Stage 1 only
+            if [[ "$lead_stage1_only" == "true" ]] || [[ "$agent_id" == "yakuzatengu" ]]; then
                 log "SKIP: ${agent_id} is limited to Stage 1 (monitor_context.sh priority)"
                 return 0
             fi

@@ -58,7 +58,7 @@ multi-agent-shogun/
 │
 ├── instructions/         # Agent behavior definitions
 │   ├── darkninja.md         # Darkninja (commander) instructions
-│   ├── gryakuza.md           # Gryakuza (manager) instructions
+│   ├── smith.md           # Team Lead (manager) instructions
 │   ├── yakuza.md       # Yakuza (worker) instructions
 │   ├── cli_specific/     # CLI-specific tool descriptions
 │   │   ├── claude_tools.md
@@ -192,7 +192,7 @@ All shell scripts must adhere to these standards:
    # Function: send_message
    # Description: Writes a message to an agent's inbox
    # Arguments:
-   #   $1 - target_agent (darkninja|gryakuza|yakuza1-8)
+   #   $1 - target_agent (darkninja|smith|yakuza1-8)
    #   $2 - message content
    # Returns: 0 on success, 1 on error
    send_message() {
@@ -254,7 +254,7 @@ The project uses a three-tier testing strategy:
 |-------|------|------|----------|-------------|
 | L1 | Unit | bats | `tests/unit/` | `make test` |
 | L2 | Integration | bats | `tests/integration/` | `make test-int` |
-| L3 | End-to-End | Manual | N/A | Gryakuza executes |
+| L3 | End-to-End | Manual | N/A | Team Lead executes |
 
 ### SKIP = FAIL Policy
 
@@ -302,9 +302,9 @@ teardown() {
 }
 
 @test "inbox_write.sh creates inbox file" {
-    run bash scripts/inbox_write.sh gryakuza "test message" cmd_new darkninja
+    run bash scripts/inbox_write.sh smith "test message" cmd_new darkninja
     [ "$status" -eq 0 ]
-    [ -f "queue/inbox/gryakuza.yaml" ]
+    [ -f "queue/inbox/smith.yaml" ]
 }
 ```
 
@@ -332,7 +332,7 @@ teardown() {
    }
    ```
 
-4. **E2E tests**: Only Gryakuza can execute E2E tests (requires multi-agent control)
+4. **E2E tests**: Only Team Lead can execute E2E tests (requires multi-agent control)
 
 ---
 

@@ -1,8 +1,8 @@
 #!/bin/bash
 # inbox_write.sh — メールボックスへのメッセージ書き込み（排他ロック付き）
 # Usage: bash scripts/inbox_write.sh <target_agent> <content> [type] [from] [task_yaml_path] [priority]
-# Example: bash scripts/inbox_write.sh gryakuza "ヤクザ5号、任務完了" report_received yakuza5 "" P1
-# Example (task_assigned): bash scripts/inbox_write.sh yakuza3 "タスクYAML読んで作業開始" task_assigned gryakuza queue/tasks/yakuza3_subtask_237c.yaml P2
+# Example: bash scripts/inbox_write.sh smith "ヤクザ5号、任務完了" report_received yakuza5 "" P1
+# Example (task_assigned): bash scripts/inbox_write.sh yakuza3 "タスクYAML読んで作業開始" task_assigned smith queue/tasks/yakuza3_subtask_237c.yaml P2
 
 # macOS SSH non-interactive shell PATH fix (Homebrew binaries not loaded by default)
 export PATH=/opt/homebrew/bin:/usr/local/bin:$PATH
@@ -119,7 +119,7 @@ try:
     #   task_yaml fields:
     #     dispatch_ack:
     #       received_at: "2026-02-28T15:00:00+09:00"
-    #       acknowledged_by: gryakuza_neo
+    #       acknowledged_by: yamahiro
     #   Flow: receiver updates task_yaml dispatch_ack → SSH ACK → Kyoto confirms delivery.
     #   ACK timeout 90s → ntfy fallback re-send. msg_id dedup prevents double execution.
     msg_id = os.environ['INBOX_MSG_ID']

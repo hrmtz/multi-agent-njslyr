@@ -7,7 +7,7 @@ display_mode: silent
 cli:
   default: claude
   agents:
-    gryakuza:
+    smith:
       type: claude
       model: sonnet
     yakuza1:

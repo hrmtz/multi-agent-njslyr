@@ -83,15 +83,15 @@ description: {いつこのスキルを使うか、具体的なユースケース
 
 ## 使用フロー
 
-このスキルはGryakuzaがDarkninjaからの指示を受けて使用する。
+このスキルはTeam LeadがDarkninjaからの指示を受けて使用する。
 
-1. Yakuzaがスキル化候補を発見 → Gryakuzaに報告
-2. Gryakuza → Darkninjaに報告
+1. Yakuzaがスキル化候補を発見 → Team Leadに報告
+2. Team Lead → Darkninjaに報告
 3. **Darkninjaが最新仕様をリサーチし、スキル設計を行う**
 4. Darkninjaが人間に承認を依頼（dashboard.md経由）
 5. 人間が承認
-6. Darkninja → Gryakuzaに作成を指示（設計書付き）
-7. **Gryakuza がこのskill-creatorを使用してスキルを作成**
+6. Darkninja → Team Leadに作成を指示（設計書付き）
+7. **Team Lead がこのskill-creatorを使用してスキルを作成**
 8. 完了報告
 
 ※ Darkninjaがリサーチした最新仕様に基づいて作成すること。

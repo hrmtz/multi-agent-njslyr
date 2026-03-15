@@ -144,16 +144,18 @@ fi
 # PUT to Cloudflare KV
 KV_URL="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/storage/kv/namespaces/${CLOUDFLARE_KV_NAMESPACE_ID}/values/agent_status"
 
-HTTP_CODE=$(curl -s -o /tmp/cron_status_push_resp.txt -w '%{http_code}' \
+OUTPUT=$(curl -s -w '\n%{http_code}' \
     -X PUT \
     -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
     -H "Content-Type: application/json" \
     --data-raw "$JSON_PAYLOAD" \
     "${KV_URL}?expiration_ttl=120")
 
+HTTP_CODE=$(echo "$OUTPUT" | tail -n1)
+RESP=$(echo "$OUTPUT" | sed '$d')
+
 if [[ "$HTTP_CODE" == "200" ]]; then
     log "OK: pushed agent_status (${#JSON_PAYLOAD} bytes)"
 else
-    RESP=$(cat /tmp/cron_status_push_resp.txt 2>/dev/null || echo "no response body")
-    log "ERROR: KV PUT returned HTTP ${HTTP_CODE}: ${RESP}"
+    log "ERROR: KV PUT returned HTTP ${HTTP_CODE}: ${RESP:-no response body}"
 fi

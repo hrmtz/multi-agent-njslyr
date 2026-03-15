@@ -54,7 +54,7 @@ setup() {
 
     # 2. Write task_assigned to inbox
     bash "$E2E_QUEUE/scripts/inbox_write.sh" "yakuza1" \
-        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "gryakuza"
+        "タスクYAMLを読んで作業開始せよ。" "task_assigned" "smith"
 
     # 3. Put agent into busy state for 6 seconds BEFORE sending nudge
     send_to_pane "$yakuza1_pane" "busy_hold 6"

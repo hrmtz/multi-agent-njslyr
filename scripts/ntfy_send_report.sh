@@ -69,7 +69,7 @@ _report_ssh_primary() {
     # 2. SSH でリモートinbox_write実行（report_received通知）
     # shellcheck disable=SC2086
     if ssh ${SSH_OPTS} "$peer_host" \
-        "bash '${peer_project}/scripts/inbox_write.sh' gryakuza \
+        "bash '${peer_project}/scripts/inbox_write.sh' smith \
         'SSH report受信: ${report_id} → queue/reports/${report_filename} 保存済み。' \
         report_received ntfy_listener '${remote_report_path}'" 2>/dev/null; then
         echo "[$(date '+%Y-%m-%dT%H:%M:%S')] SSH fallback SUCCESS → ${peer_host}:${remote_report_path}" >> "$log_file"

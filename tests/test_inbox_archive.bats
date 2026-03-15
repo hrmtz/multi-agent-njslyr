@@ -47,21 +47,21 @@ create_test_inbox() {
     cat > "$inbox_file" << 'EOF'
 messages:
 - content: 'メッセージ1（read済）'
-  from: gryakuza
+  from: smith
   id: msg_001
   priority: P2
   read: true
   timestamp: '2026-02-18T01:00:00'
   type: task_assigned
 - content: 'メッセージ2（read済）'
-  from: gryakuza
+  from: smith
   id: msg_002
   priority: P2
   read: true
   timestamp: '2026-02-18T02:00:00'
   type: task_assigned
 - content: 'メッセージ3（read済）'
-  from: gryakuza
+  from: smith
   id: msg_003
   priority: P1
   read: true

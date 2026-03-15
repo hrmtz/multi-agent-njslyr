@@ -612,7 +612,7 @@ MOCK
         cat > "$INBOX" << "YAML"
 messages:
 - id: msg_clear
-  from: gryakuza
+  from: smith
   timestamp: "2026-02-10T14:00:00+09:00"
   type: clear_command
   content: redo

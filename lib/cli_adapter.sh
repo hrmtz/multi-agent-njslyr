@@ -181,7 +181,10 @@ get_instruction_file() {
 
     case "$agent_id" in
         darkninja) role="darkninja" ;;
-        gryakuza)  role="gryakuza" ;;
+        smith)     role="smith" ;;
+        tajiba)    role="tajiba" ;;
+        yamahiro)  role="yamahiro" ;;
+        kusuba)    role="kusuba" ;;
         soukaiya)  role="soukaiya" ;;
         yakuza*)   role="yakuza" ;;
         *)
@@ -268,7 +271,7 @@ get_agent_model() {
         kimi)
             # Kimi CLI用デフォルトモデル
             case "$agent_id" in
-                darkninja|gryakuza) echo "k2.5" ;;
+                darkninja|smith|tajiba|yamahiro|kusuba) echo "k2.5" ;;
                 yakuza*)            echo "k2.5" ;;
                 *)                  echo "k2.5" ;;
             esac
@@ -277,7 +280,7 @@ get_agent_model() {
             # Claude Code/Codex/Copilot用デフォルトモデル
             case "$agent_id" in
                 darkninja)      echo "opus" ;;
-                gryakuza)       echo "sonnet" ;;
+                smith|tajiba|yamahiro|kusuba) echo "sonnet" ;;
                 soukaiya)       echo "opus" ;;
                 yakuza*)        echo "sonnet" ;;
                 *)              echo "sonnet" ;;

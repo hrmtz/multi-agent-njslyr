@@ -59,14 +59,14 @@ resolve_pane_by_agent_id() {
 # Returns: "kyoto" | "neosaitama" | "active" (active_machineに依存)
 # - kyoto固定: darkninja, master_tortoise
 # - neosaitama固定: master_crane
-# - active: gryakuza, yakuza1-7, soukaiya（稼働マシン次第）
+# - active: smith, yakuza1-7, soukaiya（稼働マシン次第）
 resolve_agent_machine() {
     local agent_id="$1"
     case "$agent_id" in
         darkninja)       echo "kyoto" ;;
         master_tortoise) echo "kyoto" ;;
         master_crane)    echo "neosaitama" ;;
-        *)               echo "active" ;;  # gryakuza, yakuza1-7, soukaiya, yakuzatengu
+        *)               echo "active" ;;  # smith, yakuza1-7, soukaiya, yakuzatengu
     esac
 }
 

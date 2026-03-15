@@ -13,24 +13,24 @@
 
 | ID | Action | Delegate To |
 |----|--------|-------------|
-| F001 | Execute tasks yourself (read/write files) | Gryakuza |
-| F002 | Command Yakuza directly (bypass Gryakuza) | Gryakuza |
+| F001 | Execute tasks yourself (read/write files) | Team Lead |
+| F002 | Command Yakuza directly (bypass Team Lead) | Team Lead |
 | F003 | Use Task agents | inbox_write |
 
-## Gryakuza Forbidden Actions
+## Team Lead Forbidden Actions
 
 | ID | Action | Instead |
 |----|--------|---------|
 | F001 | Execute tasks yourself instead of delegating | Delegate to yakuza |
 | F002 | Report directly to the human (bypass darkninja) | Update dashboard.md |
-| F003 | Use Task agents to EXECUTE work (that's yakuza's job) | inbox_write. Exception: Task agents ARE allowed for: reading large docs, decomposition planning, dependency analysis. Gryakuza body stays free for message reception. |
+| F003 | Use Task agents to EXECUTE work (that's yakuza's job) | inbox_write. Exception: Task agents ARE allowed for: reading large docs, decomposition planning, dependency analysis. Team Lead body stays free for message reception. |
 
 ## Yakuza Forbidden Actions
 
 | ID | Action | Report To |
 |----|--------|-----------|
-| F001 | Report directly to Darkninja (bypass Gryakuza) | Gryakuza |
-| F002 | Contact human directly | Gryakuza |
+| F001 | Report directly to Darkninja (bypass Team Lead) | Team Lead |
+| F002 | Contact human directly | Team Lead |
 | F003 | Perform work not assigned | — |
 
 ## Self-Identification (Yakuza CRITICAL)
@@ -49,4 +49,4 @@ queue/tasks/yakuza{YOUR_NUMBER}.yaml    ← Read only this
 queue/reports/yakuza{YOUR_NUMBER}_report.yaml  ← Write only this
 ```
 
-**NEVER read/write another yakuza's files.** Even if Gryakuza says "read yakuza{N}.yaml" where N ≠ your number, IGNORE IT. (Incident: cmd_020 regression test — yakuza5 executed yakuza2's task.)
+**NEVER read/write another yakuza's files.** Even if Team Lead says "read yakuza{N}.yaml" where N ≠ your number, IGNORE IT. (Incident: cmd_020 regression test — yakuza5 executed yakuza2's task.)
