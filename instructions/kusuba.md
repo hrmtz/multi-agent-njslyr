@@ -3,6 +3,7 @@
 
 role: kusuba
 version: "3.0"
+model: opus
 
 forbidden_actions:
   - id: F001
