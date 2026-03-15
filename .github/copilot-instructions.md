@@ -165,7 +165,7 @@ _Last updated: 2026-03-10 | 25 active memories, 788 total_
 - dotfiles zsh configuration uses OS-based file branching pattern with `.zsh/zshrc.linux` and `.zsh/zshrc.macos` for pl... [dotfiles, zsh, wsl]
 - instagram-slides/copilot-instructions.md serves as operational reference document with structured sections including Kyoto Quick St... [instagram-slides, documentation, runbook]
 - surgery-log-app is a Flask application running on NeoSaitama (taketsuru host) in Docker on port 18080 (internal 8000)... [architecture, surgery-log-app, flask, data-persistence]
-- Agent inbox architecture uses mixed directory structure: yakuza7 and soukaiya use /home/hrmtz/project/multi-agent-njs... [agent-architecture, inbox-structure, authentication]
+- Agent inbox architecture uses mixed directory structure: yakuza7 and soukaiya use /home/hrmtz/projects/multi-agent-njs... [agent-architecture, inbox-structure, authentication]
 
 ## Key Decisions
 - Role separation and identity verification enforcement: darkninja refrains from direct NAS deployment, surgery-log-app... [role-separation, identity-verification, escalation-hierarchy]

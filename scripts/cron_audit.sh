@@ -1,6 +1,6 @@
 #!/bin/bash
 # cron_audit.sh — 4時間間隔でcrontab衛生チェック + ログ肥大の自動切り詰め
-# Usage: 0 */4 * * * bash /home/hrmtz/project/multi-agent-njslyr/scripts/cron_audit.sh
+# Usage: 0 */4 * * * bash /home/hrmtz/projects/multi-agent-njslyr/scripts/cron_audit.sh
 #
 # Checks:
 #   1. Ghost entries: crontab行のスクリプトが存在しない

@@ -1,6 +1,6 @@
 #!/bin/bash
 # cron_cmd_monitor.sh — 30分間隔でdarkninjaにcmd進捗確認を促すinboxを投入
-# Usage: */30 * * * * bash /home/hrmtz/project/multi-agent-njslyr/scripts/cron_cmd_monitor.sh
+# Usage: */30 * * * * bash /home/hrmtz/projects/multi-agent-njslyr/scripts/cron_cmd_monitor.sh
 #
 # Flow:
 #   1. pending/in_progress の cmd_*.yaml が存在するか確認

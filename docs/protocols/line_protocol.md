@@ -95,13 +95,13 @@ bash scripts/line_image_download.sh <message_id>
 
 ```bash
 # ntfy_listener: 毎分実行
-* * * * * cd /home/hrmtz/project/multi-agent-njslyr && bash scripts/ntfy_listener.sh
+* * * * * cd /home/hrmtz/projects/multi-agent-njslyr && bash scripts/ntfy_listener.sh
 
 # 日報送信: 毎日22時
-0 22 * * * cd /home/hrmtz/project/multi-agent-njslyr && bash scripts/cron_njslyr_report.sh
+0 22 * * * cd /home/hrmtz/projects/multi-agent-njslyr && bash scripts/cron_njslyr_report.sh
 
 # 画像クリーンアップ: 毎日3時
-0 3 * * * find /home/hrmtz/project/multi-agent-njslyr/reel/line_images -mtime +7 -delete
+0 3 * * * find /home/hrmtz/projects/multi-agent-njslyr/reel/line_images -mtime +7 -delete
 ```
 
 ---

@@ -77,7 +77,7 @@ bash scripts/inbox_write.sh soukaiya \
 ```bash
 bash scripts/task_complete.sh <task_id> <yakuza_number> <project_path>
 # 例:
-bash scripts/task_complete.sh subtask_360a 1 /home/hrmtz/project/multi-agent-njslyr
+bash scripts/task_complete.sh subtask_360a 1 /home/hrmtz/projects/multi-agent-njslyr
 ```
 
 スクリプトが行うこと:

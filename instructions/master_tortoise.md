@@ -150,7 +150,7 @@ sleep 60
 
 Kyotoのcronが毎分surikenを送信する（自律ループが何らかの理由で止まった場合の復帰シグナル）:
 ```
-* * * * * cd /home/hrmtz/project/multi-agent-njslyr && bash scripts/njslyr_cmd.sh suriken master_tortoise
+* * * * * cd /home/hrmtz/projects/multi-agent-njslyr && bash scripts/njslyr_cmd.sh suriken master_tortoise
 ```
 - surikenを受信した場合: inbox確認後、サイクルを実行してsleep 60→次サイクル
 - 自律ループ中にsurikenが届いた場合: sleep完了後の次サイクルで自然にinboxを処理
@@ -428,7 +428,7 @@ logs/autocomplete_stuck.log
 ```bash
 SSH_OPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
 PEER_HOST="<peer-hostname>"  # MBP/crane の Tailscale ホスト名
-PEER_PROJECT="/Users/hrmtz/project/multi-agent-njslyr"
+PEER_PROJECT="/Users/hrmtz/projects/multi-agent-njslyr"
 
 ssh $SSH_OPTS $PEER_HOST "cat ${PEER_PROJECT}/queue/heartbeat/tortoise.yaml"
 ```

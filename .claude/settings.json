@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$HOME/project/multi-agent-njslyr/scripts/stop_hook_inbox.sh\"",
+            "command": "bash \"$HOME/projects/multi-agent-njslyr/scripts/stop_hook_inbox.sh\"",
             "timeout": 10
           }
         ]

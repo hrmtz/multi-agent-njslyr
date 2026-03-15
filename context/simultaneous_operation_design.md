@@ -265,11 +265,11 @@ queue/inbox/smith.yaml @ NeoSaitama ← Neo smith専用
 
 ```bash
 # Neo smith → Kyoto smith (SSH direct)
-ssh <kyoto-hostname> "cd ~/project/multi-agent-njslyr && \
+ssh <kyoto-hostname> "cd ~/projects/multi-agent-njslyr && \
   bash scripts/inbox_write.sh smith '完了報告' report_received smith@neo"
 
 # Kyoto smith → Neo smith (SSH direct)
-ssh {neo_host} "cd ~/project/multi-agent-njslyr && \
+ssh {neo_host} "cd ~/projects/multi-agent-njslyr && \
   bash scripts/inbox_write.sh smith 'タスク割り当て' task_assigned smith@kyoto"
 ```
 
@@ -301,12 +301,12 @@ SSH失敗時（NeoSaitamaスリープ等）のフォールバック → ntfy dis
 
 ```bash
 # NeoSaitama → Kyoto (Neo smith → Kyoto smith)
-ssh <kyoto-hostname> "cd ~/project/multi-agent-njslyr && \
+ssh <kyoto-hostname> "cd ~/projects/multi-agent-njslyr && \
   bash scripts/inbox_write.sh smith '完了報告内容' report_received smith@neo \
   queue/reports/neo_report_xxx.yaml P1"
 
 # Kyoto → NeoSaitama (Kyoto smith → Neo smith)
-ssh {neo_tailscale_host} "cd ~/project/multi-agent-njslyr && \
+ssh {neo_tailscale_host} "cd ~/projects/multi-agent-njslyr && \
   bash scripts/inbox_write.sh smith 'タスク割り当て' task_assigned smith@kyoto \
   queue/tasks/neo_task_xxx.yaml P2"
 ```
@@ -316,11 +316,11 @@ ssh {neo_tailscale_host} "cd ~/project/multi-agent-njslyr && \
 ```bash
 # Neo → Kyoto (rsync via SSH) — cross_sync.sh を利用
 rsync -avz --rsh=ssh queue/reports/neo_report_xxx.yaml \
-  <kyoto-hostname>:~/project/multi-agent-njslyr/queue/reports/
+  <kyoto-hostname>:~/projects/multi-agent-njslyr/queue/reports/
 
 # Kyoto → Neo (rsync via SSH)
 rsync -avz --rsh=ssh queue/tasks/neo_task_xxx.yaml \
-  {neo_host}:~/project/multi-agent-njslyr/queue/tasks/
+  {neo_host}:~/projects/multi-agent-njslyr/queue/tasks/
 ```
 
 **gitプッシュ（SSHダイレクト）**:
@@ -328,7 +328,7 @@ rsync -avz --rsh=ssh queue/tasks/neo_task_xxx.yaml \
 ```bash
 # NeoSaitama → GitHub（現行維持） → Kyoto pullのサイクル
 # SSH加速オプション: Kyotoをgitリモートとして追加（今後検討）
-# git remote add kyoto-direct <kyoto-hostname>:~/project/multi-agent-njslyr
+# git remote add kyoto-direct <kyoto-hostname>:~/projects/multi-agent-njslyr
 # git push kyoto-direct feat/cmd_XXX-neo
 ```
 

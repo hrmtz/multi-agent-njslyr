@@ -1,7 +1,7 @@
 #!/bin/bash
 # task_complete.sh — ヤクザ完了報告の4ステップを1コマンドで実行
 # Usage: bash scripts/task_complete.sh <task_id> <yakuza_number> <project_path>
-# Example: bash scripts/task_complete.sh subtask_360a 1 /home/hrmtz/project/multi-agent-njslyr
+# Example: bash scripts/task_complete.sh subtask_360a 1 /home/hrmtz/projects/multi-agent-njslyr
 #
 # Steps:
 #   1. Report YAML 生成 (queue/reports/yakuza{N}_report_{task_id}.yaml)
@@ -20,7 +20,7 @@ PROJECT_PATH="${3:-}"
 # Argument validation
 if [ -z "$TASK_ID" ] || [ -z "$YAKUZA_NUM" ] || [ -z "$PROJECT_PATH" ]; then
     echo "Usage: bash scripts/task_complete.sh <task_id> <yakuza_number> <project_path>" >&2
-    echo "Example: bash scripts/task_complete.sh subtask_360a 1 /home/hrmtz/project/multi-agent-njslyr" >&2
+    echo "Example: bash scripts/task_complete.sh subtask_360a 1 /home/hrmtz/projects/multi-agent-njslyr" >&2
     exit 1
 fi
 

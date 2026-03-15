@@ -50,7 +50,7 @@ EOF
 machine:
   role: neosaitama
   peer_host: test-peer-host
-  peer_project_root: /Users/hrmtz/project/multi-agent-njslyr
+  peer_project_root: /Users/hrmtz/projects/multi-agent-njslyr
 EOF
 
     # Mock inbox_write.sh for local notification calls
@@ -110,7 +110,7 @@ EOF
     cat > "$TEST_TMPDIR/config/settings.yaml" << 'EOF'
 machine:
   role: neosaitama
-  peer_project_root: /Users/hrmtz/project/multi-agent-njslyr
+  peer_project_root: /Users/hrmtz/projects/multi-agent-njslyr
 EOF
     run bash "$TEST_SCRIPT" smith "test" task_assigned yakuza3
     [ "$status" -eq 1 ]

@@ -52,7 +52,7 @@ EOF
 machine:
   role: kyoto
   peer_host: test-peer-host
-  peer_project_root: /Users/hrmtz/project/multi-agent-njslyr
+  peer_project_root: /Users/hrmtz/projects/multi-agent-njslyr
 EOF
 
     # inbox_write.sh モック (ローカル呼び出し用)
@@ -252,7 +252,7 @@ EOF
     cat > "$TEST_TMPDIR/config/settings.yaml" << 'EOF'
 machine:
   role: kyoto
-  peer_project_root: /Users/hrmtz/project/multi-agent-njslyr
+  peer_project_root: /Users/hrmtz/projects/multi-agent-njslyr
 EOF
     run bash "$TEST_SCRIPT" "smith" "test" "task_assigned" "yakuza3"
     [ "$status" -eq 1 ]

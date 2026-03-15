@@ -386,7 +386,7 @@ logs/autocomplete_stuck.log
 ```bash
 SSH_OPTS="-o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
 PEER_HOST="<kyoto-hostname>"  # Ryzen WSL/tortoise の Tailscale ホスト名
-PEER_PROJECT="/home/hrmtz/project/multi-agent-njslyr"
+PEER_PROJECT="/home/hrmtz/projects/multi-agent-njslyr"
 
 ssh $SSH_OPTS $PEER_HOST "cat ${PEER_PROJECT}/queue/heartbeat/crane.yaml"
 ```

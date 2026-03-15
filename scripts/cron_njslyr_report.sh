@@ -1,6 +1,6 @@
 #!/bin/bash
 # cron_njslyr_report.sh — 毎日22:00に忍殺語日報タスクをdarkninjaに投入する
-# Usage: 0 22 * * * bash /home/hrmtz/project/multi-agent-njslyr/scripts/cron_njslyr_report.sh
+# Usage: 0 22 * * * bash /home/hrmtz/projects/multi-agent-njslyr/scripts/cron_njslyr_report.sh
 #
 # Flow:
 #   1. tmuxセッション(multiagent)存在確認
