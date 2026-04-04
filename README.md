@@ -813,6 +813,55 @@ mcp__memory__read_graph()
 
 ---
 
+## Known Issues
+
+<!-- ISSUE: WSL crash caused by systemd service path mismatch (2026-04-04)
+
+### Symptom
+WSL (Kyoto/Ryzen) crashes when heavy tasks are running.
+`systemctl poweroff` fails to terminate within 10s, triggering forced `reboot(RB_POWER_OFF)`.
+Journal logs show corrupted/unclean shutdown on every boot.
+
+### Root Cause
+`multi-agent-njslyr.service` points to `/home/hrmtz/project/multi-agent-njslyr/` (singular)
+but the actual repo lives at `/home/hrmtz/projects/multi-agent-njslyr/` (plural).
+
+This causes:
+1. `multi-agent-njslyr.service` — ExecStart fails with status=203/EXEC (script not found)
+2. `multi-agent-njslyr-watchdog.service` — retries every 60s, all fail, flooding journal
+3. `cross-sync-watch.service` — WorkingDirectory missing, retries every ~10s
+
+The constant process spawning and journal writes destabilize WSL's systemd,
+preventing clean shutdown and causing forced termination.
+
+### Evidence (journalctl)
+- `InitTerminateInstanceInternal:2708: systemctl poweroff did not terminate the instance in 10000 ms`
+- `system.journal corrupted or uncleanly shut down, renaming and replacing`
+- Boot history shows 2 crashes: 2026-04-03 20:21 JST, 2026-04-04 07:39 JST
+
+### Fix
+Option A — Fix the path in the service file:
+  ```
+  sed -i 's|/home/hrmtz/project/multi-agent-njslyr|/home/hrmtz/projects/multi-agent-njslyr|g' \
+    ~/.config/systemd/user/multi-agent-njslyr.service
+  systemctl --user daemon-reload
+  ```
+
+Option B — Disable the services until needed:
+  ```
+  systemctl --user disable --now multi-agent-njslyr.service
+  systemctl --user disable --now multi-agent-njslyr-watchdog.service
+  systemctl --user disable --now cross-sync-watch.service
+  ```
+
+### Note
+Memory is NOT the cause. 62GB total / 60GB free at time of investigation.
+`autoMemoryReclaim=gradual` is configured in .wslconfig.
+
+-->
+
+---
+
 ## Credits
 
 Based on [Claude-Code-Communication](https://github.com/Akira-Papa/Claude-Code-Communication) by Akira-Papa.

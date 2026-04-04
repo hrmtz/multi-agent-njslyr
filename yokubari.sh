@@ -909,7 +909,7 @@ if [[ "$MACHINE_ROLE" == "neosaitama" || "$MACHINE_ROLE" == "mbp" ]]; then
     if [ "$KESSEN_MODE" = true ]; then
         MODEL_NAMES=("Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus" "Opus")
     else
-        MODEL_NAMES=("Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus")
+        MODEL_NAMES=("Opus" "Opus" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Sonnet" "Opus")
     fi
 
     # 小型ターミナル（132x40）対応: ペイン分割前に仮想サイズを強制設定
